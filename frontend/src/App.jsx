@@ -1,6 +1,6 @@
 import Sidebar from "./components/Layout/Sidebar";
 import Header from "./components/Layout/Header";
-import Kanban from "./pages/Kanban";
+import Kanban from "./components/Kanban/Board";
 
 export default function App() {
   return (

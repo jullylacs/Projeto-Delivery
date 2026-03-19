@@ -1,16 +1,89 @@
 export default function Sidebar() {
   return (
     <div style={{
-      width: "220px",
+      width: "250px",
       height: "100vh",
-      background: "#1e1f25",
+      background: "linear-gradient(180deg, #240046, #3c096c)",
       color: "#fff",
-      padding: "20px"
+      display: "flex",
+      flexDirection: "column",
+      padding: "25px 15px",
+      borderRight: "1px solid rgba(255,255,255,0.05)"
     }}>
-      <h2>Kanban</h2>
-      <p>Dashboard</p>
-      <p>Kanban</p>
-      <p>Agenda</p>
+      
+      {/* Logo */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "40px"
+      }}>
+        <div style={{
+          width: "45px",
+          height: "45px",
+          borderRadius: "12px",
+          background: "linear-gradient(135deg, #9d4edd, #c77dff)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "20px"
+        }}>
+          🚀
+        </div>
+        <h2 style={{ margin: 0, fontWeight: "500" }}>
+          Delivery
+        </h2>
+      </div>
+
+      {/* Menu */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+
+        {[
+          { name: "Dashboard", icon: "📊", active: true },
+          { name: "Kanban", icon: "🗂️" },
+          { name: "Agenda", icon: "📅" },
+        ].map((item, index) => (
+          <div
+            key={index}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              padding: "12px 15px",
+              borderRadius: "12px",
+              cursor: "pointer",
+              background: item.active 
+                ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" 
+                : "transparent",
+              transition: "0.2s",
+              fontSize: "14px"
+            }}
+            onMouseEnter={(e) => {
+              if (!item.active)
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+            }}
+            onMouseLeave={(e) => {
+              if (!item.active)
+                e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <span>{item.icon}</span>
+            <span>{item.name}</span>
+          </div>
+        ))}
+
+      </div>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: "auto",
+        fontSize: "12px",
+        opacity: 0.6,
+        textAlign: "center"
+      }}>
+        © 2026 Delivery System
+      </div>
+
     </div>
   );
 }

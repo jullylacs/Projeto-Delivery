@@ -10,9 +10,7 @@ export default function Column({ title, cards }) {
       minHeight: "400px"
     }}>
       <h4>{title}</h4>
-      {cards.map(card => (
-        <Card key={card._id} card={card} />
-      ))}
+      {cards.map(card => <Card key={card._id} card={card} />)}
     </div>
   );
 }
