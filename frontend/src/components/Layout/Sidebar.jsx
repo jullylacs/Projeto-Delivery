@@ -1,4 +1,15 @@
+import { useNavigate, useLocation } from "react-router-dom";
+
 export default function Sidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const menuItems = [
+    { name: "Dashboard", icon: "📊", path: "/dashboard" },
+    { name: "Kanban", icon: "🗂️", path: "/kanban" },
+    { name: "Agenda", icon: "📅", path: "/agenda" },
+  ];
+
   return (
     <div style={{
       width: "250px",
@@ -16,8 +27,11 @@ export default function Sidebar() {
         display: "flex",
         alignItems: "center",
         gap: "12px",
-        marginBottom: "40px"
-      }}>
+        marginBottom: "40px",
+        cursor: "pointer"
+      }}
+      onClick={() => navigate("/dashboard")}
+      >
         <div style={{
           width: "45px",
           height: "45px",
@@ -38,39 +52,39 @@ export default function Sidebar() {
       {/* Menu */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 
-        {[
-          { name: "Dashboard", icon: "📊", active: true },
-          { name: "Kanban", icon: "🗂️" },
-          { name: "Agenda", icon: "📅" },
-        ].map((item, index) => (
-          <div
-            key={index}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              padding: "12px 15px",
-              borderRadius: "12px",
-              cursor: "pointer",
-              background: item.active 
-                ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" 
-                : "transparent",
-              transition: "0.2s",
-              fontSize: "14px"
-            }}
-            onMouseEnter={(e) => {
-              if (!item.active)
-                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-            }}
-            onMouseLeave={(e) => {
-              if (!item.active)
-                e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <span>{item.icon}</span>
-            <span>{item.name}</span>
-          </div>
-        ))}
+        {menuItems.map((item, index) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <div
+              key={index}
+              onClick={() => navigate(item.path)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "12px 15px",
+                borderRadius: "12px",
+                cursor: "pointer",
+                background: isActive 
+                  ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" 
+                  : "transparent",
+                transition: "0.2s",
+                fontSize: "14px"
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive)
+                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive)
+                  e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <span>{item.icon}</span>
+              <span>{item.name}</span>
+            </div>
+          );
+        })}
 
       </div>
 

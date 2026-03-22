@@ -1,4 +1,15 @@
+import { useNavigate } from "react-router-dom";
+
 export default function Header() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Limpar dados de sessão se houver
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
+
   return (
     <div style={{
       height: "70px",
@@ -37,6 +48,8 @@ export default function Header() {
             background: "rgba(255,255,255,0.1)",
             color: "#fff"
           }}
+          onFocus={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+          onBlur={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
         />
 
         {/* Notificação */}
@@ -48,8 +61,12 @@ export default function Header() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          cursor: "pointer"
-        }}>
+          cursor: "pointer",
+          transition: "0.2s"
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+        onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+        >
           🔔
         </div>
 
@@ -74,6 +91,31 @@ export default function Header() {
           </div>
           <span style={{ fontSize: "14px" }}>Júlia</span>
         </div>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "8px",
+            border: "1px solid rgba(255,255,255,0.3)",
+            background: "transparent",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: "14px",
+            transition: "0.2s"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
+          }}
+        >
+          Sair
+        </button>
 
       </div>
     </div>
