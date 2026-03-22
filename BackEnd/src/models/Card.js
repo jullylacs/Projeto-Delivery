@@ -12,7 +12,16 @@ const CardSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
   },
+  titulo: String,
   tipoServico: String,
+  preco: Number,
+  comments: [
+    {
+      text: String,
+      author: String,
+      createdAt: Date,
+    }
+  ],
   ip: String,
   sla: Number,
   prazo: Date,
