@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 
+// Componente da barra lateral com menu de navegação
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();

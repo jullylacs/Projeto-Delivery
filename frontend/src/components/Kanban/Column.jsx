@@ -1,5 +1,6 @@
 import Card from "./Card";
 
+// Componente que representa uma coluna do Kanban, contendo um título e uma lista de cards
 export default function Column({ title, cards }) {
   return (
     <div style={{

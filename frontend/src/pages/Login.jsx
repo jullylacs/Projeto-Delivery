@@ -2,16 +2,19 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 
+// Página de login da aplicação
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState(""); // Email do usuário
+  const [senha, setSenha] = useState(""); // Senha do usuário
+  const [perfil, setPerfil] = useState("comercial"); // Perfil do usuário
+  const [loading, setLoading] = useState(false); // Estado de carregamento
   const navigate = useNavigate();
 
+  // Função que realiza o login via API
   const login = async () => {
     try {
       setLoading(true);
-      const res = await api.post("/users/login", { email, senha });
+      const res = await api.post("/users/login", { email, senha, perfil });
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
       alert("Logado com sucesso!");
@@ -23,6 +26,7 @@ export default function Login() {
     }
   };
 
+  // Função que permite login ao pressionar Enter
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
       login();
@@ -79,7 +83,7 @@ export default function Login() {
           style={{
             width: "100%",
             padding: "12px 15px",
-            marginBottom: "20px",
+            marginBottom: "15px",
             borderRadius: "8px",
             border: "1px solid rgba(255,255,255,0.2)",
             background: "rgba(255,255,255,0.1)",
@@ -88,6 +92,30 @@ export default function Login() {
             boxSizing: "border-box"
           }}
         />
+
+        <select
+          value={perfil}
+          onChange={e => setPerfil(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "12px 15px",
+            marginBottom: "20px",
+            borderRadius: "8px",
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.1)",
+            color: "#fff",
+            fontSize: "14px",
+            boxSizing: "border-box",
+            cursor: "pointer"
+          }}
+        >
+          <option value="comercial">👔 Comercial</option>
+          <option value="operacional">📋 Operacional</option>
+          <option value="tecnico">🔧 Técnico</option>
+          <option value="gestor">👨‍💼 Gestor</option>
+          <option value="delivery">🚚 Delivery</option>
+          <option value="admin">🔐 Admin</option>
+        </select>
         
         <button
           onClick={login}

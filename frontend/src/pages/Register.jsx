@@ -7,7 +7,8 @@ export default function Register() {
     nome: "",
     email: "",
     senha: "",
-    confirmarSenha: ""
+    confirmarSenha: "",
+    perfil: "comercial"
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,12 +28,20 @@ export default function Register() {
       setError("Nome é obrigatório");
       return false;
     }
+    if (formData.nome.trim().length < 3) {
+      setError("Nome deve ter no mínimo 3 caracteres");
+      return false;
+    }
     if (!formData.email.trim()) {
       setError("Email é obrigatório");
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError("Email inválido");
+      return false;
+    }
+    if (!formData.senha) {
+      setError("Senha é obrigatória");
       return false;
     }
     if (formData.senha.length < 6) {
@@ -51,19 +60,50 @@ export default function Register() {
     
     if (!validateForm()) return;
 
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
-      await api.post("/users/register", {
+      console.log("Tentando registrar com:", {
         nome: formData.nome,
         email: formData.email,
-        senha: formData.senha
+        perfil: formData.perfil
       });
+
+      const response = await api.post("/users/register", {
+        nome: formData.nome.trim(),
+        email: formData.email.trim().toLowerCase(),
+        senha: formData.senha,
+        perfil: formData.perfil
+      });
+
+      console.log("Resposta do servidor:", response.data);
       
       alert("Conta criada com sucesso! Faça login agora.");
       navigate("/login");
     } catch (error) {
-      const mensagem = error.response?.data?.message || "Erro ao registrar. Tente novamente.";
-      setError(mensagem);
+      console.error("Erro detalhado no registro:", error);
+      
+      // Tratamento detalhado de erros
+      if (error.response) {
+        console.log("Dados do erro:", error.response.data);
+        console.log("Status do erro:", error.response.status);
+        
+        if (error.response.status === 400) {
+          setError(error.response.data.message || "Dados inválidos. Verifique os campos.");
+        } else if (error.response.status === 409) {
+          setError("Email já cadastrado. Use outro email ou faça login.");
+        } else if (error.response.status === 500) {
+          setError("Erro no servidor. Tente novamente mais tarde.");
+        } else {
+          setError(error.response.data?.message || "Erro ao registrar. Tente novamente.");
+        }
+      } else if (error.request) {
+        console.log("Sem resposta do servidor:", error.request);
+        setError("Erro de conexão. Verifique se o servidor está rodando.");
+      } else {
+        setError(`Erro: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -80,17 +120,18 @@ export default function Register() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      height: "100vh",
-      background: "linear-gradient(135deg, #240046, #3c096c)"
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #240046, #3c096c)",
+      padding: "20px"
     }}>
       <div style={{
         background: "rgba(255,255,255,0.05)",
-        padding: "50px",
+        padding: "40px",
         borderRadius: "20px",
         border: "1px solid rgba(255,255,255,0.1)",
         backdropFilter: "blur(10px)",
         width: "100%",
-        maxWidth: "420px",
+        maxWidth: "450px",
         color: "#fff"
       }}>
         <h1 style={{ marginBottom: "10px", fontSize: "32px", textAlign: "center" }}>🚀 Delivery</h1>
@@ -107,90 +148,137 @@ export default function Register() {
             fontSize: "14px",
             textAlign: "center"
           }}>
-            {error}
+            ❌ {error}
           </div>
         )}
         
         <form onSubmit={register}>
-          <input
-            type="text"
-            name="nome"
-            placeholder="Nome completo"
-            value={formData.nome}
-            onChange={handleChange}
-            onKeyPress={handleKeyPress}
-            style={{
-              width: "100%",
-              padding: "12px 15px",
-              marginBottom: "15px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.1)",
-              color: "#fff",
-              fontSize: "14px",
-              boxSizing: "border-box"
-            }}
-          />
+          <div style={{ marginBottom: "15px" }}>
+            <input
+              type="text"
+              name="nome"
+              placeholder="Nome completo *"
+              value={formData.nome}
+              onChange={handleChange}
+              onKeyPress={handleKeyPress}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                outline: "none",
+                transition: "all 0.2s"
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#c77dff"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
+            />
+          </div>
           
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            onKeyPress={handleKeyPress}
-            style={{
-              width: "100%",
-              padding: "12px 15px",
-              marginBottom: "15px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.1)",
-              color: "#fff",
-              fontSize: "14px",
-              boxSizing: "border-box"
-            }}
-          />
+          <div style={{ marginBottom: "15px" }}>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email *"
+              value={formData.email}
+              onChange={handleChange}
+              onKeyPress={handleKeyPress}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                outline: "none",
+                transition: "all 0.2s"
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#c77dff"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
+            />
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <select
+              name="perfil"
+              value={formData.perfil}
+              onChange={handleChange}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                cursor: "pointer",
+                outline: "none"
+              }}
+            >
+              <option value="comercial" style={{ background: "#240046" }}>👔 Comercial</option>
+              <option value="operacional" style={{ background: "#240046" }}>📋 Operacional</option>
+              <option value="tecnico" style={{ background: "#240046" }}>🔧 Técnico</option>
+              <option value="gestor" style={{ background: "#240046" }}>👨‍💼 Gestor</option>
+              <option value="delivery" style={{ background: "#240046" }}>🚚 Delivery</option>
+              <option value="admin" style={{ background: "#240046" }}>🔐 Admin</option>
+            </select>
+          </div>
           
-          <input
-            type="password"
-            name="senha"
-            placeholder="Senha"
-            value={formData.senha}
-            onChange={handleChange}
-            onKeyPress={handleKeyPress}
-            style={{
-              width: "100%",
-              padding: "12px 15px",
-              marginBottom: "15px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.1)",
-              color: "#fff",
-              fontSize: "14px",
-              boxSizing: "border-box"
-            }}
-          />
+          <div style={{ marginBottom: "15px" }}>
+            <input
+              type="password"
+              name="senha"
+              placeholder="Senha * (mínimo 6 caracteres)"
+              value={formData.senha}
+              onChange={handleChange}
+              onKeyPress={handleKeyPress}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                outline: "none",
+                transition: "all 0.2s"
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#c77dff"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
+            />
+          </div>
           
-          <input
-            type="password"
-            name="confirmarSenha"
-            placeholder="Confirmar Senha"
-            value={formData.confirmarSenha}
-            onChange={handleChange}
-            onKeyPress={handleKeyPress}
-            style={{
-              width: "100%",
-              padding: "12px 15px",
-              marginBottom: "20px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(255,255,255,0.1)",
-              color: "#fff",
-              fontSize: "14px",
-              boxSizing: "border-box"
-            }}
-          />
+          <div style={{ marginBottom: "25px" }}>
+            <input
+              type="password"
+              name="confirmarSenha"
+              placeholder="Confirmar Senha *"
+              value={formData.confirmarSenha}
+              onChange={handleChange}
+              onKeyPress={handleKeyPress}
+              style={{
+                width: "100%",
+                padding: "12px 15px",
+                borderRadius: "8px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.1)",
+                color: "#fff",
+                fontSize: "14px",
+                boxSizing: "border-box",
+                outline: "none",
+                transition: "all 0.2s"
+              }}
+              onFocus={(e) => e.target.style.borderColor = "#c77dff"}
+              onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
+            />
+          </div>
           
           <button
             type="submit"
@@ -205,14 +293,15 @@ export default function Register() {
               fontSize: "16px",
               fontWeight: "bold",
               cursor: loading ? "not-allowed" : "pointer",
-              transition: "0.2s",
+              transition: "all 0.2s",
               opacity: loading ? 0.7 : 1,
-              marginBottom: "15px"
+              marginBottom: "20px",
+              transform: loading ? "none" : "scale(1)"
             }}
             onMouseEnter={(e) => !loading && (e.currentTarget.style.transform = "scale(1.02)")}
-            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            onMouseLeave={(e) => !loading && (e.currentTarget.style.transform = "scale(1)")}
           >
-            {loading ? "Criando conta..." : "Registrar"}
+            {loading ? "⏳ Criando conta..." : "✅ Registrar"}
           </button>
         </form>
 
