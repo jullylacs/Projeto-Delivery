@@ -1,33 +1,41 @@
+// Importa hooks do React
 import { useEffect, useMemo, useState } from "react";
+// Importa serviço de API customizado
 import api from "../services/api";
+// Componente visual que indica SLA (tempo limite de cards)
 import SLAIndicator from "../components/UI/SLAIndicator";
 
+// Componente principal da página Dashboard
 export default function Dashboard() {
+  // Estado para armazenar os cards do Kanban
   const [cards, setCards] = useState([]);
+  // Estado de carregamento inicial
   const [loading, setLoading] = useState(true);
+  // Estado para armazenar mensagens de erro
   const [error, setError] = useState("");
 
+  // useEffect que executa na montagem do componente para buscar os cards via API
   useEffect(() => {
-    api.get("/cards")
+    api.get("/cards") // Requisição GET para endpoint "/cards"
       .then((res) => {
-        setCards(res.data);
-        setLoading(false);
+        setCards(res.data); // Armazena os dados retornados em "cards"
+        setLoading(false);  // Marca que terminou o carregamento
       })
       .catch((err) => {
-        setError("Não foi possível carregar os dados");
-        setLoading(false);
-        console.error(err);
+        setError("Não foi possível carregar os dados"); // Seta mensagem de erro
+        setLoading(false); // Finaliza loading mesmo com erro
+        console.error(err); // Log do erro no console
       });
-  }, []);
+  }, []); // Dependências vazias: executa apenas na montagem
 
-  // Calcula estatísticas dos cards de forma otimizada (memoizada)
+  // Calcula estatísticas dos cards de forma memoizada para performance
   const stats = useMemo(() => {
-    const total = cards.length;
-    const concluido = cards.filter((c) => c.status === "Concluído").length;
-    const restante = total - concluido;
-    const ratio = total > 0 ? (concluido / total) * 100 : 0;
+    const total = cards.length; // Total de cards
+    const concluido = cards.filter((c) => c.status === "Concluído").length; // Cards concluídos
+    const restante = total - concluido; // Cards ainda em andamento
+    const ratio = total > 0 ? (concluido / total) * 100 : 0; // % de conclusão
 
-    // Status breakdown
+    // Quebra por status
     const statusBreakdown = {
       novo: cards.filter((c) => c.status === "Novo").length,
       analise: cards.filter((c) => c.status === "Em análise").length,
@@ -38,25 +46,28 @@ export default function Dashboard() {
       inativo: cards.filter((c) => c.status === "Inativo").length,
     };
 
-    // SLA alerts
+    // SLA: alerta de prazos vencidos ou próximos
     const now = new Date();
     const slaViolations = cards.filter((c) => {
       if (!c.prazo || c.status === "Concluído" || c.status === "Inativo") return false;
       const deadline = new Date(c.prazo);
-      return deadline < now; // Vencido
+      return deadline < now; // Card vencido
     });
 
     const slaWarnings = cards.filter((c) => {
       if (!c.prazo || c.status === "Concluído" || c.status === "Inativo") return false;
       const deadline = new Date(c.prazo);
-      const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-      return daysUntil >= 0 && daysUntil <= 3;
+      const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24)); // Dias restantes
+      return daysUntil >= 0 && daysUntil <= 3; // Aviso para próximos 3 dias
     });
 
-    // Vendor performance
-    const vendors = [...new Set(cards.map((c) => c.vendedor || c.vendedorId || "Sem vendedor"))];
+    // Performance por vendedor
+    const vendors = [...new Set(cards.map((c) => c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor"))];
     const vendorStats = vendors.map((vendor) => {
-      const vendorCards = cards.filter((c) => c.vendedor === vendor || c.vendedorId === vendor || (!c.vendedor && !c.vendedorId && vendor === "Sem vendedor"));
+      const vendorCards = cards.filter((c) => {
+        const vendorName = c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor";
+        return vendorName === vendor;
+      });
       const vendorCompleted = vendorCards.filter((c) => c.status === "Concluído").length;
       return {
         vendor,
@@ -76,8 +87,9 @@ export default function Dashboard() {
       slaWarnings: slaWarnings.length,
       vendorStats,
     };
-  }, [cards]);
+  }, [cards]); // Recalcula apenas quando "cards" muda
 
+  // Renderiza loading enquanto dados são carregados
   if (loading) {
     return (
       <div style={{ padding: "22px" }}>
@@ -87,121 +99,36 @@ export default function Dashboard() {
     );
   }
 
+  // Estilos inline do dashboard
   const styles = {
-    container: {
-      padding: "24px",
-      background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
-      minHeight: "90vh",
-    },
-    header: {
-      marginBottom: "24px",
-    },
-    title: {
-      margin: 0,
-      color: "#3c2f9f",
-      fontSize: "24px",
-      fontWeight: "800",
-    },
-    subtitle: {
-      color: "#5f5a88",
-      fontSize: "14px",
-      marginTop: "4px",
-    },
-    grid: {
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-      gap: "16px",
-      marginBottom: "24px",
-    },
-    card: {
-      background: "#fff",
-      border: "1px solid rgba(108,59,255,0.12)",
-      borderRadius: "14px",
-      padding: "18px",
-      boxShadow: "0 8px 18px rgba(62,44,158,0.08)",
-    },
-    cardTitle: {
-      fontSize: "13px",
-      fontWeight: "700",
-      color: "#6c65a7",
-      textTransform: "uppercase",
-      marginBottom: "12px",
-      letterSpacing: "0.5px",
-    },
-    cardValue: {
-      fontSize: "32px",
-      fontWeight: "800",
-      color: "#3c2f9f",
-      marginBottom: "8px",
-    },
-    alertBox: {
-      padding: "12px",
-      borderRadius: "8px",
-      marginBottom: "8px",
-      fontSize: "13px",
-      fontWeight: "500",
-    },
-    alertRed: {
-      backgroundColor: "#ffebee",
-      borderLeft: "4px solid #d32f2f",
-      color: "#c62828",
-      paddingLeft: "12px",
-    },
-    alertOrange: {
-      backgroundColor: "#fff3e0",
-      borderLeft: "4px solid #f57c00",
-      color: "#e65100",
-      paddingLeft: "12px",
-    },
-    chartRow: {
-      display: "flex",
-      alignItems: "flex-end",
-      gap: "8px",
-      padding: "16px 0",
-      height: "200px",
-    },
-    chartBar: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "flex-end",
-    },
-    barFill: {
-      width: "100%",
-      borderRadius: "12px 12px 0 0",
-      transition: "height 0.3s ease",
-      minHeight: "4px",
-    },
-    barLabel: {
-      marginTop: "8px",
-      fontSize: "11px",
-      color: "#6c65a7",
-      textAlign: "center",
-      fontWeight: "500",
-    },
-    progressBar: {
-      width: "100%",
-      height: "8px",
-      background: "#ebeaff",
-      borderRadius: "4px",
-      overflow: "hidden",
-      marginTop: "8px",
-    },
-    progressFill: {
-      height: "100%",
-      background: "linear-gradient(90deg, #8b64ff, #5a30ff)",
-      transition: "width 0.3s ease",
-    },
+    container: { padding: "24px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "90vh" },
+    header: { marginBottom: "24px" },
+    title: { margin: 0, color: "#3c2f9f", fontSize: "24px", fontWeight: "800" },
+    subtitle: { color: "#5f5a88", fontSize: "14px", marginTop: "4px" },
+    grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "24px" },
+    card: { background: "#fff", border: "1px solid rgba(108,59,255,0.12)", borderRadius: "14px", padding: "18px", boxShadow: "0 8px 18px rgba(62,44,158,0.08)" },
+    cardTitle: { fontSize: "13px", fontWeight: "700", color: "#6c65a7", textTransform: "uppercase", marginBottom: "12px", letterSpacing: "0.5px" },
+    cardValue: { fontSize: "32px", fontWeight: "800", color: "#3c2f9f", marginBottom: "8px" },
+    alertBox: { padding: "12px", borderRadius: "8px", marginBottom: "8px", fontSize: "13px", fontWeight: "500" },
+    alertRed: { backgroundColor: "#ffebee", borderLeft: "4px solid #d32f2f", color: "#c62828", paddingLeft: "12px" },
+    alertOrange: { backgroundColor: "#fff3e0", borderLeft: "4px solid #f57c00", color: "#e65100", paddingLeft: "12px" },
+    chartRow: { display: "flex", alignItems: "flex-end", gap: "8px", padding: "16px 0", height: "200px" },
+    chartBar: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" },
+    barFill: { width: "100%", borderRadius: "12px 12px 0 0", transition: "height 0.3s ease", minHeight: "4px" },
+    barLabel: { marginTop: "8px", fontSize: "11px", color: "#6c65a7", textAlign: "center", fontWeight: "500" },
+    progressBar: { width: "100%", height: "8px", background: "#ebeaff", borderRadius: "4px", overflow: "hidden", marginTop: "8px" },
+    progressFill: { height: "100%", background: "linear-gradient(90deg, #8b64ff, #5a30ff)", transition: "width 0.3s ease" },
   };
 
   return (
     <div style={styles.container}>
+      {/* Cabeçalho do Dashboard */}
       <div style={styles.header}>
         <h1 style={styles.title}>📊 Dashboard</h1>
         <p style={styles.subtitle}>Resumo de performance e alertas do sistema</p>
       </div>
 
+      {/* Renderiza erro caso exista */}
       {error ? (
         <div style={{ color: "#a13333" }}>{error}</div>
       ) : (
@@ -230,8 +157,9 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Métricas Principais */}
+          {/* Métricas principais */}
           <div style={styles.grid}>
+            {/* Total de Cards */}
             <div style={styles.card}>
               <div style={styles.cardTitle}>📈 Total de Cards</div>
               <div style={styles.cardValue}>{stats.total}</div>
@@ -240,6 +168,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Taxa de conclusão */}
             <div style={styles.card}>
               <div style={styles.cardTitle}>✅ Taxa de Conclusão</div>
               <div style={styles.cardValue}>{stats.ratio.toFixed(1)}%</div>
@@ -248,6 +177,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Concluído */}
             <div style={styles.card}>
               <div style={styles.cardTitle}>🎯 Concluído</div>
               <div style={styles.cardValue}>{stats.concluido}</div>
@@ -256,6 +186,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* Em andamento */}
             <div style={styles.card}>
               <div style={styles.cardTitle}>⏳ Em Andamento</div>
               <div style={styles.cardValue}>{stats.restante}</div>
@@ -265,7 +196,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Status Breakdown */}
+          {/* Distribuição por status */}
           <div style={styles.grid}>
             <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
               <div style={styles.cardTitle}>📊 Distribuição por Status</div>
@@ -312,7 +243,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Vendor Performance */}
+          {/* Performance por vendedor */}
           {stats.vendorStats.length > 0 && (
             <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
               <div style={styles.cardTitle}>👥 Performance por Vendedor</div>

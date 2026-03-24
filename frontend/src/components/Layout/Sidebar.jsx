@@ -1,10 +1,13 @@
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; 
+// useNavigate: permite navegação programática
+// useLocation: fornece informação da rota atual
 
 // Componente da barra lateral com menu de navegação
 export default function Sidebar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = useNavigate(); // Hook para redirecionamento de rotas
+  const location = useLocation(); // Hook para detectar a rota atual
 
+  // Itens do menu com nome, ícone e caminho
   const menuItems = [
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
@@ -12,53 +15,56 @@ export default function Sidebar() {
   ];
 
   return (
-    <div style={{
-      width: "250px",
-      height: "100vh",
-      background: "linear-gradient(180deg, #240046, #3c096c)",
-      color: "#fff",
-      display: "flex",
-      flexDirection: "column",
-      padding: "25px 15px",
-      borderRight: "1px solid rgba(255,255,255,0.05)"
-    }}>
-      
-      {/* Logo */}
-      <div style={{
+    <div
+      style={{
+        width: "250px", // largura fixa da sidebar
+        height: "100vh", // altura completa da tela
+        background: "linear-gradient(180deg, #240046, #3c096c)", // gradiente roxo
+        color: "#fff",
         display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        marginBottom: "40px",
-        cursor: "pointer"
+        flexDirection: "column",
+        padding: "25px 15px",
+        borderRight: "1px solid rgba(255,255,255,0.05)" // linha separando do conteúdo
       }}
-      onClick={() => navigate("/dashboard")}
-      >
-        <div style={{
-          width: "45px",
-          height: "45px",
-          borderRadius: "12px",
-          background: "linear-gradient(135deg, #9d4edd, #c77dff)",
+    >
+      
+      {/* Logo do sistema */}
+      <div
+        style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          fontSize: "20px"
-        }}>
+          gap: "12px",
+          marginBottom: "40px",
+          cursor: "pointer"
+        }}
+        onClick={() => navigate("/dashboard")} // Ao clicar, vai para dashboard
+      >
+        <div
+          style={{
+            width: "45px",
+            height: "45px",
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #9d4edd, #c77dff)", // gradiente roxo
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "20px"
+          }}
+        >
           🚀
         </div>
-        <h2 style={{ margin: 0, fontWeight: "500" }}>
-          Delivery
-        </h2>
+        <h2 style={{ margin: 0, fontWeight: "500" }}>Delivery</h2>
       </div>
 
-      {/* Menu */}
+      {/* Menu de navegação */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-
         {menuItems.map((item, index) => {
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path; 
+          // verifica se a rota atual é igual ao caminho do item
           return (
             <div
-              key={index}
-              onClick={() => navigate(item.path)}
+              key={index} // chave do item
+              onClick={() => navigate(item.path)} // navega ao clicar
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -66,36 +72,37 @@ export default function Sidebar() {
                 padding: "12px 15px",
                 borderRadius: "12px",
                 cursor: "pointer",
-                background: isActive 
-                  ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" 
-                  : "transparent",
+                background: isActive
+                  ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" // ativo
+                  : "transparent", // inativo
                 transition: "0.2s",
                 fontSize: "14px"
               }}
               onMouseEnter={(e) => {
-                if (!isActive)
-                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                if (!isActive) 
+                  e.currentTarget.style.background = "rgba(255,255,255,0.08)"; // hover
               }}
               onMouseLeave={(e) => {
                 if (!isActive)
-                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.background = "transparent"; // volta ao normal
               }}
             >
-              <span>{item.icon}</span>
-              <span>{item.name}</span>
+              <span>{item.icon}</span> {/* Ícone do item */}
+              <span>{item.name}</span> {/* Nome do item */}
             </div>
           );
         })}
-
       </div>
 
-      {/* Footer */}
-      <div style={{
-        marginTop: "auto",
-        fontSize: "12px",
-        opacity: 0.6,
-        textAlign: "center"
-      }}>
+      {/* Footer da sidebar */}
+      <div
+        style={{
+          marginTop: "auto", // posiciona no final da sidebar
+          fontSize: "12px",
+          opacity: 0.6, // mais transparente
+          textAlign: "center"
+        }}
+      >
         © 2026 Delivery System
       </div>
 

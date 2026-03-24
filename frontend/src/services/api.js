@@ -1,39 +1,45 @@
 import axios from "axios";
+// Importa a biblioteca Axios para fazer requisições HTTP
 
+// Cria uma instância do Axios com configuração padrão
 const api = axios.create({
-  baseURL: "http://localhost:3000",
-  timeout: 10000,
+  baseURL: "http://localhost:3000", // URL base para todas as requisições
+  timeout: 10000,                   // Tempo máximo de espera de 10 segundos
   headers: {
-    "Content-Type": "application/json"
+    "Content-Type": "application/json" // Define que o conteúdo será JSON
   }
 });
 
-// Interceptor para adicionar token em requisições autenticadas
+// Interceptor de requisição: executa antes de cada requisição
 api.interceptors.request.use(
   (config) => {
+    // Pega o token armazenado no localStorage
     const token = localStorage.getItem("token");
     if (token) {
+      // Adiciona o token no cabeçalho Authorization, se existir
       config.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+    return config; // Retorna a configuração atualizada
   },
   (error) => {
+    // Caso ocorra algum erro antes de enviar a requisição
     return Promise.reject(error);
   }
 );
 
-// Interceptor para tratar respostas
+// Interceptor de resposta: executa após receber uma resposta
 api.interceptors.response.use(
-  (response) => response,
+  (response) => response, // Se a resposta for ok, retorna normalmente
   (error) => {
     if (error.response?.status === 401) {
-      // Token expirado ou inválido
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+      // Se a resposta for 401 (não autorizado), significa token inválido ou expirado
+      localStorage.removeItem("token"); // Remove token do localStorage
+      localStorage.removeItem("user");  // Remove dados do usuário
+      window.location.href = "/login";  // Redireciona para a página de login
     }
-    return Promise.reject(error);
+    return Promise.reject(error); // Rejeita a Promise com o erro
   }
 );
 
 export default api;
+// Exporta a instância do Axios para ser usada em toda a aplicação

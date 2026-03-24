@@ -1,15 +1,19 @@
 import { useState } from "react";
 
+// Estilos em objeto JS para reutilização nos elementos do formulário
 const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
+    gap: "20px", // Espaço entre seções
+    minHeight: "520px", // Altura mínima maior para detalhamento
+    padding: "32px 28px", // Mais espaço interno
+    justifyContent: "flex-start"
   },
   formGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "6px", // Espaço entre label e input
   },
   label: {
     fontSize: "13px",
@@ -40,7 +44,7 @@ const styles = {
     minHeight: "80px",
     outline: "none",
     fontFamily: "inherit",
-    resize: "vertical",
+    resize: "vertical", // Usuário pode redimensionar verticalmente
   },
   select: {
     width: "100%",
@@ -55,7 +59,7 @@ const styles = {
   },
   row: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "1fr 1fr", // Duas colunas iguais
     gap: "12px",
   },
   actionButtons: {
@@ -90,11 +94,12 @@ const styles = {
     color: "#3e2c9e",
     margin: "8px 0 4px",
     paddingBottom: "8px",
-    borderBottom: "2px solid rgba(108,59,255,0.2)",
+    borderBottom: "2px solid rgba(108,59,255,0.2)", // Linha de destaque abaixo do título
   },
 };
 
 export default function CardModal({ card, onSave, onClose }) {
+  // Estado para armazenar dados do formulário, inicializado com valores do card (ou vazio)
   const [formData, setFormData] = useState({
     titulo: card.titulo || "",
     cliente: card.cliente || "",
@@ -103,7 +108,7 @@ export default function CardModal({ card, onSave, onClose }) {
     tipoServico: card.tipoServico || "",
     preco: card.preco || "",
     sla: card.sla || 0,
-    prazo: card.prazo ? card.prazo.split("T")[0] : "",
+    prazo: card.prazo ? card.prazo.split("T")[0] : "", // Converte ISO para YYYY-MM-DD
     observacoes: card.observacoes || "",
     coordenadas: {
       lat: card.coordenadas?.lat || "",
@@ -111,10 +116,13 @@ export default function CardModal({ card, onSave, onClose }) {
     },
   });
 
+  // Estado para armazenar mensagens de erro de validação
   const [errors, setErrors] = useState({});
 
+  // Função para atualizar campos do formulário
   const handleChange = (field, value) => {
     if (field === "lat" || field === "lng") {
+      // Campos de coordenadas atualizam o objeto interno 'coordenadas'
       setFormData(prev => ({
         ...prev,
         coordenadas: {
@@ -123,44 +131,50 @@ export default function CardModal({ card, onSave, onClose }) {
         },
       }));
     } else {
+      // Campos normais atualizam diretamente a chave no formData
       setFormData(prev => ({ ...prev, [field]: value }));
     }
-    
-    // Limpar erro do campo
+
+    // Limpa erro do campo ao digitar
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
+  // Validação dos campos obrigatórios
   const validate = () => {
     const newErrors = {};
     if (!formData.cliente.trim()) newErrors.cliente = "Cliente é obrigatório";
     if (!formData.telefone.trim()) newErrors.telefone = "Telefone é obrigatório";
     if (!formData.endereco.trim()) newErrors.endereco = "Endereço é obrigatório";
     if (!formData.tipoServico.trim()) newErrors.tipoServico = "Tipo de serviço é obrigatório";
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    setErrors(newErrors); // Atualiza estado de erros
+    return Object.keys(newErrors).length === 0; // Retorna true se não houver erros
   };
 
+  // Função chamada ao salvar o card
   const handleSubmit = async () => {
-    if (!validate()) return;
-    
+    if (!validate()) return; // Se houver erros, não prossegue
+
     const updatedCard = {
-      ...card,
-      ...formData,
-      preco: formData.preco ? Number(formData.preco) : undefined,
-      sla: formData.sla ? Number(formData.sla) : 0,
+      ...card, // Mantém propriedades existentes do card
+      ...formData, // Sobrescreve com os valores do formulário
+      preco: formData.preco ? Number(formData.preco) : undefined, // Converte preço para número
+      sla: formData.sla ? Number(formData.sla) : 0, // Converte SLA para número
     };
-    
-    await onSave(updatedCard);
+
+    await onSave(updatedCard); // Chama função externa de salvamento
   };
 
+  // Renderização do modal do card
   return (
     <div style={styles.container}>
+      {/* Seção de informações básicas */}
       <div>
         <h3 style={styles.sectionTitle}>📋 Informações Básicas</h3>
         <div style={{ display: "grid", gap: "12px", marginTop: "12px" }}>
+          {/* Título do card */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Título do Card</label>
             <input
@@ -170,7 +184,8 @@ export default function CardModal({ card, onSave, onClose }) {
               placeholder="Ex: Instalação de Ar Condicionado"
             />
           </div>
-          
+
+          {/* Linha com Cliente e Telefone */}
           <div style={styles.row}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Cliente *</label>
@@ -182,7 +197,7 @@ export default function CardModal({ card, onSave, onClose }) {
               />
               {errors.cliente && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.cliente}</span>}
             </div>
-            
+
             <div style={styles.formGroup}>
               <label style={styles.label}>Telefone *</label>
               <input
@@ -194,7 +209,8 @@ export default function CardModal({ card, onSave, onClose }) {
               {errors.telefone && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.telefone}</span>}
             </div>
           </div>
-          
+
+          {/* Endereço */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Endereço *</label>
             <input
@@ -205,7 +221,8 @@ export default function CardModal({ card, onSave, onClose }) {
             />
             {errors.endereco && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.endereco}</span>}
           </div>
-          
+
+          {/* Linha com Tipo de Serviço e Preço */}
           <div style={styles.row}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Tipo de Serviço *</label>
@@ -217,7 +234,7 @@ export default function CardModal({ card, onSave, onClose }) {
               />
               {errors.tipoServico && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.tipoServico}</span>}
             </div>
-            
+
             <div style={styles.formGroup}>
               <label style={styles.label}>Preço (R$)</label>
               <input
@@ -232,7 +249,8 @@ export default function CardModal({ card, onSave, onClose }) {
           </div>
         </div>
       </div>
-      
+
+      {/* Seção de Localização */}
       <div>
         <h3 style={styles.sectionTitle}>📍 Localização</h3>
         <div style={styles.row}>
@@ -245,7 +263,7 @@ export default function CardModal({ card, onSave, onClose }) {
               placeholder="-23.5505"
             />
           </div>
-          
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Longitude</label>
             <input
@@ -257,7 +275,8 @@ export default function CardModal({ card, onSave, onClose }) {
           </div>
         </div>
       </div>
-      
+
+      {/* Seção de Prazo e SLA */}
       <div>
         <h3 style={styles.sectionTitle}>⏱️ Prazos e SLAs</h3>
         <div style={styles.row}>
@@ -270,7 +289,7 @@ export default function CardModal({ card, onSave, onClose }) {
               onChange={(e) => handleChange("prazo", e.target.value)}
             />
           </div>
-          
+
           <div style={styles.formGroup}>
             <label style={styles.label}>SLA (dias)</label>
             <input
@@ -283,7 +302,8 @@ export default function CardModal({ card, onSave, onClose }) {
           </div>
         </div>
       </div>
-      
+
+      {/* Seção de Observações */}
       <div>
         <h3 style={styles.sectionTitle}>📝 Observações</h3>
         <div style={styles.formGroup}>
@@ -296,8 +316,10 @@ export default function CardModal({ card, onSave, onClose }) {
           />
         </div>
       </div>
-      
+
+      {/* Botões de ação */}
       <div style={styles.actionButtons}>
+        {/* Botão Cancelar */}
         <button
           style={styles.cancelBtn}
           onClick={onClose}
@@ -306,6 +328,8 @@ export default function CardModal({ card, onSave, onClose }) {
         >
           Cancelar
         </button>
+
+        {/* Botão Salvar */}
         <button
           style={styles.saveBtn}
           onClick={handleSubmit}

@@ -1,77 +1,85 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { useEffect, useState } from "react"; // Hooks do React
+import { useNavigate } from "react-router-dom"; // Hook para navegação programática
+import api from "../services/api"; // Instância de API configurada para comunicação com backend
 
 export default function Profile() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({});
-  const [avatarPreview, setAvatarPreview] = useState(null);
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
+  // Estados do componente
+  const [user, setUser] = useState(null); // Armazena dados do usuário
+  const [loading, setLoading] = useState(true); // Indica se o perfil está sendo carregado
+  const [isEditing, setIsEditing] = useState(false); // Define se o usuário está no modo de edição
+  const [formData, setFormData] = useState({}); // Armazena dados do formulário enquanto edita
+  const [avatarPreview, setAvatarPreview] = useState(null); // Armazena preview do avatar
+  const [error, setError] = useState(""); // Mensagem de erro
+  const navigate = useNavigate(); // Hook para navegação programática
 
+  // Carrega perfil do usuário ao montar o componente
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca dados do usuário no localStorage
+
     if (!userData._id) {
-      navigate("/login");
+      navigate("/login"); // Se não tiver usuário, redireciona para login
       return;
     }
 
-    fetchUserProfile(userData._id);
+    fetchUserProfile(userData._id); // Busca perfil do usuário no backend
   }, [navigate]);
 
+  // Função para buscar perfil do usuário pelo ID
   const fetchUserProfile = async (userId) => {
     try {
-      const response = await api.get(`/users/${userId}`);
-      setUser(response.data);
-      setFormData(response.data);
-      setAvatarPreview(response.data.avatar);
-      setLoading(false);
+      const response = await api.get(`/users/${userId}`); // Requisição GET para backend
+      setUser(response.data); // Salva dados do usuário
+      setFormData(response.data); // Preenche formulário com os dados atuais
+      setAvatarPreview(response.data.avatar); // Define avatar
+      setLoading(false); // Desativa loading
     } catch (err) {
-      console.error("Erro ao buscar perfil:", err);
-      setError("Erro ao carregar perfil");
-      setLoading(false);
+      console.error("Erro ao buscar perfil:", err); // Loga erro
+      setError("Erro ao carregar perfil"); // Mostra mensagem de erro
+      setLoading(false); // Desativa loading
     }
   };
 
+  // Atualiza valores do formulário conforme usuário digita
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value // Atualiza o campo específico do formulário
     }));
-    setError("");
+    setError(""); // Limpa erro ao digitar
   };
 
+  // Função para alterar avatar com preview
   const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files[0]; // Pega arquivo selecionado
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setAvatarPreview(reader.result);
+        setAvatarPreview(reader.result); // Atualiza preview
         setFormData(prev => ({
           ...prev,
-          avatar: reader.result
+          avatar: reader.result // Salva avatar em base64 no formulário
         }));
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(file); // Converte arquivo para base64
     }
   };
 
+  // Salva alterações do perfil no backend
   const handleSaveProfile = async () => {
     try {
-      const response = await api.put(`/users/${user._id}`, formData);
-      setUser(response.data);
-      localStorage.setItem("user", JSON.stringify(response.data));
-      setIsEditing(false);
-      setError("");
-      alert("Perfil atualizado com sucesso!");
+      const response = await api.put(`/users/${user._id}`, formData); // Requisição PUT para atualizar perfil
+      setUser(response.data); // Atualiza estado do usuário
+      localStorage.setItem("user", JSON.stringify(response.data)); // Atualiza localStorage
+      setIsEditing(false); // Sai do modo edição
+      setError(""); // Limpa erro
+      alert("Perfil atualizado com sucesso!"); // Alerta de sucesso
     } catch (err) {
-      setError("Erro ao atualizar perfil: " + (err.response?.data?.message || err.message));
+      setError("Erro ao atualizar perfil: " + (err.response?.data?.message || err.message)); // Mostra erro detalhado
     }
   };
 
+  // Objetos de perfis com label e cor para visualização
   const perfis = {
     comercial: { label: "👔 Comercial", color: "#1e40af" },
     operacional: { label: "📋 Operacional", color: "#059669" },
@@ -81,6 +89,7 @@ export default function Profile() {
     admin: { label: "🔐 Admin", color: "#dc2626" }
   };
 
+  // Renderiza loading enquanto busca dados
   if (loading) {
     return (
       <div style={{ padding: "24px", textAlign: "center", color: "#666" }}>
@@ -89,6 +98,7 @@ export default function Profile() {
     );
   }
 
+  // Caso não tenha usuário carregado, mostra erro
   if (!user) {
     return (
       <div style={{ padding: "24px", textAlign: "center", color: "#d32f2f" }}>
@@ -97,6 +107,7 @@ export default function Profile() {
     );
   }
 
+  // Renderização principal do componente
   return (
     <div style={{
       padding: "24px",
@@ -115,6 +126,7 @@ export default function Profile() {
           </p>
         </div>
 
+        {/* Mensagem de erro */}
         {error && (
           <div style={{
             padding: "12px 16px",
@@ -129,7 +141,7 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Card de Perfil */}
+        {/* Card de perfil */}
         <div style={{
           backgroundColor: "#fff",
           border: "1px solid rgba(108,59,255,0.12)",
@@ -150,8 +162,8 @@ export default function Profile() {
               width: "120px",
               height: "120px",
               borderRadius: "50%",
-              backgroundColor: avatarPreview ? "transparent" : "#8b64ff",
-              backgroundImage: avatarPreview ? `url(${avatarPreview})` : "none",
+              backgroundColor: avatarPreview ? "transparent" : "#8b64ff", // Cor padrão se não tiver avatar
+              backgroundImage: avatarPreview ? `url(${avatarPreview})` : "none", // Imagem do avatar
               backgroundSize: "cover",
               backgroundPosition: "center",
               display: "flex",
@@ -162,9 +174,10 @@ export default function Profile() {
               border: "4px solid #e0e0e0",
               boxShadow: "0 4px 12px rgba(62,44,158,0.15)"
             }}>
-              {!avatarPreview && "👤"}
+              {!avatarPreview && "👤"} {/* Emoji padrão */}
             </div>
 
+            {/* Botão para alterar avatar */}
             {isEditing && (
               <label style={{
                 padding: "8px 16px",
@@ -181,11 +194,12 @@ export default function Profile() {
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  style={{ display: "none" }}
+                  style={{ display: "none" }} // input escondido
                 />
               </label>
             )}
 
+            {/* Nome e perfil */}
             <h2 style={{ margin: "0 0 8px 0", color: "#3c2f9f", fontSize: "20px" }}>
               {user.nome}
             </h2>
@@ -222,7 +236,7 @@ export default function Profile() {
                   type="text"
                   name="nome"
                   value={formData.nome || ""}
-                  onChange={handleChange}
+                  onChange={handleChange} // Atualiza estado do form
                   style={{
                     width: "100%",
                     padding: "10px 12px",
@@ -236,7 +250,7 @@ export default function Profile() {
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.nome}
+                  {user.nome} {/* Apenas exibe nome */}
                 </p>
               )}
             </div>
@@ -398,7 +412,7 @@ export default function Profile() {
               )}
             </div>
 
-            {/* Data de Criação */}
+            {/* Data de criação */}
             <div style={{ paddingTop: "12px", borderTop: "1px solid #e0e0e0" }}>
               <label style={{
                 display: "block",
@@ -421,7 +435,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Botões de Ação */}
+          {/* Botões de ação */}
           <div style={{
             display: "flex",
             gap: "12px",
@@ -431,12 +445,13 @@ export default function Profile() {
           }}>
             {isEditing ? (
               <>
+                {/* Cancelar edição */}
                 <button
                   onClick={() => {
-                    setIsEditing(false);
-                    setFormData(user);
-                    setAvatarPreview(user.avatar);
-                    setError("");
+                    setIsEditing(false); // Sai do modo edição
+                    setFormData(user); // Restaura dados originais
+                    setAvatarPreview(user.avatar); // Restaura avatar
+                    setError(""); // Limpa erros
                   }}
                   style={{
                     flex: 1,
@@ -452,6 +467,8 @@ export default function Profile() {
                 >
                   Cancelar
                 </button>
+
+                {/* Salvar alterações */}
                 <button
                   onClick={handleSaveProfile}
                   style={{
@@ -459,7 +476,6 @@ export default function Profile() {
                     padding: "10px 16px",
                     border: "none",
                     borderRadius: "8px",
-                    backgroundColor: "linear-gradient(90deg, #8b64ff, #5a30ff)",
                     background: "linear-gradient(90deg, #8b64ff, #5a30ff)",
                     color: "#fff",
                     cursor: "pointer",
@@ -471,6 +487,7 @@ export default function Profile() {
                 </button>
               </>
             ) : (
+              /* Botão para ativar modo edição */
               <button
                 onClick={() => setIsEditing(true)}
                 style={{

@@ -1,30 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import api from '../../services/api';
+import api from '../../services/api'; 
+// Importa o serviço de API para fazer requisições HTTP
 
 // Componente que exibe o histórico de atividades de um card específico
 const ActivityHistory = ({ cardId }) => {
-  const [activities, setActivities] = useState([]); // Lista de atividades do card
-  const [loading, setLoading] = useState(false); // Estado de carregamento
+  const [activities, setActivities] = useState([]); // Estado para armazenar atividades do card
+  const [loading, setLoading] = useState(false); // Estado para controlar carregamento
 
-  // Hook que busca o histórico de atividades quando o cardId muda
+  // useEffect para buscar o histórico sempre que o cardId mudar
   useEffect(() => {
-    if (!cardId) return;
+    if (!cardId) return; // Se não houver cardId, não faz nada
 
     const fetchHistory = async () => {
-      setLoading(true);
+      setLoading(true); // Ativa indicador de carregamento
       try {
+        // Requisição GET para buscar atividades relacionadas ao cardId
         const response = await api.get(`/activity-logs/card/${cardId}`);
-        setActivities(response.data);
+        setActivities(response.data); // Atualiza estado com os dados recebidos
       } catch (err) {
-        console.error('Erro ao buscar histórico:', err);
+        console.error('Erro ao buscar histórico:', err); // Loga erro caso ocorra
       }
-      setLoading(false);
+      setLoading(false); // Desativa indicador de carregamento
     };
 
-    fetchHistory();
+    fetchHistory(); // Chama a função assíncrona
   }, [cardId]);
 
-  // Função que retorna o estilo e label do badge baseado no tipo de ação
+  // Função que retorna estilo e label do badge baseado na ação da atividade
   const getActionBadge = (action) => {
     const badges = {
       CREATED: { color: '#4caf50', label: '✅ Criado' },
@@ -33,10 +35,10 @@ const ActivityHistory = ({ cardId }) => {
       MOVED: { color: '#ff9800', label: '↔️ Movido' },
       COMMENTED: { color: '#9c27b0', label: '💬 Comentado' }
     };
-    return badges[action] || { color: '#999', label: action };
+    return badges[action] || { color: '#999', label: action }; // Caso a ação não exista
   };
 
-  // Função que formata uma data para o formato brasileiro
+  // Função que formata data para o padrão brasileiro com hora
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -47,22 +49,30 @@ const ActivityHistory = ({ cardId }) => {
     });
   };
 
-  // Renderiza mensagem de carregamento enquanto busca dados
+  // Mostra mensagem de carregamento enquanto busca os dados
   if (loading) {
-    return <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>Carregando histórico...</div>;
+    return (
+      <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>
+        Carregando histórico...
+      </div>
+    );
   }
 
-  // Renderiza mensagem quando não há atividades
+  // Mostra mensagem caso não existam atividades
   if (!activities || activities.length === 0) {
-    return <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>Sem histórico de atividades</div>;
+    return (
+      <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>
+        Sem histórico de atividades
+      </div>
+    );
   }
 
-  // Renderiza a lista de atividades em formato de timeline
+  // Renderiza a lista de atividades como uma timeline
   return (
     <div style={{
       padding: '16px',
-      maxHeight: '400px',
-      overflowY: 'auto',
+      maxHeight: '400px', // Limita altura do container
+      overflowY: 'auto', // Permite rolagem vertical
       borderTop: '1px solid #e0e0e0'
     }}>
       <h4 style={{ margin: '0 0 16px 0', color: '#333', fontSize: '14px', fontWeight: '600' }}>
@@ -80,14 +90,12 @@ const ActivityHistory = ({ cardId }) => {
           backgroundColor: '#e0e0e0'
         }} />
 
-        {/* Mapeia cada atividade para um item da timeline */}
+        {/* Mapeia cada atividade do histórico */}
         {activities.map((activity, index) => {
-          const badge = getActionBadge(activity.action);
+          const badge = getActionBadge(activity.action); // Obtém cor e label do badge
           return (
-            <div key={activity._id} style={{
-              marginBottom: '16px',
-              position: 'relative'
-            }}>
+            <div key={activity._id} style={{ marginBottom: '16px', position: 'relative' }}>
+              
               {/* Ponto na timeline */}
               <div style={{
                 position: 'absolute',
@@ -108,6 +116,7 @@ const ActivityHistory = ({ cardId }) => {
                 borderRadius: '4px',
                 borderLeft: `3px solid ${badge.color}`
               }}>
+                {/* Cabeçalho do item com badge e data */}
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -123,20 +132,19 @@ const ActivityHistory = ({ cardId }) => {
                     fontSize: '11px',
                     fontWeight: '600'
                   }}>
-                    {badge.label}
+                    {badge.label} {/* Label da ação */}
                   </span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#666'
-                  }}>
-                    {formatDate(activity.timestamp)}
+                  <span style={{ fontSize: '12px', color: '#666' }}>
+                    {formatDate(activity.timestamp)} {/* Data da atividade */}
                   </span>
                 </div>
 
+                {/* Descrição da atividade */}
                 <div style={{ fontSize: '13px', color: '#333', marginBottom: '4px' }}>
                   {activity.description}
                 </div>
 
+                {/* Nome do usuário que realizou a atividade */}
                 {activity.userName && (
                   <div style={{ fontSize: '11px', color: '#999' }}>
                     Por: <strong>{activity.userName}</strong>
@@ -158,7 +166,7 @@ const ActivityHistory = ({ cardId }) => {
                     whiteSpace: 'pre-wrap',
                     wordWrap: 'break-word'
                   }}>
-                    {JSON.stringify(activity.changes, null, 2)}
+                    {JSON.stringify(activity.changes, null, 2)} {/* Exibe mudanças formatadas */}
                   </div>
                 )}
               </div>

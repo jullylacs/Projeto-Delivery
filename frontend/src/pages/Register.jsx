@@ -1,28 +1,33 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import api from "../services/api";
+import api from "../services/api"; 
+// Importa a instância da API configurada para comunicação com o backend
 
+// Componente de registro de usuário
 export default function Register() {
+  // Estado do formulário
   const [formData, setFormData] = useState({
     nome: "",
     email: "",
     senha: "",
     confirmarSenha: "",
-    perfil: "comercial"
+    perfil: "comercial" // perfil padrão ao registrar
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false); // Indica carregamento do submit
+  const [error, setError] = useState(""); // Mensagem de erro do formulário
+  const navigate = useNavigate(); // Hook para navegação programática
 
+  // Atualiza o estado do formulário quando o usuário digita
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value // atualiza o campo correspondente
     }));
-    setError("");
+    setError(""); // limpa erro ao digitar
   };
 
+  // Função que valida todos os campos do formulário
   const validateForm = () => {
     if (!formData.nome.trim()) {
       setError("Nome é obrigatório");
@@ -52,24 +57,27 @@ export default function Register() {
       setError("Senhas não conferem");
       return false;
     }
-    return true;
+    return true; // tudo válido
   };
 
+  // Função que envia o formulário para o backend
   const register = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
+    e.preventDefault(); // previne reload da página
 
-    setLoading(true);
-    setError("");
+    if (!validateForm()) return; // valida antes de enviar
+
+    setLoading(true); // ativa indicador de carregamento
+    setError(""); // limpa erros
 
     try {
+      // Log para depuração
       console.log("Tentando registrar com:", {
         nome: formData.nome,
         email: formData.email,
         perfil: formData.perfil
       });
 
+      // Requisição POST para criar usuário
       const response = await api.post("/users/register", {
         nome: formData.nome.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -78,17 +86,18 @@ export default function Register() {
       });
 
       console.log("Resposta do servidor:", response.data);
-      
+
+      // Sucesso
       alert("Conta criada com sucesso! Faça login agora.");
-      navigate("/login");
+      navigate("/login"); // redireciona para login
     } catch (error) {
       console.error("Erro detalhado no registro:", error);
-      
+
       // Tratamento detalhado de erros
       if (error.response) {
         console.log("Dados do erro:", error.response.data);
         console.log("Status do erro:", error.response.status);
-        
+
         if (error.response.status === 400) {
           setError(error.response.data.message || "Dados inválidos. Verifique os campos.");
         } else if (error.response.status === 409) {
@@ -105,16 +114,17 @@ export default function Register() {
         setError(`Erro: ${error.message}`);
       }
     } finally {
-      setLoading(false);
+      setLoading(false); // desativa carregamento
     }
   };
 
+  // Permite enviar formulário ao pressionar Enter
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !loading) {
       register(e);
     }
   };
-  
+
   return (
     <div style={{
       display: "flex",
@@ -124,6 +134,7 @@ export default function Register() {
       background: "linear-gradient(135deg, #240046, #3c096c)",
       padding: "20px"
     }}>
+      {/* Container do formulário */}
       <div style={{
         background: "rgba(255,255,255,0.05)",
         padding: "40px",
@@ -137,6 +148,7 @@ export default function Register() {
         <h1 style={{ marginBottom: "10px", fontSize: "32px", textAlign: "center" }}>🚀 Delivery</h1>
         <p style={{ marginBottom: "30px", opacity: 0.8, textAlign: "center", fontSize: "14px" }}>Crie sua conta</p>
         
+        {/* Mensagem de erro */}
         {error && (
           <div style={{
             padding: "12px 15px",
@@ -152,7 +164,9 @@ export default function Register() {
           </div>
         )}
         
+        {/* Formulário */}
         <form onSubmit={register}>
+          {/* Campo Nome */}
           <div style={{ marginBottom: "15px" }}>
             <input
               type="text"
@@ -177,7 +191,8 @@ export default function Register() {
               onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
             />
           </div>
-          
+
+          {/* Campo Email */}
           <div style={{ marginBottom: "15px" }}>
             <input
               type="email"
@@ -203,6 +218,7 @@ export default function Register() {
             />
           </div>
 
+          {/* Select Perfil */}
           <div style={{ marginBottom: "15px" }}>
             <select
               name="perfil"
@@ -229,7 +245,8 @@ export default function Register() {
               <option value="admin" style={{ background: "#240046" }}>🔐 Admin</option>
             </select>
           </div>
-          
+
+          {/* Campo Senha */}
           <div style={{ marginBottom: "15px" }}>
             <input
               type="password"
@@ -254,7 +271,8 @@ export default function Register() {
               onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
             />
           </div>
-          
+
+          {/* Campo Confirmar Senha */}
           <div style={{ marginBottom: "25px" }}>
             <input
               type="password"
@@ -279,7 +297,8 @@ export default function Register() {
               onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
             />
           </div>
-          
+
+          {/* Botão de submit */}
           <button
             type="submit"
             disabled={loading}
@@ -305,11 +324,8 @@ export default function Register() {
           </button>
         </form>
 
-        <div style={{
-          textAlign: "center",
-          fontSize: "14px",
-          opacity: 0.8
-        }}>
+        {/* Link para Login */}
+        <div style={{ textAlign: "center", fontSize: "14px", opacity: 0.8 }}>
           Já tem conta? 
           <Link to="/login" style={{
             color: "#c77dff",
