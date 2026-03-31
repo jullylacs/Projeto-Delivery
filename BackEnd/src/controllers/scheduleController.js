@@ -1,38 +1,46 @@
-const Schedule = require("../models/Schedule"); // Importa o model de agendamentos
+const { Schedule, Card, Technician } = require("../models"); // Importa models via index centralizado
 
 // 🔹 Criação de um novo agendamento
 exports.create = async (req, res) => {
-  // Cria um novo agendamento com os dados enviados no body da requisição
-  const schedule = await Schedule.create(req.body);
-
-  // Retorna o agendamento criado
-  res.json(schedule);
+  try {
+    const schedule = await Schedule.create(req.body);
+    res.json(schedule);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
-// 🔹 Listagem de todos os agendamentos
+// 🔹 Listagem de todos os agendamentos com dados relacionados
 exports.getAll = async (req, res) => {
-  // Busca todos os agendamentos no banco de dados
-  const schedules = await Schedule.find()
-    // Substitui o ID do card pelos dados completos do card relacionado
-    .populate("card")
-    // Substitui o ID do técnico pelos dados completos do técnico
-    .populate("tecnico");
-
-  // Retorna a lista de agendamentos
-  res.json(schedules);
+  try {
+    const schedules = await Schedule.findAll({
+      include: [
+        { model: Card,       as: "card"    }, // Dados completos do card vinculado
+        { model: Technician, as: "tecnico" }  // Dados completos do técnico
+      ],
+      order: [["data", "ASC"]]
+    });
+    res.json(schedules);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 // 🔹 Atualização de um agendamento existente
 exports.update = async (req, res) => {
-  // Atualiza o agendamento pelo ID informado na URL (req.params.id)
-  // req.body contém os novos dados
-  // { new: true } retorna o documento já atualizado
-  const schedule = await Schedule.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true }
-  );
+  try {
+    await Schedule.update(req.body, { where: { id: req.params.id } });
 
-  // Retorna o agendamento atualizado
-  res.json(schedule);
+    // Retorna o agendamento atualizado com dados relacionados
+    const schedule = await Schedule.findByPk(req.params.id, {
+      include: [
+        { model: Card,       as: "card"    },
+        { model: Technician, as: "tecnico" }
+      ]
+    });
+
+    res.json(schedule);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };

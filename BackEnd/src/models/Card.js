@@ -1,74 +1,71 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Define o schema do Card (estrutura do documento no banco)
-const CardSchema = new mongoose.Schema({
-  
+// 🔹 Model de cards do Kanban
+const Card = sequelize.define("Card", {
+
   // Nome do cliente
-  cliente: String,
+  cliente: DataTypes.STRING,
 
   // Telefone de contato do cliente
-  telefone: String,
+  telefone: DataTypes.STRING,
 
-  // Endereço completo da instalação/atendimento
-  endereco: String,
+  // Endereço completo da instalação
+  endereco: DataTypes.STRING,
 
-  // Coordenadas geográficas (usado para mapa/rota)
+  // Coordenadas geográficas armazenadas como JSONB
+  // Mantém compatibilidade com o frontend: card.coordenadas.lat / card.coordenadas.lng
   coordenadas: {
-    lat: Number, // Latitude
-    lng: Number  // Longitude
+    type: DataTypes.JSONB,
+    defaultValue: null
+    // Estrutura esperada: { lat: Number, lng: Number }
   },
 
-  // Referência ao usuário (vendedor) que criou o card
-  vendedor: {
-    type: mongoose.Schema.Types.ObjectId, // ID do documento
-    ref: "User" // Faz relação com a coleção "User"
-  },
+  // Título/resumo da demanda
+  titulo: DataTypes.STRING,
 
-  // Título do card (resumo da demanda)
-  titulo: String,
+  // Tipo de serviço (DIA, BIA, L2L, etc.)
+  tipoServico: DataTypes.STRING,
 
-  // Tipo de serviço (ex: DIA, BIA, L2L)
-  tipoServico: String,
-
-  // Valor/preço do serviço
-  preco: Number,
-
-  // Lista de comentários associados ao card
-  comments: [
-    {
-      text: String,       // Conteúdo do comentário
-      author: String,     // Autor do comentário (nome ou ID)
-      createdAt: Date,    // Data de criação do comentário
-    }
-  ],
+  // Preço/valor do serviço
+  preco: DataTypes.DECIMAL(10, 2),
 
   // IP relacionado ao serviço
-  ip: String,
+  ip: DataTypes.STRING,
 
-  // SLA (tempo acordado para execução, geralmente em horas ou dias)
-  sla: Number,
+  // SLA acordado (em horas ou dias)
+  sla: DataTypes.INTEGER,
 
-  // Prazo contratual para conclusão
-  prazo: Date,
+  // Prazo contratual
+  prazo: DataTypes.DATE,
 
   // Status atual do card
   status: {
-    type: String,
-    default: "Novo" // Valor padrão ao criar o card
+    type: DataTypes.STRING,
+    defaultValue: "Novo"
   },
 
-  // Nome da coluna do Kanban onde o card está
-  coluna: String,
+  // Coluna atual do Kanban
+  coluna: DataTypes.STRING,
 
   // Observações adicionais
-  observacoes: String
+  observacoes: DataTypes.TEXT,
 
-}, 
-{ 
-  timestamps: true // Adiciona automaticamente:
-  // createdAt -> data de criação
-  // updatedAt -> data da última atualização
+  // Referência ao usuário (vendedor) que criou o card
+  // Equivalente ao: vendedor: { type: ObjectId, ref: "User" } do Mongoose
+  vendedor_id: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: "users",
+      key: "id"
+    },
+    onDelete: "SET NULL",
+    allowNull: true
+  }
+
+}, {
+  tableName: "cards",
+  timestamps: true // createdAt e updatedAt automáticos
 });
 
-// Exporta o model para uso no sistema
-module.exports = mongoose.model("Card", CardSchema);
+module.exports = Card;

@@ -11,11 +11,10 @@ module.exports = (req, res, next) => {
   }
 
   try {
-    // Verifica e decodifica o token usando a chave secreta ("segredo")
-    const decoded = jwt.verify(token, "segredo");
-
-    // Adiciona o ID do usuário decodificado na requisição
-    // Isso permite usar o ID em rotas protegidas posteriormente
+    // Verifica e decodifica — usa variável de ambiente ou fallback
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "segredo");
+ 
+    // Agora decoded.id é um integer (PK do PostgreSQL), não mais ObjectId do MongoDB
     req.userId = decoded.id;
 
     // Chama o próximo middleware ou rota

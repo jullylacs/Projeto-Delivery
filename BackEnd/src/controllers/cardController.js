@@ -1,4 +1,4 @@
-const Card = require("../models/Card"); // Importa o model de Card (MongoDB/Mongoose)
+const { Card, User } = require("../models"); // Importa o model de Card (Sequelize/PostgreSQL)
 
 // 🔹 Criação de um novo card
 exports.createCard = async (req, res) => {
@@ -16,29 +16,54 @@ exports.createCard = async (req, res) => {
 
 // 🔹 Listagem de todos os cards
 exports.getCards = async (req, res) => {
-  // Busca todos os cards no banco
-  // populate("vendedor") substitui o ID do vendedor pelos dados completos do usuário
-  const cards = await Card.find().populate("vendedor");
+  try {
+    // Busca todos os cards no banco
+    // include: [{ model: User }] substitui o populate("vendedor") do Mongoose —
+    // traz os dados completos do usuário vinculado ao card
+    const cards = await Card.findAll({
+      include: [{ model: User, as: "vendedor", attributes: { exclude: ["senha"] } }]
+    });
 
-  // Retorna a lista de cards
-  res.json(cards);
+    // Retorna a lista de cards
+    res.json(cards);
+  } catch (err) {
+    // Em caso de erro (ex: falha no banco), retorna status 500
+    res.status(500).json(err);
+  }
 };
 
 // 🔹 Atualização de um card existente
 exports.updateCard = async (req, res) => {
-  // Busca o card pelo ID (req.params.id) e atualiza com os dados do body
-  // { new: true } faz com que retorne o documento já atualizado
-  const card = await Card.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  try {
+    // Atualiza o card com os dados do body filtrando pelo ID
+    // Equivalente ao findByIdAndUpdate do Mongoose
+    await Card.update(req.body, { where: { id: req.params.id } });
 
-  // Retorna o card atualizado
-  res.json(card);
+    // Busca o card já atualizado para retornar ao cliente
+    // Equivalente ao { new: true } do Mongoose — que retornava o documento atualizado
+    const card = await Card.findByPk(req.params.id, {
+      include: [{ model: User, as: "vendedor", attributes: { exclude: ["senha"] } }]
+    });
+
+    // Retorna o card atualizado
+    res.json(card);
+  } catch (err) {
+    // Em caso de erro (ex: falha no banco), retorna status 500
+    res.status(500).json(err);
+  }
 };
 
 // 🔹 Exclusão de um card
 exports.deleteCard = async (req, res) => {
-  // Remove o card do banco pelo ID informado
-  await Card.findByIdAndDelete(req.params.id);
+  try {
+    // Remove o card do banco pelo ID informado
+    // Equivalente ao findByIdAndDelete do Mongoose
+    await Card.destroy({ where: { id: req.params.id } });
 
-  // Retorna mensagem de confirmação
-  res.json({ message: "Deletado" });
+    // Retorna mensagem de confirmação
+    res.json({ message: "Deletado" });
+  } catch (err) {
+    // Em caso de erro (ex: falha no banco), retorna status 500
+    res.status(500).json(err);
+  }
 };

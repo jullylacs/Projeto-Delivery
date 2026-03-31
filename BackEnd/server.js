@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const app = require("./src/app"); // Importa a aplicação Express
 const http = require("http");     // Core do Node para criar servidor HTTP
 const { Server } = require("socket.io"); // Importa Socket.IO para tempo real
@@ -18,7 +20,8 @@ io.on("connection", (socket) => {
   // ex: socket.on("novoCard", data => { ... })
 });
 
-// 🔹 Inicia o servidor na porta 3000
-server.listen(3000, () => {
-  console.log("Servidor rodando na porta 3000");
+// 🔹 Inicia o servidor na porta configurada
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });

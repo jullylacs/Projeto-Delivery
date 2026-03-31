@@ -1,28 +1,36 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Define o schema de comentários (separado do Card - melhor para escala)
-const CommentSchema = new mongoose.Schema({
+// 🔹 Model de comentários (separado do Card - melhor para escala)
+const Comment = sequelize.define("Comment", {
 
   // Referência ao card ao qual o comentário pertence
-  card: {
-    type: mongoose.Schema.Types.ObjectId, // ID do documento
-    ref: "Card" // Relaciona com a coleção "Card"
+  // Equivalente ao: card: { type: ObjectId, ref: "Card" } do Mongoose
+  card_id: {
+    type: DataTypes.INTEGER,
+    references: { model: "cards", key: "id" },
+    onDelete: "CASCADE", // Se o card for deletado, apaga os comentários junto
+    allowNull: false
   },
 
   // Referência ao usuário que fez o comentário
-  usuario: {
-    type: mongoose.Schema.Types.ObjectId, // ID do usuário
-    ref: "User" // Relaciona com a coleção "User"
+  // Equivalente ao: usuario: { type: ObjectId, ref: "User" } do Mongoose
+  usuario_id: {
+    type: DataTypes.INTEGER,
+    references: { model: "users", key: "id" },
+    onDelete: "SET NULL",
+    allowNull: true
   },
 
   // Conteúdo da mensagem do comentário
-  mensagem: String
+  mensagem: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  }
 
-}, { 
-  timestamps: true // Adiciona automaticamente:
-  // createdAt -> data de criação
-  // updatedAt -> data da última edição
+}, {
+  tableName: "comments",
+  timestamps: true // createdAt e updatedAt automáticos
 });
 
-// Exporta o model para uso no sistema
-module.exports = mongoose.model("Comment", CommentSchema);
+module.exports = Comment;

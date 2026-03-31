@@ -1,6 +1,5 @@
 const express = require("express"); // Importa o Express, framework web
 const cors = require("cors");       // Permite requisições cross-origin
-require("./config/db");              // Conecta ao banco MongoDB (configuração externa)
 
 const app = express();               // Cria a aplicação Express
 
@@ -14,9 +13,9 @@ app.get("/", (req, res) => {
 });
 
 // 🔹 Rotas da aplicação
-app.use("/cards", require("./routes/cardRoutes"));         // Rotas de cards
-app.use("/users", require("./routes/userRoutes"));         // Rotas de usuários
-app.use("/schedules", require("./routes/scheduleRoutes")); // Rotas de agendamentos
+app.use("/cards",       require("./routes/cardRoutes"));       // Rotas de cards
+app.use("/users",       require("./routes/userRoutes"));       // Rotas de usuários
+app.use("/schedules",   require("./routes/scheduleRoutes"));   // Rotas de agendamentos
 app.use("/technicians", require("./routes/technicianRoutes")); // Rotas de técnicos
 
 // 🔹 Exporta app para ser usado no server principal ou testes

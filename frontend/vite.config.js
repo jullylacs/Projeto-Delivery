@@ -10,4 +10,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'), // @ aponta para src
     },
   },
+  server: {
+    host: "10.0.254.32", // opcional (pra acessar na rede)
+    port: 5173       // muda aqui
+  }
 });
