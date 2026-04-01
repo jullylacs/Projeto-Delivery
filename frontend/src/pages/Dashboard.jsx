@@ -140,7 +140,7 @@ export default function Dashboard() {
                 <div style={{ ...styles.card, borderLeft: "4px solid #d32f2f" }}>
                   <div style={styles.cardTitle}>🔴 Violações de SLA</div>
                   <div style={styles.cardValue}>{stats.slaViolations}</div>
-                  <div style={styles.alertBox + { ...styles.alertRed }}>
+                  <div style={{ ...styles.alertBox, ...styles.alertRed }}>
                     {stats.slaViolations} card(s) vencido(s) e não concluído(s)
                   </div>
                 </div>
@@ -149,7 +149,7 @@ export default function Dashboard() {
                 <div style={{ ...styles.card, borderLeft: "4px solid #f57c00" }}>
                   <div style={styles.cardTitle}>🟠 Avisos de SLA</div>
                   <div style={styles.cardValue}>{stats.slaWarnings}</div>
-                  <div style={styles.alertBox + { ...styles.alertOrange }}>
+                  <div style={{ ...styles.alertBox, ...styles.alertOrange }}>
                     {stats.slaWarnings} card(s) vence(m) nos próximos 3 dias
                   </div>
                 </div>
