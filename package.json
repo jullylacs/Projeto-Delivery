@@ -1,9 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"BACK,FRONT\" -c \"bgBlue.bold,bgGreen.bold\" --kill-others-on-fail \"npm --prefix BackEnd start\" \"npm --prefix frontend run dev\"",
+    "dev": "concurrently -n \"BACK,FRONT\" -c \"bgBlue.bold,bgGreen.bold\" --kill-others-on-fail \"npm --prefix BackEnd run dev\" \"npm --prefix frontend run dev -- --host\"",
     "dev:backend": "npm --prefix BackEnd run dev",
     "dev:frontend": "npm --prefix frontend run dev",
+    "dev:frontend:host": "npm --prefix frontend run dev -- --host",
     "start": "concurrently -n \"BACK,FRONT\" -c \"blue,green\" \"npm --prefix BackEnd run start\" \"npm --prefix frontend run start\""
   },
   "dependencies": {

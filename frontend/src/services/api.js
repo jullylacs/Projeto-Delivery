@@ -1,9 +1,14 @@
 import axios from "axios";
 // Importa a biblioteca Axios para fazer requisições HTTP
 
+const apiProtocol = import.meta.env.VITE_API_PROTOCOL || "http";
+const apiHost = import.meta.env.VITE_API_HOST || "localhost";
+const apiPort = import.meta.env.VITE_API_PORT || "3000";
+const apiBaseUrl = import.meta.env.VITE_API_URL || `${apiProtocol}://${apiHost}${apiPort ? `:${apiPort}` : ""}`;
+
 // Cria uma instância do Axios com configuração padrão
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000", // URL base para todas as requisições
+  baseURL: apiBaseUrl, // URL base para todas as requisições
   timeout: 10000,                   // Tempo máximo de espera de 10 segundos
   headers: {
     "Content-Type": "application/json" // Define que o conteúdo será JSON
