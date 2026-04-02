@@ -389,7 +389,7 @@ export default function Agenda() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 style={{ margin: 0, color: "#1f2b46", fontSize: "24px", fontWeight: 700 }}>Calendário</h2>
-          <span style={{ fontSize: 12, color: "#7c879f", fontWeight: 600 }}>Bitrix style</span>
+          <span style={{ fontSize: 12, color: "#7c879f", fontWeight: 600 }}>NVX</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
