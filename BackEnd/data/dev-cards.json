@@ -1,17 +1,17 @@
 [
   {
-    "titulo": "Teste",
+    "titulo": "BR Digital - Araraquara",
     "cliente": "BRDigital",
     "telefone": "19999999999",
-    "endereco": "rua tal",
-    "tipoServico": "Dia",
-    "preco": 12000,
+    "endereco": "Araraquara, SP",
+    "tipoServico": "100 mb Banda Larga",
+    "preco": 1200,
     "sla": 4,
-    "prazo": "0026-02-12",
-    "observacoes": "teste",
+    "prazo": "2026-04-02",
+    "observacoes": "conforme conversado no grupo com o cliente. Faremos apenas à ativação do POP BR Araraquara até o cliente. (lançamento da fibra e ativação).\nAssim, à Ponta B-Campinas (Ouro verde), eles mesmo farão.\nInformei a localização no rack:\nEstamos localizados na sala 2601 no andar 26 - Clicknet",
     "coordenadas": {
-      "lat": "267262766",
-      "lng": "7383783783"
+      "lat": " -21.773607",
+      "lng": "-48.256264 "
     },
     "status": "Novo",
     "coluna": "Novo",
@@ -43,6 +43,6 @@
     "_id": "dev-1775140267189",
     "id": null,
     "createdAt": "2026-04-02T14:31:07.189Z",
-    "updatedAt": "2026-04-02T15:53:23.499Z"
+    "updatedAt": "2026-04-02T18:09:17.986Z"
   }
 ]

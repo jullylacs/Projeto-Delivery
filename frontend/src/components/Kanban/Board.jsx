@@ -1,6 +1,6 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
-import { DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   CalendarDays,
   ClipboardList,
@@ -155,6 +155,8 @@ const downloadBlobFile = (content, mimeType, fileName) => {
   anchor.remove();
   URL.revokeObjectURL(href);
 };
+
+const getCardKey = (card) => card?._id || card?.id;
 
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
@@ -708,13 +710,15 @@ function DroppableColumn({ id, children, minHeight, padding }) {
 // Representa um item individual no kanban
 function DraggableCard({ card, onOpen, densityCfg }) {
   // useDraggable do dnd-kit para tornar o card arrastável
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: getCardKey(card) });
   const [isHovered, setIsHovered] = useState(false);
   
   // Estilo dinâmico baseado no estado de arrasto e hover
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.5 : 1, // Reduz opacidade durante arrasto
+    transition: isDragging ? "none" : styles.cardItem.transition,
+    willChange: "transform",
     ...styles.cardItem,
     padding: densityCfg?.cardPadding || styles.cardItem.padding,
     minWidth: densityCfg?.cardMinWidth || styles.cardItem.minWidth,
@@ -903,7 +907,11 @@ export default function Board() {
   const densityCfg = densityPresets[density] || densityPresets.confortavel;
 
   // Configuração dos sensores para drag and drop (apenas pointer/mouse)
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    })
+  );
 
   // Manipulador de início de arrasto
   const handleDragStart = (event) => {
@@ -919,24 +927,40 @@ export default function Board() {
     // Verifica se soltou em uma coluna (IDs começam com "column-")
     if (String(over.id).startsWith("column-")) {
       const targetStatus = String(over.id).replace("column-", ""); // Extrai o nome do status
-      const movedCard = cards.find((card) => card.id === active.id);
+      const movedCard = cards.find((card) => getCardKey(card) === active.id);
       
       // Se o status é diferente, atualiza
       if (movedCard && movedCard.status !== targetStatus) {
+        const optimisticCard = { ...movedCard, status: targetStatus, coluna: targetStatus };
+
+        setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? optimisticCard : card)));
+
+        if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
+          setSelectedCard(optimisticCard);
+          setStatusEdit(targetStatus);
+        }
+
         try {
           // Envia requisição PUT para atualizar o status
-          const response = await api.put(`/cards/${movedCard.id}`, { ...movedCard, status: targetStatus, coluna: targetStatus });
+          const response = await api.put(`/cards/${getCardKey(movedCard)}`, optimisticCard);
           const updatedCard = response.data;
           
           // Atualiza o estado local com o card modificado
-          setCards((prev) => prev.map((card) => (card.id === updatedCard.id ? updatedCard : card)));
+          setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(updatedCard) ? updatedCard : card)));
           
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
-          if (selectedCard && selectedCard.id === updatedCard.id) {
+          if (selectedCard && getCardKey(selectedCard) === getCardKey(updatedCard)) {
             setSelectedCard(updatedCard);
             setStatusEdit(updatedCard.status);
           }
         } catch (e) {
+          setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? movedCard : card)));
+
+          if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
+            setSelectedCard(movedCard);
+            setStatusEdit(movedCard.status);
+          }
+
           console.error("Falha ao mover card", e);
         }
       }
@@ -1089,11 +1113,11 @@ export default function Board() {
 
     try {
       // Envia para API
-      const response = await api.put(`/cards/${selectedCard.id}`, cardUpdate);
+      const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
       const updatedCard = response.data;
 
       // Atualiza estados localmente
-      setCards((prev) => prev.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
+      setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
       setSelectedCard(updatedCard);
       setCommentText(""); // Limpa campo de comentário
     } catch (err) {
@@ -1108,9 +1132,9 @@ export default function Board() {
 
     const payload = { ...selectedCard, ...updates };
     try {
-      const response = await api.put(`/cards/${selectedCard.id}`, payload);
+      const response = await api.put(`/cards/${getCardKey(selectedCard)}`, payload);
       const updatedCard = response.data;
-      setCards((prev) => prev.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
+      setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
       setSelectedCard(updatedCard);
     } catch (err) {
       console.error("Erro ao salvar alterações do card", err);
@@ -1123,8 +1147,8 @@ export default function Board() {
     if (!selectedCard) return;
 
     try {
-      await api.delete(`/cards/${selectedCard.id}`);
-      setCards((prev) => prev.filter((c) => c.id !== selectedCard.id));
+      await api.delete(`/cards/${getCardKey(selectedCard)}`);
+      setCards((prev) => prev.filter((c) => getCardKey(c) !== getCardKey(selectedCard)));
       handleCloseCard(); // Fecha modal após exclusão
     } catch (err) {
       console.error("Erro ao deletar card", err);
@@ -1139,7 +1163,8 @@ export default function Board() {
     // Remove campos de identificação única e reseta status
     const duplicatePayload = {
       ...selectedCard,
-      id: undefined,          // Remove ID original
+      id: undefined,
+      _id: undefined,
       titulo: `${selectedCard.titulo || selectedCard.cliente || "Card"} (cópia)`, // Adiciona "(cópia)" ao título
       status: "Novo",          // Reseta status para Novo
       coluna: "Novo",          // Reseta coluna
@@ -1441,36 +1466,47 @@ export default function Board() {
   };
 
   // Filtra cards para uma coluna específica com base nos filtros ativos
-  const filteredCards = (col) => {
-    return cards.filter((c) => {
-      // Primeiro critério: o status do card deve corresponder à coluna
-      let matches = c.status === col;
+  const cardsByColumn = useMemo(() => {
+    const grouped = Object.fromEntries(columns.map((column) => [column, []]));
+    const normalizedSearch = searchTerm.trim().toLowerCase();
 
-      // Aplica filtro de busca textual (cliente, título, telefone, endereço)
-      if (searchTerm.trim()) {
-        const search = searchTerm.toLowerCase();
-        matches = matches && (
-          (c.cliente || "").toLowerCase().includes(search) ||
-          (c.titulo || "").toLowerCase().includes(search) ||
-          (c.telefone || "").toLowerCase().includes(search) ||
-          (c.endereco || "").toLowerCase().includes(search)
+    cards.forEach((card) => {
+      let matches = true;
+
+      if (normalizedSearch) {
+        matches = (
+          (card.cliente || "").toLowerCase().includes(normalizedSearch) ||
+          (card.titulo || "").toLowerCase().includes(normalizedSearch) ||
+          (card.telefone || "").toLowerCase().includes(normalizedSearch) ||
+          (card.endereco || "").toLowerCase().includes(normalizedSearch)
         );
       }
 
-      // Aplica filtro por status (selecionado no dropdown)
-      if (statusFilter) {
-        matches = matches && c.status === statusFilter;
+      if (matches && statusFilter) {
+        matches = card.status === statusFilter;
       }
 
-      // Aplica filtro por vendedor
-      if (vendorFilter) {
-        const vendorName = c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor";
-        matches = matches && vendorName === vendorFilter;
+      if (matches && vendorFilter) {
+        const vendorName = card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor";
+        matches = vendorName === vendorFilter;
       }
 
-      return matches;
+      if (!matches) return;
+
+      if (!grouped[card.status]) {
+        grouped[card.status] = [];
+      }
+
+      grouped[card.status].push(card);
     });
-  };
+
+    return grouped;
+  }, [cards, columns, searchTerm, statusFilter, vendorFilter]);
+
+  const activeCard = useMemo(
+    () => cards.find((card) => getCardKey(card) === activeId) || null,
+    [cards, activeId]
+  );
 
   // Renderização do componente principal
   return (
@@ -1598,7 +1634,7 @@ export default function Board() {
               <tr>
                 {/* Renderiza cabeçalho com cada coluna e controles de edição */}
                 {columns.map((col, idx) => {
-                  const columnCards = filteredCards(col);
+                  const columnCards = cardsByColumn[col] || [];
                   return (
                     <th key={col} style={{ ...styles.th, minWidth: densityCfg.columnWidth }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
@@ -1658,27 +1694,38 @@ export default function Board() {
             <tbody>
               <tr>
                 {/* Renderiza cada coluna com seus cards */}
-                {columns.map((col) => (
-                  <td key={col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
-                    {/* Área droppable para receber cards arrastados */}
-                    <DroppableColumn id={`column-${col}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
-                      {/* Mapeia e renderiza cada card da coluna */}
-                      {filteredCards(col).map((card) => (
-                        <DraggableCard key={card._id} card={card} onOpen={handleOpenCard} densityCfg={densityCfg} />
-                      ))}
-                      {/* Mensagem quando não há cards na coluna */}
-                      {filteredCards(col).length === 0 && (
-                        <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
-                          Nenhum card
-                        </div>
-                      )}
-                    </DroppableColumn>
-                  </td>
-                ))}
+                {columns.map((col) => {
+                  const columnCards = cardsByColumn[col] || [];
+
+                  return (
+                    <td key={col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
+                      {/* Área droppable para receber cards arrastados */}
+                      <DroppableColumn id={`column-${col}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
+                        {/* Mapeia e renderiza cada card da coluna */}
+                        {columnCards.map((card) => (
+                          <DraggableCard key={getCardKey(card)} card={card} onOpen={handleOpenCard} densityCfg={densityCfg} />
+                        ))}
+                        {/* Mensagem quando não há cards na coluna */}
+                        {columnCards.length === 0 && (
+                          <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
+                            Nenhum card
+                          </div>
+                        )}
+                      </DroppableColumn>
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
           </table>
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activeCard ? (
+            <div style={{ width: densityCfg.columnWidth, pointerEvents: "none" }}>
+              <DraggableCard card={activeCard} onOpen={() => {}} densityCfg={densityCfg} />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {/* Modal de criação de card */}
@@ -2039,9 +2086,9 @@ export default function Board() {
                             const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
                             const cardUpdate = { ...selectedCard, comments: updatedComments };
                             try {
-                              const response = await api.put(`/cards/${selectedCard._id}`, cardUpdate);
+                              const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
                               const updatedCard = response.data;
-                              setCards((prev) => prev.map((c) => (c._id === updatedCard._id ? updatedCard : c)));
+                              setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
                               setSelectedCard(updatedCard);
                             } catch (err) {
                               setError("Erro ao excluir comentário");
@@ -2051,9 +2098,9 @@ export default function Board() {
                             setCommentText(comment.text);
                             const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
                             const cardUpdate = { ...selectedCard, comments: updatedComments };
-                            api.put(`/cards/${selectedCard._id}`, cardUpdate).then((response) => {
+                            api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate).then((response) => {
                               const updatedCard = response.data;
-                              setCards((prev) => prev.map((c) => (c._id === updatedCard._id ? updatedCard : c)));
+                              setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
                               setSelectedCard(updatedCard);
                             });
                           }}><Pencil size={15} /></button>
@@ -2110,9 +2157,9 @@ export default function Board() {
                       const updatedComments = [...(selectedCard.comments || []), newComment];
                       const cardUpdate = { ...selectedCard, comments: updatedComments };
                       try {
-                        const response = await api.put(`/cards/${selectedCard._id}`, cardUpdate);
+                        const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
                         const updatedCard = response.data;
-                        setCards((prev) => prev.map((c) => (c._id === updatedCard._id ? updatedCard : c)));
+                        setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
                         setSelectedCard(updatedCard);
                         setCommentText("");
                       } catch (err) {
@@ -2153,14 +2200,14 @@ export default function Board() {
               onSave={async (updatedCard) => {
                 try {
                   // Envia atualização para API
-                  const response = await api.put(`/cards/${editingCard.id}`, updatedCard);
+                  const response = await api.put(`/cards/${getCardKey(editingCard)}`, updatedCard);
                   const savedCard = response.data;
                   
                   // Atualiza estado dos cards
-                  setCards((prev) => prev.map((c) => c.id === savedCard.id ? savedCard : c));
+                  setCards((prev) => prev.map((c) => getCardKey(c) === getCardKey(savedCard) ? savedCard : c));
                   
                   // Se o card editado está selecionado, atualiza também
-                  if (selectedCard && selectedCard.id === savedCard.id) {
+                  if (selectedCard && getCardKey(selectedCard) === getCardKey(savedCard)) {
                     setSelectedCard(savedCard);
                     setStatusEdit(savedCard.status);
                   }
