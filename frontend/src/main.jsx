@@ -7,6 +7,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App"; 
 // Importa o componente principal da aplicação
 
+import "./index.css";
+
 import { ErrorBoundary } from "./ErrorBoundary"; 
 // Importa o componente ErrorBoundary para capturar erros em qualquer componente filho
 

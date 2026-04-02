@@ -15,6 +15,7 @@ export default function Register() {
   });
   const [loading, setLoading] = useState(false); // Indica carregamento do submit
   const [error, setError] = useState(""); // Mensagem de erro do formulário
+  const [success, setSuccess] = useState("");
   const navigate = useNavigate(); // Hook para navegação programática
 
   // Atualiza o estado do formulário quando o usuário digita
@@ -68,6 +69,7 @@ export default function Register() {
 
     setLoading(true); // ativa indicador de carregamento
     setError(""); // limpa erros
+    setSuccess("");
 
     try {
       // Log para depuração
@@ -88,8 +90,8 @@ export default function Register() {
       console.log("Resposta do servidor:", response.data);
 
       // Sucesso
-      alert("Conta criada com sucesso! Faça login agora.");
-      navigate("/login"); // redireciona para login
+      setSuccess("Conta criada com sucesso! Redirecionando para login...");
+      setTimeout(() => navigate("/login"), 1200);
     } catch (error) {
       console.error("Erro detalhado no registro:", error);
 
@@ -161,6 +163,21 @@ export default function Register() {
             textAlign: "center"
           }}>
             ❌ {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{
+            padding: "12px 15px",
+            marginBottom: "20px",
+            borderRadius: "8px",
+            background: "rgba(52, 211, 153, 0.16)",
+            border: "1px solid rgba(52, 211, 153, 0.5)",
+            color: "#b8ffe4",
+            fontSize: "14px",
+            textAlign: "center"
+          }}>
+            ✅ {success}
           </div>
         )}
         

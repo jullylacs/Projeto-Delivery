@@ -19,7 +19,7 @@ export default function Sidebar() {
       style={{
         width: "250px", // largura fixa da sidebar
         height: "100vh", // altura completa da tela
-        background: "linear-gradient(180deg, #240046, #3c096c)", // gradiente roxo
+        background: "linear-gradient(180deg, #2c0b52, #4f238f)", // gradiente roxo
         color: "#fff",
         display: "flex",
         flexDirection: "column",
@@ -73,7 +73,7 @@ export default function Sidebar() {
                 borderRadius: "12px",
                 cursor: "pointer",
                 background: isActive
-                  ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" // ativo
+                  ? "linear-gradient(90deg, #6f3dde, #8a5dff)" // ativo
                   : "transparent", // inativo
                 transition: "0.2s",
                 fontSize: "14px"

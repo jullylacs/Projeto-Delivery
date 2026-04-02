@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"; 
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; 
+import { useEffect } from "react";
 // Importa componentes do React Router para controle de rotas
 
 import Sidebar from "./components/Layout/Sidebar"; // Barra lateral do layout
@@ -9,6 +10,63 @@ import Agenda from "./pages/Agenda";              // Página Agenda
 import Profile from "./pages/Profile";            // Página Profile
 import Login from "./pages/Login";                // Página Login
 import Register from "./pages/Register";          // Página Register
+
+const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
+const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/profile"];
+
+function getLastPrivateRoute() {
+  const saved = localStorage.getItem(LAST_PRIVATE_ROUTE_KEY);
+  return PRIVATE_ROUTES.includes(saved) ? saved : "/dashboard";
+}
+
+function LastRouteTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (PRIVATE_ROUTES.includes(location.pathname)) {
+      localStorage.setItem(LAST_PRIVATE_ROUTE_KEY, location.pathname);
+    }
+  }, [location.pathname]);
+
+  return null;
+}
+
+function MainLayout() {
+  const restoreRoute = getLastPrivateRoute();
+
+  return (
+    <div style={{ display: "flex", background: "#f2efff", color: "#1f2b46" }}>
+      <LastRouteTracker />
+      {/* Layout principal: sidebar à esquerda e conteúdo à direita */}
+      <Sidebar />
+
+      <div style={{ flex: 1, background: "#f2efff", color: "#1f2b46" }}>
+        {/* Área principal: Header no topo e conteúdo abaixo */}
+        <Header />
+
+        <div
+          style={{
+            padding: "20px",
+            overflow: "auto",
+            height: "calc(100vh - 70px)",
+            background: "#f2efff",
+          }}
+        >
+          {/* Sub-rotas dentro do layout principal */}
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/kanban" element={<Kanban />} />
+            <Route path="/agenda" element={<Agenda />} />
+            <Route path="/profile" element={<Profile />} />
+
+            {/* Redireciona "/" para última rota privada */}
+            <Route path="/" element={<Navigate to={restoreRoute} replace />} />
+          </Routes>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -23,37 +81,8 @@ export default function App() {
 
         {/* Rotas protegidas / principais da aplicação */}
         <Route
-          path="/*" 
-          element={
-            <div style={{ display: "flex" }}>
-              {/* Layout principal: sidebar à esquerda e conteúdo à direita */}
-              <Sidebar /> 
-
-              <div style={{ flex: 1 }}>
-                {/* Área principal: Header no topo e conteúdo abaixo */}
-                <Header /> 
-
-                <div 
-                  style={{ 
-                    padding: "20px", 
-                    overflow: "auto", 
-                    height: "calc(100vh - 70px)" 
-                  }}
-                >
-                  {/* Sub-rotas dentro do layout principal */}
-                  <Routes>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/kanban" element={<Kanban />} />
-                    <Route path="/agenda" element={<Agenda />} />
-                    <Route path="/profile" element={<Profile />} />
-
-                    {/* Redireciona "/" para "/dashboard" */}
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
-                </div>
-              </div>
-            </div>
-          }
+          path="/*"
+          element={<MainLayout />}
         />
       </Routes>
     </BrowserRouter>

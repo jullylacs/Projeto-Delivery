@@ -1,35 +1,37 @@
-import { useEffect, useState } from "react"; // Hooks do React
-import { useNavigate } from "react-router-dom"; // Hook para navegação programática
-import api from "../services/api"; // Instância de API configurada para comunicação com backend
+﻿import { useEffect, useState } from "react"; // Hooks do React
+import { useNavigate } from "react-router-dom"; // Hook para navegaÃ§Ã£o programÃ¡tica
+import api from "../services/api"; // InstÃ¢ncia de API configurada para comunicaÃ§Ã£o com backend
 
 export default function Profile() {
   // Estados do componente
-  const [user, setUser] = useState(null); // Armazena dados do usuário
-  const [loading, setLoading] = useState(true); // Indica se o perfil está sendo carregado
-  const [isEditing, setIsEditing] = useState(false); // Define se o usuário está no modo de edição
-  const [formData, setFormData] = useState({}); // Armazena dados do formulário enquanto edita
+  const [user, setUser] = useState(null); // Armazena dados do usuÃ¡rio
+  const [loading, setLoading] = useState(true); // Indica se o perfil estÃ¡ sendo carregado
+  const [isEditing, setIsEditing] = useState(false); // Define se o usuÃ¡rio estÃ¡ no modo de ediÃ§Ã£o
+  const [formData, setFormData] = useState({}); // Armazena dados do formulÃ¡rio enquanto edita
   const [avatarPreview, setAvatarPreview] = useState(null); // Armazena preview do avatar
   const [error, setError] = useState(""); // Mensagem de erro
-  const navigate = useNavigate(); // Hook para navegação programática
+  const [successMessage, setSuccessMessage] = useState("");
+  const navigate = useNavigate(); // Hook para navegaÃ§Ã£o programÃ¡tica
 
-  // Carrega perfil do usuário ao montar o componente
+  // Carrega perfil do usuÃ¡rio ao montar o componente
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca dados do usuário no localStorage
+    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca dados do usuÃ¡rio no localStorage
+    const userId = userData?._id || userData?.id;
 
-    if (!userData._id) {
-      navigate("/login"); // Se não tiver usuário, redireciona para login
+    if (!userId) {
+      navigate("/login"); // Se nÃ£o tiver usuÃ¡rio, redireciona para login
       return;
     }
 
-    fetchUserProfile(userData._id); // Busca perfil do usuário no backend
+    fetchUserProfile(userId); // Busca perfil do usuÃ¡rio no backend
   }, [navigate]);
 
-  // Função para buscar perfil do usuário pelo ID
+  // FunÃ§Ã£o para buscar perfil do usuÃ¡rio pelo ID
   const fetchUserProfile = async (userId) => {
     try {
-      const response = await api.get(`/users/${userId}`); // Requisição GET para backend
-      setUser(response.data); // Salva dados do usuário
-      setFormData(response.data); // Preenche formulário com os dados atuais
+      const response = await api.get(`/users/${userId}`); // RequisiÃ§Ã£o GET para backend
+      setUser(response.data); // Salva dados do usuÃ¡rio
+      setFormData(response.data); // Preenche formulÃ¡rio com os dados atuais
       setAvatarPreview(response.data.avatar); // Define avatar
       setLoading(false); // Desativa loading
     } catch (err) {
@@ -39,17 +41,18 @@ export default function Profile() {
     }
   };
 
-  // Atualiza valores do formulário conforme usuário digita
+  // Atualiza valores do formulÃ¡rio conforme usuÃ¡rio digita
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value // Atualiza o campo específico do formulário
+      [name]: value // Atualiza o campo especÃ­fico do formulÃ¡rio
     }));
     setError(""); // Limpa erro ao digitar
+    setSuccessMessage("");
   };
 
-  // Função para alterar avatar com preview
+  // FunÃ§Ã£o para alterar avatar com preview
   const handleAvatarChange = (e) => {
     const file = e.target.files[0]; // Pega arquivo selecionado
     if (file) {
@@ -58,56 +61,64 @@ export default function Profile() {
         setAvatarPreview(reader.result); // Atualiza preview
         setFormData(prev => ({
           ...prev,
-          avatar: reader.result // Salva avatar em base64 no formulário
+          avatar: reader.result // Salva avatar em base64 no formulÃ¡rio
         }));
       };
       reader.readAsDataURL(file); // Converte arquivo para base64
     }
   };
 
-  // Salva alterações do perfil no backend
+  // Salva alteraÃ§Ãµes do perfil no backend
   const handleSaveProfile = async () => {
     try {
-      const response = await api.put(`/users/${user._id}`, formData); // Requisição PUT para atualizar perfil
-      setUser(response.data); // Atualiza estado do usuário
+      const userId = user?._id || user?.id;
+      if (!userId) {
+        setError("Identificador de usuÃ¡rio invÃ¡lido");
+        return;
+      }
+
+      const response = await api.put(`/users/${userId}`, formData); // RequisiÃ§Ã£o PUT para atualizar perfil
+      setUser(response.data); // Atualiza estado do usuÃ¡rio
       localStorage.setItem("user", JSON.stringify(response.data)); // Atualiza localStorage
-      setIsEditing(false); // Sai do modo edição
+      window.dispatchEvent(new Event("user-updated"));
+      setIsEditing(false); // Sai do modo ediÃ§Ã£o
       setError(""); // Limpa erro
-      alert("Perfil atualizado com sucesso!"); // Alerta de sucesso
+      setSuccessMessage("Perfil atualizado com sucesso!");
     } catch (err) {
+      setSuccessMessage("");
       setError("Erro ao atualizar perfil: " + (err.response?.data?.message || err.message)); // Mostra erro detalhado
     }
   };
 
-  // Objetos de perfis com label e cor para visualização
+  // Objetos de perfis com label e cor para visualizaÃ§Ã£o
   const perfis = {
-    comercial: { label: "👔 Comercial", color: "#1e40af" },
-    operacional: { label: "📋 Operacional", color: "#059669" },
-    tecnico: { label: "🔧 Técnico", color: "#d97706" },
-    gestor: { label: "👨‍💼 Gestor", color: "#7c3aed" },
-    delivery: { label: "🚚 Delivery", color: "#0ea5e9" },
-    admin: { label: "🔐 Admin", color: "#dc2626" }
+    comercial: { label: "ðŸ‘” Comercial", color: "#1e40af" },
+    operacional: { label: "ðŸ“‹ Operacional", color: "#059669" },
+    tecnico: { label: "ðŸ”§ TÃ©cnico", color: "#d97706" },
+    gestor: { label: "ðŸ‘¨â€ðŸ’¼ Gestor", color: "#7c3aed" },
+    delivery: { label: "ðŸšš Delivery", color: "#0ea5e9" },
+    admin: { label: "ðŸ” Admin", color: "#dc2626" }
   };
 
   // Renderiza loading enquanto busca dados
   if (loading) {
     return (
-      <div style={{ padding: "24px", textAlign: "center", color: "#666" }}>
+      <div style={{ padding: "24px", textAlign: "center", color: "#5f5a88" }}>
         Carregando perfil...
       </div>
     );
   }
 
-  // Caso não tenha usuário carregado, mostra erro
+  // Caso nÃ£o tenha usuÃ¡rio carregado, mostra erro
   if (!user) {
     return (
-      <div style={{ padding: "24px", textAlign: "center", color: "#d32f2f" }}>
+      <div style={{ padding: "24px", textAlign: "center", color: "#c62828" }}>
         Erro ao carregar perfil
       </div>
     );
   }
 
-  // Renderização principal do componente
+  // RenderizaÃ§Ã£o principal do componente
   return (
     <div style={{
       padding: "24px",
@@ -120,9 +131,9 @@ export default function Profile() {
       }}>
         {/* Header */}
         <div style={{ marginBottom: "24px" }}>
-          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>👤 Meu Perfil</h1>
+          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>ðŸ‘¤ Meu Perfil</h1>
           <p style={{ color: "#5f5a88", fontSize: "14px", marginTop: "4px" }}>
-            Visualize e edite suas informações
+            Visualize e edite suas informaÃ§Ãµes
           </p>
         </div>
 
@@ -141,10 +152,24 @@ export default function Profile() {
           </div>
         )}
 
+        {successMessage && (
+          <div style={{
+            padding: "12px 16px",
+            backgroundColor: "#ecfdf3",
+            border: "1px solid #35c986",
+            borderRadius: "8px",
+            color: "#146c43",
+            marginBottom: "16px",
+            fontSize: "14px"
+          }}>
+            {successMessage}
+          </div>
+        )}
+
         {/* Card de perfil */}
         <div style={{
           backgroundColor: "#fff",
-          border: "1px solid rgba(108,59,255,0.12)",
+          border: "1px solid #d6d0ff",
           borderRadius: "14px",
           padding: "32px",
           boxShadow: "0 8px 18px rgba(62,44,158,0.08)"
@@ -162,7 +187,7 @@ export default function Profile() {
               width: "120px",
               height: "120px",
               borderRadius: "50%",
-              backgroundColor: avatarPreview ? "transparent" : "#8b64ff", // Cor padrão se não tiver avatar
+              backgroundColor: avatarPreview ? "transparent" : "#8b64ff", // Cor padrÃ£o se nÃ£o tiver avatar
               backgroundImage: avatarPreview ? `url(${avatarPreview})` : "none", // Imagem do avatar
               backgroundSize: "cover",
               backgroundPosition: "center",
@@ -174,10 +199,10 @@ export default function Profile() {
               border: "4px solid #e0e0e0",
               boxShadow: "0 4px 12px rgba(62,44,158,0.15)"
             }}>
-              {!avatarPreview && "👤"} {/* Emoji padrão */}
+              {!avatarPreview && "ðŸ‘¤"} {/* Emoji padrÃ£o */}
             </div>
 
-            {/* Botão para alterar avatar */}
+            {/* BotÃ£o para alterar avatar */}
             {isEditing && (
               <label style={{
                 padding: "8px 16px",
@@ -189,7 +214,7 @@ export default function Profile() {
                 fontWeight: "600",
                 marginBottom: "12px"
               }}>
-                📸 Mudar Foto
+                ðŸ“¸ Mudar Foto
                 <input
                   type="file"
                   accept="image/*"
@@ -216,7 +241,7 @@ export default function Profile() {
             </span>
           </div>
 
-          {/* Informações */}
+          {/* InformaÃ§Ãµes */}
           <div style={{ display: "grid", gap: "16px" }}>
             {/* Nome */}
             <div>
@@ -243,7 +268,7 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
@@ -280,7 +305,7 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
@@ -316,18 +341,18 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box",
                     cursor: "pointer"
                   }}
                 >
-                  <option value="comercial">👔 Comercial</option>
-                  <option value="operacional">📋 Operacional</option>
-                  <option value="tecnico">🔧 Técnico</option>
-                  <option value="gestor">👨‍💼 Gestor</option>
-                  <option value="delivery">🚚 Delivery</option>
-                  <option value="admin">🔐 Admin</option>
+                  <option value="comercial">ðŸ‘” Comercial</option>
+                  <option value="operacional">ðŸ“‹ Operacional</option>
+                  <option value="tecnico">ðŸ”§ TÃ©cnico</option>
+                  <option value="gestor">ðŸ‘¨â€ðŸ’¼ Gestor</option>
+                  <option value="delivery">ðŸšš Delivery</option>
+                  <option value="admin">ðŸ” Admin</option>
                 </select>
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
@@ -362,14 +387,14 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.telefone || "Não informado"}
+                  {user.telefone || "NÃ£o informado"}
                 </p>
               )}
             </div>
@@ -400,20 +425,20 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.departamento || "Não informado"}
+                  {user.departamento || "NÃ£o informado"}
                 </p>
               )}
             </div>
 
-            {/* Data de criação */}
-            <div style={{ paddingTop: "12px", borderTop: "1px solid #e0e0e0" }}>
+            {/* Data de criaÃ§Ã£o */}
+            <div style={{ paddingTop: "12px", borderTop: "1px solid #d6d0ff" }}>
               <label style={{
                 display: "block",
                 fontSize: "12px",
@@ -435,20 +460,20 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Botões de ação */}
+          {/* BotÃµes de aÃ§Ã£o */}
           <div style={{
             display: "flex",
             gap: "12px",
             marginTop: "28px",
             paddingTop: "20px",
-            borderTop: "1px solid #e0e0e0"
+            borderTop: "1px solid #d6d0ff"
           }}>
             {isEditing ? (
               <>
-                {/* Cancelar edição */}
+                {/* Cancelar ediÃ§Ã£o */}
                 <button
                   onClick={() => {
-                    setIsEditing(false); // Sai do modo edição
+                    setIsEditing(false); // Sai do modo ediÃ§Ã£o
                     setFormData(user); // Restaura dados originais
                     setAvatarPreview(user.avatar); // Restaura avatar
                     setError(""); // Limpa erros
@@ -458,8 +483,8 @@ export default function Profile() {
                     padding: "10px 16px",
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
-                    backgroundColor: "#f8f7ff",
-                    color: "#5b4eaa",
+                    backgroundColor: "#faf9ff",
+                    color: "#5f5a88",
                     cursor: "pointer",
                     fontWeight: "600",
                     fontSize: "14px"
@@ -468,7 +493,7 @@ export default function Profile() {
                   Cancelar
                 </button>
 
-                {/* Salvar alterações */}
+                {/* Salvar alteraÃ§Ãµes */}
                 <button
                   onClick={handleSaveProfile}
                   style={{
@@ -483,11 +508,11 @@ export default function Profile() {
                     fontSize: "14px"
                   }}
                 >
-                  💾 Salvar Alterações
+                  ðŸ’¾ Salvar AlteraÃ§Ãµes
                 </button>
               </>
             ) : (
-              /* Botão para ativar modo edição */
+              /* BotÃ£o para ativar modo ediÃ§Ã£o */
               <button
                 onClick={() => setIsEditing(true)}
                 style={{
@@ -502,7 +527,7 @@ export default function Profile() {
                   fontSize: "14px"
                 }}
               >
-                ✏️ Editar Perfil
+                âœï¸ Editar Perfil
               </button>
             )}
           </div>

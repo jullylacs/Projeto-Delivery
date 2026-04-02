@@ -1,17 +1,149 @@
 import { useNavigate } from "react-router-dom"; // Hook para navegação programática
-import { useState, useEffect } from "react";     // Hooks de estado e ciclo de vida
+import { useState, useEffect, useRef } from "react";     // Hooks de estado e ciclo de vida
+import api from "../../services/api";
+
+const NOTIFICATION_READ_KEY = "readNotifications";
+const USER_UPDATED_EVENT = "user-updated";
+
+const readReadNotifications = () => {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_READ_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const getCardId = (card) => card?._id || card?.id || card?.uuid || String(Math.random());
+
+const buildSlaNotifications = (cards) => {
+  const now = new Date();
+
+  return cards
+    .filter((card) => {
+      if (!card?.prazo) return false;
+      return card.status !== "Concluído" && card.status !== "Inativo";
+    })
+    .map((card) => {
+      const deadline = new Date(card.prazo);
+      if (Number.isNaN(deadline.getTime())) return null;
+
+      const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+      const baseId = getCardId(card);
+
+      if (deadline < now) {
+        return {
+          id: `${baseId}-late-${deadline.toISOString()}`,
+          title: card.empresa || card.nome || card.title || "Card sem título",
+          message: "Prazo vencido. Requer atenção imediata.",
+          when: deadline,
+          priority: "high",
+        };
+      }
+
+      if (diffDays >= 0 && diffDays <= 3) {
+        return {
+          id: `${baseId}-due-${deadline.toISOString()}`,
+          title: card.empresa || card.nome || card.title || "Card sem título",
+          message: `Prazo vence em ${diffDays} dia(s).`,
+          when: deadline,
+          priority: "medium",
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.priority === b.priority) {
+        return a.when - b.when;
+      }
+
+      return a.priority === "high" ? -1 : 1;
+    });
+};
 
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
 export default function Header() {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
   const [showMenu, setShowMenu] = useState(false); // Controla visibilidade do menu dropdown
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [readNotifications, setReadNotifications] = useState(() => readReadNotifications());
   const [user, setUser] = useState(null); // Armazena dados do usuário logado
+  const userMenuRef = useRef(null);
+  const notificationsRef = useRef(null);
+
+  const unreadCount = notifications.filter((item) => !readNotifications.includes(item.id)).length;
+
+  const markAllAsRead = () => {
+    const allIds = notifications.map((item) => item.id);
+    setReadNotifications(allIds);
+  };
+
+  const markOneAsRead = (notificationId) => {
+    setReadNotifications((prev) => (prev.includes(notificationId) ? prev : [...prev, notificationId]));
+  };
 
   // Carrega dados do usuário do localStorage ao montar o componente
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca o objeto 'user'
-    setUser(userData); // Atualiza estado do usuário
+    const syncUser = () => {
+      const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca o objeto 'user'
+      setUser(userData); // Atualiza estado do usuário
+    };
+
+    const handleStorage = (event) => {
+      if (!event.key || event.key === "user") {
+        syncUser();
+      }
+    };
+
+    syncUser();
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(USER_UPDATED_EVENT, syncUser);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(USER_UPDATED_EVENT, syncUser);
+    };
   }, []); // Executa apenas na montagem
+
+  useEffect(() => {
+    localStorage.setItem(NOTIFICATION_READ_KEY, JSON.stringify(readNotifications));
+  }, [readNotifications]);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await api.get("/cards");
+        const items = buildSlaNotifications(Array.isArray(response.data) ? response.data : []);
+        setNotifications(items);
+      } catch {
+        setNotifications([]);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   // Função que realiza logout
   const handleLogout = () => {
@@ -59,31 +191,135 @@ export default function Header() {
 
       {/* Área direita contendo notificações e menu do usuário */}
       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-
         {/* Ícone de Notificação */}
-        <div
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.1)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "0.2s"
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"} // Hover
-          onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"} // Normal
-        >
-          🔔
+        <div ref={notificationsRef} style={{ position: "relative" }}>
+          <div
+            onClick={() => {
+              setShowNotifications((prev) => !prev);
+              setShowMenu(false);
+              if (!showNotifications && unreadCount > 0) {
+                markAllAsRead();
+              }
+            }}
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "0.2s",
+              position: "relative",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"} // Hover
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"} // Normal
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-3px",
+                  right: "-3px",
+                  minWidth: "18px",
+                  height: "18px",
+                  borderRadius: "9px",
+                  background: "#ff4d6d",
+                  color: "#fff",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 4px",
+                  border: "1px solid rgba(255,255,255,0.4)",
+                }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
+
+          {showNotifications && (
+            <div
+              style={{
+                position: "absolute",
+                top: "50px",
+                right: "0",
+                background: "#fff",
+                borderRadius: "10px",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                minWidth: "320px",
+                maxWidth: "360px",
+                zIndex: 1000,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderBottom: "1px solid #efe8ff",
+                  fontSize: "13px",
+                  color: "#4e3ca4",
+                  fontWeight: 700,
+                }}
+              >
+                Notificações ({notifications.length})
+              </div>
+
+              <div style={{ maxHeight: "320px", overflowY: "auto" }}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: "14px", color: "#7b6cae", fontSize: "13px" }}>
+                    Sem notificações no momento.
+                  </div>
+                ) : (
+                  notifications.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        markOneAsRead(item.id);
+                        setShowNotifications(false);
+                        navigate("/kanban");
+                      }}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        border: "none",
+                        background: readNotifications.includes(item.id) ? "#fff" : "#f6f1ff",
+                        borderBottom: "1px solid #f3edff",
+                        cursor: "pointer",
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                        <strong style={{ color: "#3f3292", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</strong>
+                        <span style={{ fontSize: "10px", color: item.priority === "high" ? "#d32f2f" : "#7b54e8", fontWeight: 700 }}>
+                          {item.priority === "high" ? "ALTO" : "MÉDIO"}
+                        </span>
+                      </div>
+                      <div style={{ color: "#685d95", fontSize: "12px", marginTop: 4 }}>{item.message}</div>
+                      <div style={{ color: "#8d83b3", fontSize: "11px", marginTop: 4 }}>
+                        {item.when.toLocaleDateString("pt-BR")}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Usuário com menu dropdown */}
-        <div style={{ position: "relative" }}>
+        <div ref={userMenuRef} style={{ position: "relative" }}>
           {/* Botão de usuário que abre/fecha dropdown */}
           <div
-            onClick={() => setShowMenu(!showMenu)}
+            onClick={() => {
+              setShowMenu(!showMenu);
+              setShowNotifications(false);
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -146,9 +382,9 @@ export default function Header() {
               <div
                 style={{
                   padding: "12px 16px",
-                  borderBottom: "1px solid #e0e0e0",
+                  borderBottom: "1px solid #efe8ff",
                   fontSize: "12px",
-                  color: "#666",
+                  color: "#6a5ea8",
                   fontWeight: "600"
                 }}
               >
@@ -173,14 +409,14 @@ export default function Header() {
                   textAlign: "left",
                   transition: "0.2s"
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "#f5f5f5"} // Hover
+                onMouseEnter={(e) => e.currentTarget.style.background = "#f4efff"} // Hover
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"} // Normal
               >
                 👤 Meu Perfil
               </button>
 
               {/* Botão Sair */}
-              <div style={{ borderTop: "1px solid #e0e0e0" }}>
+              <div style={{ borderTop: "1px solid #efe8ff" }}>
                 <button
                   onClick={() => {
                     handleLogout(); // Executa logout
@@ -197,7 +433,7 @@ export default function Header() {
                     fontWeight: "500",
                     textAlign: "left"
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "#fce4ec"} // Hover
+                  onMouseEnter={(e) => e.currentTarget.style.background = "#f7edff"} // Hover
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"} // Normal
                 >
                   🚪 Sair
