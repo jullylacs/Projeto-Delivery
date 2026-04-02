@@ -22,6 +22,7 @@ io.on("connection", (socket) => {
 
 // 🔹 Inicia o servidor na porta configurada
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+const HOST = process.env.HOST || "localhost";
+server.listen(PORT, HOST, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });

@@ -1,5 +1,13 @@
 {
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"BACK,FRONT\" -c \"bgBlue.bold,bgGreen.bold\" --kill-others-on-fail \"npm --prefix BackEnd start\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix BackEnd run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start": "concurrently -n \"BACK,FRONT\" -c \"blue,green\" \"npm --prefix BackEnd run start\" \"npm --prefix frontend run start\""
+  },
   "dependencies": {
-    "@dnd-kit/sortable": "^10.0.0"
+    "@dnd-kit/sortable": "^10.0.0",
+    "concurrently": "^9.2.1"
   }
 }
