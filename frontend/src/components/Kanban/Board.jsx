@@ -708,7 +708,7 @@ function DroppableColumn({ id, children, minHeight, padding }) {
 // Representa um item individual no kanban
 function DraggableCard({ card, onOpen, densityCfg }) {
   // useDraggable do dnd-kit para tornar o card arrastável
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card._id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const [isHovered, setIsHovered] = useState(false);
   
   // Estilo dinâmico baseado no estado de arrasto e hover
@@ -919,20 +919,20 @@ export default function Board() {
     // Verifica se soltou em uma coluna (IDs começam com "column-")
     if (String(over.id).startsWith("column-")) {
       const targetStatus = String(over.id).replace("column-", ""); // Extrai o nome do status
-      const movedCard = cards.find((card) => card._id === active.id);
+      const movedCard = cards.find((card) => card.id === active.id);
       
       // Se o status é diferente, atualiza
       if (movedCard && movedCard.status !== targetStatus) {
         try {
           // Envia requisição PUT para atualizar o status
-          const response = await api.put(`/cards/${movedCard._id}`, { ...movedCard, status: targetStatus, coluna: targetStatus });
+          const response = await api.put(`/cards/${movedCard.id}`, { ...movedCard, status: targetStatus, coluna: targetStatus });
           const updatedCard = response.data;
           
           // Atualiza o estado local com o card modificado
-          setCards((prev) => prev.map((card) => (card._id === updatedCard._id ? updatedCard : card)));
+          setCards((prev) => prev.map((card) => (card.id === updatedCard.id ? updatedCard : card)));
           
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
-          if (selectedCard && selectedCard._id === updatedCard._id) {
+          if (selectedCard && selectedCard.id === updatedCard.id) {
             setSelectedCard(updatedCard);
             setStatusEdit(updatedCard.status);
           }
@@ -1089,11 +1089,11 @@ export default function Board() {
 
     try {
       // Envia para API
-      const response = await api.put(`/cards/${selectedCard._id}`, cardUpdate);
+      const response = await api.put(`/cards/${selectedCard.id}`, cardUpdate);
       const updatedCard = response.data;
 
       // Atualiza estados localmente
-      setCards((prev) => prev.map((c) => (c._id === updatedCard._id ? updatedCard : c)));
+      setCards((prev) => prev.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
       setSelectedCard(updatedCard);
       setCommentText(""); // Limpa campo de comentário
     } catch (err) {
@@ -1108,9 +1108,9 @@ export default function Board() {
 
     const payload = { ...selectedCard, ...updates };
     try {
-      const response = await api.put(`/cards/${selectedCard._id}`, payload);
+      const response = await api.put(`/cards/${selectedCard.id}`, payload);
       const updatedCard = response.data;
-      setCards((prev) => prev.map((c) => (c._id === updatedCard._id ? updatedCard : c)));
+      setCards((prev) => prev.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
       setSelectedCard(updatedCard);
     } catch (err) {
       console.error("Erro ao salvar alterações do card", err);
@@ -1123,8 +1123,8 @@ export default function Board() {
     if (!selectedCard) return;
 
     try {
-      await api.delete(`/cards/${selectedCard._id}`);
-      setCards((prev) => prev.filter((c) => c._id !== selectedCard._id));
+      await api.delete(`/cards/${selectedCard.id}`);
+      setCards((prev) => prev.filter((c) => c.id !== selectedCard.id));
       handleCloseCard(); // Fecha modal após exclusão
     } catch (err) {
       console.error("Erro ao deletar card", err);
@@ -1139,7 +1139,7 @@ export default function Board() {
     // Remove campos de identificação única e reseta status
     const duplicatePayload = {
       ...selectedCard,
-      _id: undefined,          // Remove ID original
+      id: undefined,          // Remove ID original
       titulo: `${selectedCard.titulo || selectedCard.cliente || "Card"} (cópia)`, // Adiciona "(cópia)" ao título
       status: "Novo",          // Reseta status para Novo
       coluna: "Novo",          // Reseta coluna
@@ -2153,14 +2153,14 @@ export default function Board() {
               onSave={async (updatedCard) => {
                 try {
                   // Envia atualização para API
-                  const response = await api.put(`/cards/${editingCard._id}`, updatedCard);
+                  const response = await api.put(`/cards/${editingCard.id}`, updatedCard);
                   const savedCard = response.data;
                   
                   // Atualiza estado dos cards
-                  setCards((prev) => prev.map((c) => c._id === savedCard._id ? savedCard : c));
+                  setCards((prev) => prev.map((c) => c.id === savedCard.id ? savedCard : c));
                   
                   // Se o card editado está selecionado, atualiza também
-                  if (selectedCard && selectedCard._id === savedCard._id) {
+                  if (selectedCard && selectedCard.id === savedCard.id) {
                     setSelectedCard(savedCard);
                     setStatusEdit(savedCard.status);
                   }
