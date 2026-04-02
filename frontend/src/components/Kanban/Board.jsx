@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Paperclip,
   Pencil,
+  Phone,
   Plus,
   Trash2,
   User,
@@ -164,23 +165,23 @@ const styles = {
       background: '#f5f3ff',
       borderRadius: '22px',
       boxShadow: '0 20px 45px rgba(49, 22, 118, 0.25), 0 2px 8px rgba(0,0,0,0.08)',
-      padding: '24px 28px',
-      maxWidth: '1440px',
-      maxHeight: '94vh',
+      padding: '20px 22px',
+      width: 'min(1160px, calc(100vw - 28px))',
+      maxHeight: '90vh',
       margin: '0 auto',
       position: 'relative',
       border: '1px solid #d9d0ff',
-      minWidth: '1040px',
-      minHeight: '680px',
+      minHeight: '620px',
       fontFamily: 'inherit',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-start',
+      overflow: 'hidden',
     },
     detailsContent: {
       display: 'grid',
-      gridTemplateColumns: '1.1fr 1fr',
-      gap: '18px',
+      gridTemplateColumns: '1.15fr 0.85fr',
+      gap: '14px',
       minHeight: 0,
       flex: 1,
       overflow: 'hidden',
@@ -276,9 +277,9 @@ const styles = {
       marginTop: 0,
       background: '#f0ecff',
       borderRadius: '16px',
-      padding: '18px',
+      padding: '14px',
       boxShadow: 'inset 0 0 0 1px #ddd3ff',
-      minHeight: '560px',
+      minHeight: '480px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-start',
@@ -576,11 +577,194 @@ const styles = {
     boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
     border: "1px solid rgba(108,59,255,0.1)",
   },
+  createModal: {
+    background: "linear-gradient(180deg, #fcfbff 0%, #f6f1ff 100%)",
+    borderRadius: "26px",
+    padding: "20px",
+    width: "min(920px, calc(100vw - 28px))",
+    maxHeight: "88vh",
+    overflowY: "auto",
+    boxShadow: "0 28px 60px rgba(43, 20, 111, 0.24)",
+    border: "1px solid #ddd4ff",
+  },
   modalTitle: {
     marginBottom: "20px",
     color: "#4c3393",
     fontSize: "24px",
     fontWeight: "600",
+  },
+  createHero: {
+    display: "grid",
+    gridTemplateColumns: "1fr 220px",
+    gap: "14px",
+    padding: "16px",
+    background: "linear-gradient(135deg, #ffffff 0%, #f2ebff 100%)",
+    border: "1px solid #e3d8ff",
+    borderRadius: "20px",
+    marginBottom: "18px",
+    boxShadow: "0 10px 24px rgba(92, 57, 201, 0.08)",
+  },
+  createHeroTitleWrap: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  createHeroTitle: {
+    margin: 0,
+    color: "#41288f",
+    fontSize: "24px",
+    fontWeight: "700",
+    letterSpacing: "-0.5px",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  createHeroText: {
+    margin: 0,
+    color: "#6b5baa",
+    fontSize: "13px",
+    lineHeight: 1.55,
+    maxWidth: "470px",
+  },
+  createHeroBadgeRow: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  createHeroBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "#efe8ff",
+    border: "1px solid #ddd1ff",
+    color: "#5a43af",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+  createHeroSide: {
+    display: "grid",
+    gap: "10px",
+    alignContent: "start",
+  },
+  createMetaCard: {
+    background: "rgba(255,255,255,0.92)",
+    border: "1px solid #e6dcff",
+    borderRadius: "16px",
+    padding: "12px 14px",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+  },
+  createMetaLabel: {
+    margin: 0,
+    color: "#8978c1",
+    fontSize: "10px",
+    fontWeight: "700",
+    letterSpacing: "0.7px",
+    textTransform: "uppercase",
+  },
+  createMetaValue: {
+    margin: "5px 0 0",
+    color: "#3f2b85",
+    fontSize: "14px",
+    fontWeight: "700",
+  },
+  createBody: {
+    display: "grid",
+    gap: "12px",
+  },
+  createSection: {
+    background: "#f9f6ff",
+    border: "1px solid #e1d8ff",
+    borderRadius: "18px",
+    padding: "14px",
+    boxShadow: "0 8px 18px rgba(84, 56, 190, 0.06)",
+  },
+  createSectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "12px",
+  },
+  createSectionTitle: {
+    margin: 0,
+    color: "#463191",
+    fontSize: "14px",
+    fontWeight: "700",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+  },
+  createSectionChip: {
+    fontSize: "11px",
+    fontWeight: "700",
+    color: "#6d59b4",
+    background: "#eee7ff",
+    border: "1px solid #d8ccff",
+    borderRadius: "999px",
+    padding: "4px 9px",
+  },
+  createSectionGrid: {
+    display: "grid",
+    gap: "12px",
+  },
+  createRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+  },
+  createField: {
+    display: "grid",
+    gap: "6px",
+  },
+  createLabel: {
+    color: "#6853b0",
+    fontSize: "11px",
+    fontWeight: "700",
+    letterSpacing: "0.5px",
+    textTransform: "uppercase",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  createRequired: {
+    color: "#e53935",
+    fontSize: "11px",
+    fontWeight: "800",
+  },
+  createInput: {
+    width: "100%",
+    border: "1px solid #d9d0f9",
+    borderRadius: "12px",
+    padding: "12px 14px",
+    background: "#ffffff",
+    color: "#201b5f",
+    fontSize: "13px",
+    outline: "none",
+    transition: "all 0.2s ease",
+    boxSizing: "border-box",
+    fontFamily: "inherit",
+  },
+  createTextArea: {
+    width: "100%",
+    border: "1px solid #d9d0f9",
+    borderRadius: "12px",
+    padding: "12px 14px",
+    background: "#ffffff",
+    color: "#201b5f",
+    fontSize: "13px",
+    minHeight: "110px",
+    outline: "none",
+    transition: "all 0.2s ease",
+    boxSizing: "border-box",
+    fontFamily: "inherit",
+    resize: "vertical",
+  },
+  createFooterNote: {
+    margin: "2px 0 0",
+    color: "#7d6bb8",
+    fontSize: "12px",
   },
   formGrid: {
     display: "grid",
@@ -1062,6 +1246,16 @@ export default function Board() {
       setNewCard((prev) => ({ ...prev, [field]: value }));
     }
     setError(""); // Limpa erro ao modificar campos
+  };
+
+  const handleCreateFieldFocus = (event) => {
+    event.currentTarget.style.borderColor = "#8d76ff";
+    event.currentTarget.style.boxShadow = "0 0 0 3px rgba(124, 91, 255, 0.16)";
+  };
+
+  const handleCreateFieldBlur = (event) => {
+    event.currentTarget.style.borderColor = "#d9d0f9";
+    event.currentTarget.style.boxShadow = "none";
   };
 
   // Abre modal de detalhes do card
@@ -1731,101 +1925,205 @@ export default function Board() {
       {/* Modal de criação de card */}
       {isModalOpen && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
-            <h2 style={styles.modalTitle}><Plus size={18} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Criar novo card</h2>
-            
-            <div style={styles.formGrid}>
-              {/* Campo título (opcional) */}
-              <input 
-                style={styles.modalInput} 
-                value={newCard.titulo} 
-                onChange={(e) => handleInputChange("titulo", e.target.value)} 
-                placeholder="Título do card" 
-              />
-              
-              {/* Campos obrigatórios com indicador * */}
-              <input 
-                style={styles.modalInput} 
-                value={newCard.cliente} 
-                onChange={(e) => handleInputChange("cliente", e.target.value)} 
-                placeholder="Cliente *" 
-              />
-              <input 
-                style={styles.modalInput} 
-                value={newCard.telefone} 
-                onChange={(e) => handleInputChange("telefone", e.target.value)} 
-                placeholder="Telefone *" 
-              />
-              <input 
-                style={styles.modalInput} 
-                value={newCard.endereco} 
-                onChange={(e) => handleInputChange("endereco", e.target.value)} 
-                placeholder="Endereço *" 
-              />
-              <input 
-                style={styles.modalInput} 
-                value={newCard.tipoServico} 
-                onChange={(e) => handleInputChange("tipoServico", e.target.value)} 
-                placeholder="Tipo de serviço *" 
-              />
-              
-              {/* Campo preço (numérico) */}
-              <input 
-                style={styles.modalInput} 
-                type="number" 
-                value={newCard.preco} 
-                onChange={(e) => handleInputChange("preco", Number(e.target.value))} 
-                placeholder="Preço (R$)" 
-              />
-              
-              {/* Coordenadas geográficas (latitude/longitude) */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                <input 
-                  style={styles.modalInput} 
-                  type="text" 
-                  value={newCard.coordenadas.lat} 
-                  onChange={(e) => handleInputChange("lat", e.target.value)} 
-                  placeholder="Latitude" 
-                />
-                <input 
-                  style={styles.modalInput} 
-                  type="text" 
-                  value={newCard.coordenadas.lng} 
-                  onChange={(e) => handleInputChange("lng", e.target.value)} 
-                  placeholder="Longitude" 
-                />
+          <div style={styles.createModal}>
+            <div style={styles.createHero}>
+              <div style={styles.createHeroTitleWrap}>
+                <h2 style={styles.createHeroTitle}>
+                  <Plus size={20} /> Criar novo card
+                </h2>
+                <p style={styles.createHeroText}>
+                  Monte a solicitação com o mesmo padrão visual do Bitrix: dados principais primeiro, contexto operacional em seguida e um fechamento claro para a equipe.
+                </p>
+                <div style={styles.createHeroBadgeRow}>
+                  <span style={styles.createHeroBadge}><Wrench size={13} /> Fluxo comercial</span>
+                  <span style={styles.createHeroBadge}><Zap size={13} /> Entrada rápida</span>
+                  <span style={styles.createHeroBadge}><CalendarDays size={13} /> Pronto para operação</span>
+                </div>
               </div>
 
-              {/* SLA (dias) e prazo */}
-              <input 
-                style={styles.modalInput} 
-                type="number" 
-                value={newCard.sla} 
-                onChange={(e) => handleInputChange("sla", Number(e.target.value))} 
-                placeholder="SLA (dias)" 
-              />
-              <input 
-                style={styles.modalInput} 
-                type="date" 
-                value={newCard.prazo} 
-                onChange={(e) => handleInputChange("prazo", e.target.value)} 
-                placeholder="Prazo" 
-              />
-              
-              {/* Observações (textarea) */}
-              <textarea 
-                style={styles.modalTextArea} 
-                value={newCard.observacoes} 
-                onChange={(e) => handleInputChange("observacoes", e.target.value)} 
-                placeholder="Observações (opcional)" 
-                rows={3} 
-              />
+              <div style={styles.createHeroSide}>
+                <div style={styles.createMetaCard}>
+                  <p style={styles.createMetaLabel}>Responsável</p>
+                  <p style={styles.createMetaValue}>{seller}</p>
+                </div>
+                <div style={styles.createMetaCard}>
+                  <p style={styles.createMetaLabel}>Status inicial</p>
+                  <p style={styles.createMetaValue}>Novo</p>
+                </div>
+              </div>
             </div>
 
-            {/* Exibe mensagem de erro se houver */}
-            {error && <p style={styles.errorText}>{error}</p>}
+            <div style={styles.createBody}>
+              <div style={styles.createSection}>
+                <div style={styles.createSectionHeader}>
+                  <h3 style={styles.createSectionTitle}><User size={16} /> Informações principais</h3>
+                  <span style={styles.createSectionChip}>Principal</span>
+                </div>
+                <div style={styles.createSectionGrid}>
+                  <div style={styles.createField}>
+                    <label style={styles.createLabel}><FileText size={13} /> Título do card</label>
+                    <input
+                      style={styles.createInput}
+                      value={newCard.titulo}
+                      onChange={(e) => handleInputChange("titulo", e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                      placeholder="Ex: Instalação de internet empresarial"
+                    />
+                  </div>
 
-            {/* Botões de ação */}
+                  <div style={styles.createRow}>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><User size={13} /> Cliente <span style={styles.createRequired}>*</span></label>
+                      <input
+                        style={styles.createInput}
+                        value={newCard.cliente}
+                        onChange={(e) => handleInputChange("cliente", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="Nome do cliente"
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><Phone size={13} /> Telefone <span style={styles.createRequired}>*</span></label>
+                      <input
+                        style={styles.createInput}
+                        value={newCard.telefone}
+                        onChange={(e) => handleInputChange("telefone", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.createField}>
+                    <label style={styles.createLabel}><MapPin size={13} /> Endereço <span style={styles.createRequired}>*</span></label>
+                    <input
+                      style={styles.createInput}
+                      value={newCard.endereco}
+                      onChange={(e) => handleInputChange("endereco", e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                      placeholder="Rua, número, bairro, cidade"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.createSection}>
+                <div style={styles.createSectionHeader}>
+                  <h3 style={styles.createSectionTitle}><Wrench size={16} /> Escopo e valores</h3>
+                  <span style={styles.createSectionChip}>Operação</span>
+                </div>
+                <div style={styles.createSectionGrid}>
+                  <div style={styles.createRow}>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><Wrench size={13} /> Tipo de serviço <span style={styles.createRequired}>*</span></label>
+                      <input
+                        style={styles.createInput}
+                        value={newCard.tipoServico}
+                        onChange={(e) => handleInputChange("tipoServico", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="Instalação, manutenção, visita técnica"
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><DollarSign size={13} /> Preço</label>
+                      <input
+                        style={styles.createInput}
+                        type="number"
+                        step="0.01"
+                        value={newCard.preco}
+                        onChange={(e) => handleInputChange("preco", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="0,00"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.createRow}>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><Zap size={13} /> SLA (dias)</label>
+                      <input
+                        style={styles.createInput}
+                        type="number"
+                        value={newCard.sla}
+                        onChange={(e) => handleInputChange("sla", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><CalendarDays size={13} /> Prazo</label>
+                      <input
+                        style={styles.createInput}
+                        type="date"
+                        value={newCard.prazo}
+                        onChange={(e) => handleInputChange("prazo", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.createSection}>
+                <div style={styles.createSectionHeader}>
+                  <h3 style={styles.createSectionTitle}><MapPin size={16} /> Localização e contexto</h3>
+                  <span style={styles.createSectionChip}>Detalhes</span>
+                </div>
+                <div style={styles.createSectionGrid}>
+                  <div style={styles.createRow}>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><MapPin size={13} /> Latitude</label>
+                      <input
+                        style={styles.createInput}
+                        type="text"
+                        value={newCard.coordenadas.lat}
+                        onChange={(e) => handleInputChange("lat", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="-23.550520"
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><MapPin size={13} /> Longitude</label>
+                      <input
+                        style={styles.createInput}
+                        type="text"
+                        value={newCard.coordenadas.lng}
+                        onChange={(e) => handleInputChange("lng", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="-46.633308"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={styles.createField}>
+                    <label style={styles.createLabel}><FileText size={13} /> Observações</label>
+                    <textarea
+                      style={styles.createTextArea}
+                      value={newCard.observacoes}
+                      onChange={(e) => handleInputChange("observacoes", e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                      placeholder="Contexto da visita, acesso ao local, restrições técnicas ou observações comerciais"
+                      rows={4}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {error && <p style={styles.errorText}>{error}</p>}
+            {!error && <p style={styles.createFooterNote}>Os campos marcados com * são obrigatórios para abrir o card no fluxo.</p>}
+
             <div style={styles.actionGroup}>
               <button style={styles.cancelBtn} onClick={() => setIsModalOpen(false)}>
                 Cancelar
