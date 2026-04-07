@@ -51,6 +51,14 @@ const Card = sequelize.define("Card", {
   // Observações adicionais
   observacoes: DataTypes.TEXT,
 
+  // Comentários embutidos no card (JSONB array)
+  // Cada item: { id, text, author, authorAvatar, createdAt, attachment? }
+  comments: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: []
+  },
+
   // Referência ao usuário (vendedor) que criou o card
   // Equivalente ao: vendedor: { type: ObjectId, ref: "User" } do Mongoose
   vendedor_id: {

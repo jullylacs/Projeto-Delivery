@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { AtSign, Paperclip, SendHorizontal } from "lucide-react";
+import { AtSign, Bold, Code, Italic, List, ListOrdered, Paperclip, Quote, SendHorizontal } from "lucide-react";
 
 const normalizeMentionUsers = (users = []) => {
   return users
@@ -44,7 +44,16 @@ const mentionContextFromText = (text, caretPosition) => {
   };
 };
 
-export default function CommentInput({ value, onChange, onSend, onFile, placeholder, mentionUsers = [] }) {
+export default function CommentInput({
+  value,
+  onChange,
+  onSend,
+  onFile,
+  placeholder,
+  mentionUsers = [],
+  pendingAttachment = null,
+  onClearAttachment,
+}) {
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({
     isOpen: false,
@@ -55,6 +64,49 @@ export default function CommentInput({ value, onChange, onSend, onFile, placehol
   });
 
   const users = useMemo(() => normalizeMentionUsers(mentionUsers), [mentionUsers]);
+
+  const applyInlineFormat = (prefix, suffix = prefix) => {
+    const node = textAreaRef.current;
+    if (!node) return;
+
+    const start = node.selectionStart ?? value.length;
+    const end = node.selectionEnd ?? value.length;
+    const selected = value.slice(start, end) || "texto";
+    const formatted = `${prefix}${selected}${suffix}`;
+    const nextValue = `${value.slice(0, start)}${formatted}${value.slice(end)}`;
+
+    onChange(nextValue);
+
+    requestAnimationFrame(() => {
+      node.focus();
+      const caretStart = start + prefix.length;
+      const caretEnd = caretStart + selected.length;
+      node.setSelectionRange(caretStart, caretEnd);
+    });
+  };
+
+  const applyLinePrefix = (prefix) => {
+    const node = textAreaRef.current;
+    if (!node) return;
+
+    const start = node.selectionStart ?? value.length;
+    const end = node.selectionEnd ?? value.length;
+    const selected = value.slice(start, end);
+
+    const block = selected || "item";
+    const prefixed = block
+      .split("\n")
+      .map((line) => (line.trim() ? `${prefix}${line}` : line))
+      .join("\n");
+
+    const nextValue = `${value.slice(0, start)}${prefixed}${value.slice(end)}`;
+    onChange(nextValue);
+
+    requestAnimationFrame(() => {
+      node.focus();
+      node.setSelectionRange(start, start + prefixed.length);
+    });
+  };
 
   const filteredUsers = useMemo(() => {
     const query = mentionState.query.trim().toLowerCase();
@@ -168,12 +220,74 @@ export default function CommentInput({ value, onChange, onSend, onFile, placehol
   const handleFile = (e) => {
     if (e.target.files && e.target.files[0]) {
       onFile(e.target.files[0]);
+      e.target.value = "";
     }
   };
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 6 }}>
       <div style={{ flex: 1, position: "relative" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginBottom: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          {[{
+            key: "bold",
+            title: "Negrito",
+            icon: <Bold size={14} />,
+            onClick: () => applyInlineFormat("**"),
+          }, {
+            key: "italic",
+            title: "Itálico",
+            icon: <Italic size={14} />,
+            onClick: () => applyInlineFormat("*"),
+          }, {
+            key: "quote",
+            title: "Citação",
+            icon: <Quote size={14} />,
+            onClick: () => applyLinePrefix("> "),
+          }, {
+            key: "list",
+            title: "Lista",
+            icon: <List size={14} />,
+            onClick: () => applyLinePrefix("- "),
+          }, {
+            key: "ordered",
+            title: "Lista numerada",
+            icon: <ListOrdered size={14} />,
+            onClick: () => applyLinePrefix("1. "),
+          }, {
+            key: "code",
+            title: "Código",
+            icon: <Code size={14} />,
+            onClick: () => applyInlineFormat("`"),
+          }].map((action) => (
+            <button
+              key={action.key}
+              type="button"
+              onClick={action.onClick}
+              title={action.title}
+              style={{
+                background: "#f1eaff",
+                border: "1px solid #daccff",
+                borderRadius: 7,
+                padding: "6px 7px",
+                cursor: "pointer",
+                color: "#5f3dc6",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {action.icon}
+            </button>
+          ))}
+        </div>
+
         <textarea
           ref={textAreaRef}
           style={{
@@ -197,6 +311,56 @@ export default function CommentInput({ value, onChange, onSend, onFile, placehol
           placeholder={placeholder || "Escreva um comentário..."}
           rows={2}
         />
+
+        {pendingAttachment && (
+          <div
+            style={{
+              marginTop: 8,
+              border: "1px solid #ded2ff",
+              borderRadius: 10,
+              background: "#f8f5ff",
+              padding: 8,
+              position: "relative",
+            }}
+          >
+            {pendingAttachment.type?.startsWith("image/") ? (
+              <img
+                src={pendingAttachment.data}
+                alt={pendingAttachment.name || "Imagem anexada"}
+                style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, display: "block", border: "1px solid #ddd0ff" }}
+              />
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5f3dc6", fontSize: 13, fontWeight: 600 }}>
+                <Paperclip size={14} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pendingAttachment.name || "Arquivo anexado"}</span>
+              </div>
+            )}
+
+            {onClearAttachment && (
+              <button
+                type="button"
+                onClick={onClearAttachment}
+                title="Remover anexo"
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  border: "1px solid #cdbfff",
+                  background: "#ffffff",
+                  color: "#6b54c7",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
 
         {mentionState.isOpen && (
           <div

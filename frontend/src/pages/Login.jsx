@@ -11,6 +11,14 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate(); // Hook para redirecionar usuário após login
 
+  const getApiErrorMessage = (error, fallback) => {
+    const data = error?.response?.data;
+    if (typeof data === "string") return data;
+    if (data?.message) return data.message;
+    if (data?.error) return data.error;
+    return fallback;
+  };
+
   // Função que realiza login via API
   const login = async () => {
     try {
@@ -22,7 +30,7 @@ export default function Login() {
       navigate("/dashboard"); // Redireciona para dashboard
     } catch (error) {
       // Caso ocorra erro, exibe mensagem apropriada
-      setErrorMessage("Falha no login: " + (error.response?.data?.message || "Erro ao conectar"));
+      setErrorMessage("Falha no login: " + getApiErrorMessage(error, "Erro ao conectar"));
     } finally {
       setLoading(false); // Desativa loading independente do resultado
     }
@@ -136,7 +144,6 @@ export default function Login() {
           <option value="operacional">📋 Operacional</option>
           <option value="tecnico">🔧 Técnico</option>
           <option value="gestor">👨‍💼 Gestor</option>
-          <option value="delivery">🚚 Delivery</option>
           <option value="admin">🔐 Admin</option>
         </select>
         

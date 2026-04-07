@@ -2,6 +2,69 @@
 import { useNavigate } from "react-router-dom"; // Hook para navegaÃ§Ã£o programÃ¡tica
 import api from "../services/api"; // InstÃ¢ncia de API configurada para comunicaÃ§Ã£o com backend
 
+const ALLOWED_PERFIS = ["comercial", "operacional", "tecnico", "gestor", "admin"];
+const MAX_AVATAR_UPLOAD_MB = 10;
+const TARGET_AVATAR_BASE64_BYTES = 900 * 1024;
+const MAX_AVATAR_DIMENSION = 1024;
+
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Falha ao ler imagem"));
+    reader.readAsDataURL(file);
+  });
+
+const loadImageElement = (src) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Falha ao processar imagem"));
+    image.src = src;
+  });
+
+const compressAvatarImage = async (file) => {
+  const initialDataUrl = await fileToDataUrl(file);
+  const image = await loadImageElement(initialDataUrl);
+
+  const maxSide = Math.max(image.width, image.height);
+  const scale = maxSide > MAX_AVATAR_DIMENSION ? MAX_AVATAR_DIMENSION / maxSide : 1;
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Falha ao preparar compressao de imagem");
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  // Reduz qualidade progressivamente para manter payload leve e evitar 413.
+  let quality = 0.86;
+  let compressed = canvas.toDataURL("image/jpeg", quality);
+
+  while (compressed.length > TARGET_AVATAR_BASE64_BYTES && quality > 0.4) {
+    quality -= 0.08;
+    compressed = canvas.toDataURL("image/jpeg", quality);
+  }
+
+  return compressed;
+};
+
+const readStoredUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function Profile() {
   // Estados do componente
   const [user, setUser] = useState(null); // Armazena dados do usuÃ¡rio
@@ -15,7 +78,7 @@ export default function Profile() {
 
   // Carrega perfil do usuÃ¡rio ao montar o componente
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca dados do usuÃ¡rio no localStorage
+    const userData = readStoredUser(); // Busca dados do usuÃ¡rio no localStorage
     const userId = userData?._id || userData?.id;
 
     if (!userId) {
@@ -36,7 +99,24 @@ export default function Profile() {
       setLoading(false); // Desativa loading
     } catch (err) {
       console.error("Erro ao buscar perfil:", err); // Loga erro
-      setError("Erro ao carregar perfil"); // Mostra mensagem de erro
+
+      if (err?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        navigate("/login");
+        return;
+      }
+
+      const localUser = readStoredUser();
+      if (localUser) {
+        setUser(localUser);
+        setFormData(localUser);
+        setAvatarPreview(localUser.avatar || null);
+        setError("Não foi possível sincronizar com o servidor. Exibindo dados locais.");
+      } else {
+        setError("Erro ao carregar perfil"); // Mostra mensagem de erro
+      }
+
       setLoading(false); // Desativa loading
     }
   };
@@ -53,18 +133,29 @@ export default function Profile() {
   };
 
   // FunÃ§Ã£o para alterar avatar com preview
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files[0]; // Pega arquivo selecionado
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result); // Atualiza preview
-        setFormData(prev => ({
-          ...prev,
-          avatar: reader.result // Salva avatar em base64 no formulÃ¡rio
-        }));
-      };
-      reader.readAsDataURL(file); // Converte arquivo para base64
+    if (!file) return;
+
+    try {
+      const maxBytes = MAX_AVATAR_UPLOAD_MB * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setError(`Imagem muito grande. Envie um arquivo de ate ${MAX_AVATAR_UPLOAD_MB}MB.`);
+        setSuccessMessage("");
+        return;
+      }
+
+      const compressedDataUrl = await compressAvatarImage(file);
+
+      setAvatarPreview(compressedDataUrl); // Atualiza preview
+      setFormData(prev => ({
+        ...prev,
+        avatar: compressedDataUrl // Salva avatar comprimido em base64 no formulÃ¡rio
+      }));
+      setError("");
+    } catch (error) {
+      setSuccessMessage("");
+      setError(error.message || "Nao foi possivel processar a imagem");
     }
   };
 
@@ -92,12 +183,11 @@ export default function Profile() {
 
   // Objetos de perfis com label e cor para visualizaÃ§Ã£o
   const perfis = {
-    comercial: { label: "ðŸ‘” Comercial", color: "#1e40af" },
-    operacional: { label: "ðŸ“‹ Operacional", color: "#059669" },
-    tecnico: { label: "ðŸ”§ TÃ©cnico", color: "#d97706" },
-    gestor: { label: "ðŸ‘¨â€ðŸ’¼ Gestor", color: "#7c3aed" },
-    delivery: { label: "ðŸšš Delivery", color: "#0ea5e9" },
-    admin: { label: "ðŸ” Admin", color: "#dc2626" }
+    comercial: { label: "Comercial", color: "#1e40af" },
+    operacional: { label: "Operacional", color: "#059669" },
+    tecnico: { label: "Tecnico", color: "#d97706" },
+    gestor: { label: "Gestor", color: "#7c3aed" },
+    admin: { label: "Admin", color: "#dc2626" }
   };
 
   // Renderiza loading enquanto busca dados
@@ -131,9 +221,9 @@ export default function Profile() {
       }}>
         {/* Header */}
         <div style={{ marginBottom: "24px" }}>
-          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>ðŸ‘¤ Meu Perfil</h1>
+          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>Meu Perfil</h1>
           <p style={{ color: "#5f5a88", fontSize: "14px", marginTop: "4px" }}>
-            Visualize e edite suas informaÃ§Ãµes
+            Visualize e edite suas informacoes
           </p>
         </div>
 
@@ -199,7 +289,7 @@ export default function Profile() {
               border: "4px solid #e0e0e0",
               boxShadow: "0 4px 12px rgba(62,44,158,0.15)"
             }}>
-              {!avatarPreview && "ðŸ‘¤"} {/* Emoji padrÃ£o */}
+              {!avatarPreview && "U"}
             </div>
 
             {/* BotÃ£o para alterar avatar */}
@@ -214,7 +304,7 @@ export default function Profile() {
                 fontWeight: "600",
                 marginBottom: "12px"
               }}>
-                ðŸ“¸ Mudar Foto
+                Mudar foto
                 <input
                   type="file"
                   accept="image/*"
@@ -333,7 +423,7 @@ export default function Profile() {
               {isEditing ? (
                 <select
                   name="perfil"
-                  value={formData.perfil || "comercial"}
+                  value={ALLOWED_PERFIS.includes(formData.perfil) ? formData.perfil : "comercial"}
                   onChange={handleChange}
                   style={{
                     width: "100%",
@@ -347,12 +437,11 @@ export default function Profile() {
                     cursor: "pointer"
                   }}
                 >
-                  <option value="comercial">ðŸ‘” Comercial</option>
-                  <option value="operacional">ðŸ“‹ Operacional</option>
-                  <option value="tecnico">ðŸ”§ TÃ©cnico</option>
-                  <option value="gestor">ðŸ‘¨â€ðŸ’¼ Gestor</option>
-                  <option value="delivery">ðŸšš Delivery</option>
-                  <option value="admin">ðŸ” Admin</option>
+                  <option value="comercial">Comercial</option>
+                  <option value="operacional">Operacional</option>
+                  <option value="tecnico">Tecnico</option>
+                  <option value="gestor">Gestor</option>
+                  <option value="admin">Admin</option>
                 </select>
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
@@ -394,7 +483,7 @@ export default function Profile() {
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.telefone || "NÃ£o informado"}
+                  {user.telefone || "Nao informado"}
                 </p>
               )}
             </div>
@@ -432,7 +521,7 @@ export default function Profile() {
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.departamento || "NÃ£o informado"}
+                  {user.departamento || "Nao informado"}
                 </p>
               )}
             </div>
@@ -508,7 +597,7 @@ export default function Profile() {
                     fontSize: "14px"
                   }}
                 >
-                  ðŸ’¾ Salvar AlteraÃ§Ãµes
+                  Salvar alteracoes
                 </button>
               </>
             ) : (
@@ -527,7 +616,7 @@ export default function Profile() {
                   fontSize: "14px"
                 }}
               >
-                âœï¸ Editar Perfil
+                Editar perfil
               </button>
             )}
           </div>

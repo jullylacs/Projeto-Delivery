@@ -1,241 +1,199 @@
-# 📌 Requisitos da Plataforma Kanban – Delivery
+# NVX Fibra LTDA - Plataforma Operacional
 
-A plataforma deverá ser um sistema web baseado em metodologia Kanban, com foco em gestão de demandas operacionais, comerciais e agendamento de instalações, garantindo rastreabilidade, organização e atualização em tempo real.
+Plataforma web para operacao de campo com Kanban, Agenda e colaboracao em cards.
 
----
-
-## 🧩 Funcionalidades Principais
-
-### 📋 Gestão de Cards
-
-- Criação de cards pelo time comercial contendo:
-  - Cliente
-  - Telefone para contato
-  - Endereço completo
-  - Coordenadas geográficas
-  - Vendedor responsável (automático via login)
-  - Tipo de serviço (DIA, BIA, L2L, etc.)
-  - IP
-  - SLA acordado
-  - Prazo contratual
-  - Observações adicionais
-- Edição, duplicação, arquivamento e exclusão de cards
-- Templates de cards para padronização
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-4c1d95)
+![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-2563eb)
+![Backend](https://img.shields.io/badge/backend-Node%20%2B%20Express-0f766e)
+![Database](https://img.shields.io/badge/database-PostgreSQL-1d4ed8)
+![Auth](https://img.shields.io/badge/auth-JWT-9333ea)
 
 ---
 
-## 🔄 Fluxo Kanban (Colunas)
+## Sumario
 
-- Colunas personalizáveis (exemplo):
-  - Novo
-  - Em análise
-  - Agendamento
-  - Agendado
-  - Em execução
-  - Concluído
-  - Inativo
-- Movimentação via **drag-and-drop**
-- Regras de transição entre etapas
-- Limite de cards por coluna (WIP)
-
----
-
-## 📅 Agendamento de Instalações
-
-### 📆 Gestão de Agenda
-
-- Agenda integrada por:
-  - Dia
-  - Semana
-  - Técnico/equipe
-- Visualização em formato:
-  - Calendário
-  - Lista
-  - Timeline
+- [Visao geral](#visao-geral)
+- [Arquitetura](#arquitetura)
+- [Stack](#stack)
+- [Funcionalidades entregues](#funcionalidades-entregues)
+- [Melhorias recentes](#melhorias-recentes)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Como rodar localmente](#como-rodar-localmente)
+- [Scripts uteis](#scripts-uteis)
+- [Roadmap tecnico](#roadmap-tecnico)
+- [Observacoes](#observacoes)
 
 ---
 
-### 👷‍♂️ Alocação de Técnicos
+## Visao geral
 
-- Cadastro de técnicos/equipes
-- Atribuição de instalação diretamente no card
-- Controle de disponibilidade por técnico
-- Evitar conflitos de horário (duplo agendamento)
+O sistema centraliza o fluxo operacional da empresa em tres frentes:
 
----
+1. Kanban para ciclo de vida de cards operacionais/comerciais.
+2. Agenda para organizacao de tarefas por dia, semana e mes.
+3. Colaboracao em comentarios com mencoes, anexos e historico.
 
-### ⏰ Informações de Agendamento
-
-Cada card poderá conter:
-
-- Data da instalação
-- Horário agendado
-- Técnico responsável
-- Janela de atendimento (ex: 08h–12h)
-- Status do agendamento:
-  - Pendente
-  - Confirmado
-  - Reagendado
-  - Em execução
-  - Finalizado
+Objetivo pratico: reduzir retrabalho, acelerar resposta operacional e melhorar a visibilidade da execucao.
 
 ---
 
-### 🔁 Reagendamento
+## Arquitetura
 
-- Alteração rápida de data/horário via drag no calendário
-- Histórico de reagendamentos
-- Motivo do reagendamento
-
----
-
-### 🔔 Notificações de Agenda
-
-- Alertas para:
-  - Instalações próximas
-  - Atrasos
-  - Reagendamentos
-- Notificação para:
-  - Técnico
-  - Comercial
-  - Gestor
+```mermaid
+flowchart LR
+	U[Usuario] --> F[Frontend React/Vite]
+	F --> A[API Node/Express]
+	A --> D[(PostgreSQL)]
+	F --> L[(LocalStorage)]
+	A --> S[Socket.io Infra]
+```
 
 ---
 
-### 📍 Localização e Rota
+## Stack
 
-- Integração com coordenadas do card
-- Visualização de localização da instalação
-- Possibilidade futura de otimização de rotas
-
----
-
-### 📊 Indicadores de Instalação
-
-- Instalações por dia/semana/mês
-- Taxa de sucesso (concluído vs reagendado)
-- Tempo médio de execução
-- Produtividade por técnico
+| Camada | Tecnologias |
+|---|---|
+| Frontend | React, Vite, React Router, Axios, DnD Kit, React Markdown, remark-gfm |
+| Backend | Node.js, Express, Sequelize, JWT, Socket.io |
+| Banco | PostgreSQL |
+| Persistencia local | LocalStorage (preferencias, estado de tela, agenda e configuracoes) |
 
 ---
 
-## 💬 Comunicação e Colaboração
+## Funcionalidades entregues
 
-- Comentários nos cards
-- Menções (@usuário)
-- Anexos (contratos, fotos, prints)
-- Histórico completo de atividades
+### Autenticacao e usuarios
+- Login e cadastro com validacoes alinhadas entre frontend e backend.
+- Perfis de acesso aplicados (comercial, operacional, tecnico, gestor, admin).
+- Painel administrativo com paginacao server-side.
+- Persistencia de filtros/ordenacao/paginacao da tela administrativa.
 
----
+### Kanban
+- Criacao, edicao, duplicacao, exclusao e movimentacao de cards.
+- Colunas dinamicas (adicionar, editar, excluir).
+- Acao de excluir todos os cards de uma coluna.
+- Promocao visual de card atualizado para topo da coluna.
+- Densidade visual configuravel (compacto, medio, confortavel).
+- Importacao via JSON e importacao direta do Trello.
+- Exportacao CSV e Excel.
 
-## 👥 Gestão de Usuários e Permissões
+### Comentarios e colaboracao
+- Mencoes com notificacao e navegação ate o card mencionado.
+- Hover em mencao com cartao de usuario (foto, nome, cargo).
+- Comentarios com formatacao rica:
+	- negrito
+	- italico
+	- listas
+	- citacao
+	- codigo
+- Anexos com fluxo pendente (so envia ao clicar em Enviar).
+- Imagens sem forcar nome como texto.
+- PDF com abrir, baixar e imprimir.
 
-- Perfis:
-  - Comercial
-  - Operacional
-  - Técnico
-  - Gestor
-  - Administrador
-- Controle de permissões por ação
-- Auditoria completa
+### Agenda
+- Modos de visualizacao: mes, semana e dia.
+- Criacao de tarefa por clique direito no dia.
+- Entrada rapida no dia por duplo clique.
+- Modo dia com mini-cards de tarefa (titulo, horario, observacoes).
+- Drag-and-drop entre status (planejado, andamento, concluido).
+- Persistencia robusta de tarefas e preferencias.
 
----
-
-## 📊 Dashboard (Tempo Real)
-
-- Demandas:
-  - Criadas
-  - Em andamento
-  - Concluídas
-  - Inativas
-- Instalações:
-  - Agendadas
-  - Em execução
-  - Finalizadas
-  - Reagendadas
-- SLA:
-  - Cumpridos vs violados
-
----
-
-## ⏱️ SLA e Alertas
-
-- Controle automático por card
-- Alertas visuais (cores/status)
-- Priorização por urgência
-
----
-
-## 🔍 Busca e Filtros
-
-- Por cliente, técnico, vendedor, status, data
-- Filtros por período de instalação
-- Busca rápida
+### UX geral
+- Skeleton loading nas telas principais.
+- Melhorias de microinteracao e animacao.
+- Ajustes de camadas e sobreposicao de menus.
+- Branding atualizado para NVX Fibra LTDA no cabecalho.
 
 ---
 
-## 🔔 Notificações
+## Melhorias recentes
 
-- Tempo real (WebSocket / Socket.io)
-- Eventos:
-  - Mudança de status
-  - Novo comentário
-  - Agendamento/criação
+### Backend
+- Limite de payload configuravel para uploads maiores.
+- Tratamento amigavel de erro 413.
+- Correcao de persistencia de comentarios nos cards.
+- Ajuste de associacao Sequelize para evitar conflito de nomes.
+- Rate limiting global parametrizavel para evitar bloqueios indevidos em dev.
 
----
-
-## ⚙️ Arquitetura Técnica
-
-### 🎨 Front-end
-
-- React, Vue ou Angular
-- Drag-and-drop (ex: Angular CDK)
-- Biblioteca de calendário (FullCalendar recomendado)
-- RxJS + WebSocket
+### Frontend
+- Menus de dados agrupados em popover.
+- Importacao Trello com persistencia local de configuracoes.
+- Melhorias de drag-and-drop na Agenda para arraste mais confortavel.
 
 ---
 
-### 🖥️ Back-end
+## Estrutura do projeto
 
-- Node.js
-- Express ou NestJS
-- Socket.io
-- JWT (autenticação)
-- API REST
-
----
-
-### 🗄️ Banco de Dados
-
-- MongoDB
-
-#### Coleções sugeridas:
-
-- Users
-- Cards
-- Columns
-- Comments
-- ActivityLogs
-- Schedules (Agendamentos)
-- Technicians (Técnicos)
+```text
+Projeto-Delivery/
+	BackEnd/
+		src/
+			controllers/
+			models/
+			routes/
+			middleware/
+			database/
+	frontend/
+		src/
+			components/
+			pages/
+			services/
+```
 
 ---
 
-## 🚀 Diferenciais
+## Como rodar localmente
 
-- Kanban + Agenda integrados (estilo CRM completo)
-- Drag-and-drop tanto no quadro quanto no calendário
-- Histórico completo de agendamentos
-- Visão operacional + comercial no mesmo sistema
-- Escalável para múltiplas equipes/regiões
+### Requisitos
+- Node.js 18+
+- PostgreSQL em execucao
+
+### Backend
+```bash
+cd BackEnd
+npm install
+# configurar .env com base no .env.example
+npm run dev
+```
+
+API padrao: http://localhost:3000
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App padrao: http://localhost:5173
 
 ---
 
-## 🎯 Objetivo Final
+## Scripts uteis
 
-Criar uma plataforma centralizada que permita:
+### Backend
+- npm run dev
+- npm run db:migrate
+- npm run db:undo
 
-- Controle total das demandas
-- Organização eficiente das instalações
-- Redução de atrasos e retrabalho
-- Visibilidade em tempo real para todos os envolvidos
+### Frontend
+- npm run dev
+- npm run build
+
+---
+
+## Roadmap tecnico
+
+- Persistencia completa em banco para Agenda (hoje parte local).
+- WebSocket em producao para atualizacao em tempo real ponta a ponta.
+- Auditoria de eventos por card e por usuario.
+- Testes automatizados de fluxo principal (frontend e backend).
+
+---
+
+## Observacoes
+
+- Este README descreve o estado atual implementado.
+- Algumas funcionalidades originalmente planejadas foram adaptadas para entregas iterativas.
+- Para importacao Trello, use credenciais validas com permissao de leitura do board.

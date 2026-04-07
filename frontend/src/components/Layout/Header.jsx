@@ -4,6 +4,7 @@ import api from "../../services/api";
 
 const NOTIFICATION_READ_KEY = "readNotifications";
 const USER_UPDATED_EVENT = "user-updated";
+const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 
 const readReadNotifications = () => {
   try {
@@ -64,6 +65,59 @@ const buildSlaNotifications = (cards) => {
     });
 };
 
+const normalizeName = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+const commentMentionsUser = (commentText, userName) => {
+  const safeText = normalizeName(commentText);
+  const safeUser = normalizeName(userName);
+  if (!safeText || !safeUser) return false;
+  return safeText.includes(`@${safeUser}`);
+};
+
+const buildMentionNotifications = (cards, currentUserName) => {
+  if (!currentUserName) return [];
+
+  return cards
+    .flatMap((card) => {
+      const cardId = getCardId(card);
+      const title = card?.cliente || card?.titulo || card?.nome || "Card sem título";
+      const comments = Array.isArray(card?.comments) ? card.comments : [];
+
+      return comments
+        .filter((comment) => {
+          if (!comment?.text) return false;
+          const author = normalizeName(comment.author);
+          const me = normalizeName(currentUserName);
+          if (author && me && author === me) return false;
+          return commentMentionsUser(comment.text, currentUserName);
+        })
+        .map((comment, index) => {
+          const when = comment?.createdAt ? new Date(comment.createdAt) : new Date();
+          const safeWhen = Number.isNaN(when.getTime()) ? new Date() : when;
+          const commentId = comment?.id || `${safeWhen.toISOString()}-${index}`;
+          const snippet = String(comment.text || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 100);
+
+          return {
+            id: `mention-${cardId}-${commentId}`,
+            type: "mention",
+            cardId,
+            title,
+            message: `${comment.author || "Alguém"} mencionou você${snippet ? `: ${snippet}` : "."}`,
+            when: safeWhen,
+            priority: "high",
+          };
+        });
+    })
+    .sort((a, b) => b.when - a.when);
+};
+
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
 export default function Header() {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
@@ -117,8 +171,14 @@ export default function Header() {
     const fetchNotifications = async () => {
       try {
         const response = await api.get("/cards");
-        const items = buildSlaNotifications(Array.isArray(response.data) ? response.data : []);
-        setNotifications(items);
+        const cards = Array.isArray(response.data) ? response.data : [];
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
+        const currentUserName = userData?.nome || userData?.username || userData?.email || "";
+        const slaItems = buildSlaNotifications(cards);
+        const mentionItems = buildMentionNotifications(cards, currentUserName);
+
+        // Menções primeiro, depois SLA
+        setNotifications([...mentionItems, ...slaItems]);
       } catch {
         setNotifications([]);
       }
@@ -175,7 +235,8 @@ export default function Header() {
         padding: "0 30px",
         borderBottom: "1px solid rgba(255,255,255,0.1)", // Linha inferior
         color: "#fff",
-        position: "relative" // Necessário para posicionar dropdown
+        position: "relative", // Necessário para posicionar dropdown
+        zIndex: 3000,
       }}
     >
       {/* Título */}
@@ -186,7 +247,7 @@ export default function Header() {
           letterSpacing: "0.5px"
         }}
       >
-        🚀 Delivery Panel
+        🚀 NVX Fibra LTDA
       </h2>
 
       {/* Área direita contendo notificações e menu do usuário */}
@@ -253,7 +314,7 @@ export default function Header() {
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                 minWidth: "320px",
                 maxWidth: "360px",
-                zIndex: 1000,
+                zIndex: 2200,
                 overflow: "hidden",
               }}
             >
@@ -282,6 +343,9 @@ export default function Header() {
                       onClick={() => {
                         markOneAsRead(item.id);
                         setShowNotifications(false);
+                        if (item.type === "mention" && item.cardId !== undefined && item.cardId !== null) {
+                          localStorage.setItem(KANBAN_FOCUS_CARD_KEY, String(item.cardId));
+                        }
                         navigate("/kanban");
                       }}
                       style={{
@@ -297,7 +361,7 @@ export default function Header() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <strong style={{ color: "#3f3292", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</strong>
                         <span style={{ fontSize: "10px", color: item.priority === "high" ? "#d32f2f" : "#7b54e8", fontWeight: 700 }}>
-                          {item.priority === "high" ? "ALTO" : "MÉDIO"}
+                          {item.type === "mention" ? "MENÇÃO" : item.priority === "high" ? "ALTO" : "MÉDIO"}
                         </span>
                       </div>
                       <div style={{ color: "#685d95", fontSize: "12px", marginTop: 4 }}>{item.message}</div>
@@ -374,7 +438,7 @@ export default function Header() {
                 borderRadius: "10px",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                 minWidth: "200px",
-                zIndex: 1000,
+                zIndex: 2200,
                 overflow: "hidden"
               }}
             >
@@ -412,7 +476,7 @@ export default function Header() {
                 onMouseEnter={(e) => e.currentTarget.style.background = "#f4efff"} // Hover
                 onMouseLeave={(e) => e.currentTarget.style.background = "transparent"} // Normal
               >
-                👤 Meu Perfil
+                Meu Perfil
               </button>
 
               {/* Botão Sair */}
@@ -436,7 +500,7 @@ export default function Header() {
                   onMouseEnter={(e) => e.currentTarget.style.background = "#f7edff"} // Hover
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"} // Normal
                 >
-                  🚪 Sair
+                  Sair
                 </button>
               </div>
             </div>

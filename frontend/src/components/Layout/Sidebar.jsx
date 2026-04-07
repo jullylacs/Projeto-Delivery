@@ -6,12 +6,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 export default function Sidebar() {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
   const location = useLocation(); // Hook para detectar a rota atual
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
 
   // Itens do menu com nome, ícone e caminho
   const menuItems = [
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
     { name: "Agenda", icon: "📅", path: "/agenda" },
+    ...(user?.perfil === "admin" ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
   ];
 
   return (

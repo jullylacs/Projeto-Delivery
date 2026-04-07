@@ -8,11 +8,23 @@ import Dashboard from "./pages/Dashboard";        // Página Dashboard
 import Kanban from "./pages/Kanban";              // Página Kanban
 import Agenda from "./pages/Agenda";              // Página Agenda
 import Profile from "./pages/Profile";            // Página Profile
+import AdminUsers from "./pages/AdminUsers";
 import Login from "./pages/Login";                // Página Login
 import Register from "./pages/Register";          // Página Register
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
-const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/profile"];
+const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/profile", "/admin/users"];
+
+function AdminRoute({ children }) {
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
+
+  if (!user || user.perfil !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
 
 function getLastPrivateRoute() {
   const saved = localStorage.getItem(LAST_PRIVATE_ROUTE_KEY);
@@ -58,6 +70,7 @@ function MainLayout() {
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
 
             {/* Redireciona "/" para última rota privada */}
             <Route path="/" element={<Navigate to={restoreRoute} replace />} />

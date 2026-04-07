@@ -1,5 +1,7 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   CalendarDays,
@@ -25,6 +27,8 @@ import CardModal from "../Modal/CardModal";
 import CommentInput from "./CommentInput";
 
 const KANBAN_PREFS_KEY = "kanbanPrefs";
+const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
+const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
 const DEFAULT_COLUMNS = [
   "Novo",
   "Em análise",
@@ -39,6 +43,16 @@ const readKanbanPrefs = () => {
   try {
     const raw = localStorage.getItem(KANBAN_PREFS_KEY);
     return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const readTrelloPrefs = () => {
+  try {
+    const raw = localStorage.getItem(KANBAN_TRELLO_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
@@ -106,6 +120,20 @@ const extractImportCards = (parsed, columns, fallbackStatus) => {
   return [];
 };
 
+const parseTrelloBoardId = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  // Aceita ID puro, URL de board, ou URL curta do Trello
+  const boardMatch = raw.match(/\/b\/([a-zA-Z0-9]+)/i);
+  if (boardMatch?.[1]) return boardMatch[1];
+
+  const shortMatch = raw.match(/trello\.com\/([a-zA-Z0-9]{8,})/i);
+  if (shortMatch?.[1]) return shortMatch[1];
+
+  return raw;
+};
+
 const EXPORT_FIELDS = [
   { key: "_id", label: "id" },
   { key: "titulo", label: "titulo" },
@@ -158,6 +186,274 @@ const downloadBlobFile = (content, mimeType, fileName) => {
 };
 
 const getCardKey = (card) => card?._id || card?.id;
+const getCardDomId = (cardId) => `kanban-card-${String(cardId ?? "").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+const normalizePersonName = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+const roleLabelByKey = {
+  comercial: "Comercial",
+  operacional: "Operacional",
+  tecnico: "Técnico",
+  gestor: "Gestor",
+  admin: "Administrador",
+};
+
+const formatRoleLabel = (role) => {
+  const key = normalizePersonName(role);
+  if (!key) return "Cargo não informado";
+  return roleLabelByKey[key] || String(role);
+};
+
+function MentionToken({ mentionText, profile }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const openTimerRef = useRef(null);
+  const personName = profile?.name || mentionText.replace(/^@/, "") || "Usuário";
+  const personAvatar = profile?.avatar || "";
+  const personRole = formatRoleLabel(profile?.role);
+
+  useEffect(() => {
+    return () => {
+      if (openTimerRef.current) {
+        clearTimeout(openTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+    }
+
+    openTimerRef.current = setTimeout(() => {
+      setIsOpen(true);
+    }, 150);
+  };
+
+  const handleMouseLeave = () => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+    }
+    setIsOpen(false);
+  };
+
+  return (
+    <span
+      style={{ position: "relative", display: "inline-block" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <span
+        style={{
+          color: "#5a34d1",
+          fontWeight: 700,
+          background: "#efe7ff",
+          borderRadius: 7,
+          padding: "1px 6px",
+          border: "1px solid #dbcfff",
+          cursor: "default",
+        }}
+      >
+        {mentionText}
+      </span>
+
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          bottom: "calc(100% + 8px)",
+          minWidth: 210,
+          maxWidth: 280,
+          background: "#ffffff",
+          border: "1px solid #d9cdfd",
+          borderRadius: 12,
+          padding: "10px 12px",
+          boxShadow: "0 12px 26px rgba(63, 47, 140, 0.2)",
+          zIndex: 40,
+          opacity: isOpen ? 1 : 0,
+          transform: isOpen ? "translateY(0)" : "translateY(6px)",
+          transition: "opacity 180ms ease, transform 220ms ease",
+          pointerEvents: isOpen ? "auto" : "none",
+        }}
+      >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {personAvatar ? (
+              <img
+                src={personAvatar}
+                alt={personName}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: "1px solid #ddcffd",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #8f6bff, #5b3fc9)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: 12,
+                }}
+              >
+                {personName
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase() || "")
+                  .join("") || "U"}
+              </div>
+            )}
+
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  color: "#3e2c9e",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {personName}
+              </div>
+              <div style={{ color: "#7768b3", fontSize: 12, marginTop: 2 }}>{personRole}</div>
+            </div>
+          </div>
+      </div>
+    </span>
+  );
+}
+
+const renderCommentTextWithMentions = (text, mentionLookup) => {
+  const source = String(text || "");
+  const profiles = Array.from(mentionLookup.values()).sort((a, b) => b.name.length - a.name.length);
+  if (!source || profiles.length === 0) return source;
+
+  let cursor = 0;
+  let output = "";
+
+  while (cursor < source.length) {
+    const atIndex = source.indexOf("@", cursor);
+    if (atIndex === -1) {
+      output += source.slice(cursor);
+      break;
+    }
+
+    output += source.slice(cursor, atIndex);
+
+    const prevChar = atIndex > 0 ? source[atIndex - 1] : "";
+    const hasWordBefore = prevChar && /[\p{L}\p{N}_]/u.test(prevChar);
+    if (hasWordBefore) {
+      output += "@";
+      cursor = atIndex + 1;
+      continue;
+    }
+
+    let matchedProfile = null;
+    let matchedText = "";
+
+    for (const profile of profiles) {
+      const mentionCandidate = `@${profile.name}`;
+      const candidateSlice = source.slice(atIndex, atIndex + mentionCandidate.length);
+      if (candidateSlice.toLowerCase() !== mentionCandidate.toLowerCase()) {
+        continue;
+      }
+
+      const nextChar = source[atIndex + mentionCandidate.length] || "";
+      if (nextChar && !/[\s.,!?;:()\[\]{}"']/u.test(nextChar)) {
+        continue;
+      }
+
+      matchedProfile = profile;
+      matchedText = source.slice(atIndex, atIndex + mentionCandidate.length);
+      break;
+    }
+
+    if (!matchedProfile) {
+      output += "@";
+      cursor = atIndex + 1;
+      continue;
+    }
+
+    const mentionHref = `/__mention__/${encodeURIComponent(normalizePersonName(matchedProfile.name))}`;
+    output += `[${matchedText}](${mentionHref})`;
+    cursor = atIndex + matchedText.length;
+  }
+
+  return output;
+};
+
+const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
+  const markdown = renderCommentTextWithMentions(text, mentionLookup);
+
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => <p style={{ margin: "0 0 6px", lineHeight: 1.55 }}>{children}</p>,
+        ul: ({ children }) => <ul style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ol>,
+        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+        strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
+        em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+        blockquote: ({ children }) => (
+          <blockquote
+            style={{
+              margin: "8px 0",
+              padding: "4px 10px",
+              borderLeft: "3px solid #c4b2ff",
+              color: "#5a4a9d",
+              background: "#f5efff",
+              borderRadius: 6,
+            }}
+          >
+            {children}
+          </blockquote>
+        ),
+        code: ({ children }) => (
+          <code
+            style={{
+              background: "#ece5ff",
+              border: "1px solid #dacdff",
+              borderRadius: 6,
+              padding: "1px 5px",
+              fontSize: 12,
+              color: "#4a379b",
+            }}
+          >
+            {children}
+          </code>
+        ),
+        a: ({ href, children }) => {
+          if (href && href.startsWith("/__mention__/")) {
+            const normalizedName = decodeURIComponent(href.replace("/__mention__/", ""));
+            const profile = mentionLookup.get(normalizedName);
+            const mentionText = Array.isArray(children) ? children.join("") : String(children || "@");
+
+            return <MentionToken mentionText={mentionText} profile={profile} />;
+          }
+
+          return <span>{children}</span>;
+        },
+      }}
+    >
+      {markdown}
+    </ReactMarkdown>
+  );
+};
 
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
@@ -180,7 +476,7 @@ const styles = {
     },
     detailsContent: {
       display: 'grid',
-      gridTemplateColumns: '1.15fr 0.85fr',
+      gridTemplateColumns: '0.95fr 1.05fr',
       gap: '14px',
       minHeight: 0,
       flex: 1,
@@ -221,31 +517,39 @@ const styles = {
       marginBottom: '18px',
       paddingBottom: '12px',
       borderBottom: '1px solid #ece7fa',
-      display: 'grid',
-      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-      gap: '12px 24px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px',
     },
     detailsRow: {
       display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      fontSize: '15px',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '4px',
+      fontSize: '16px',
       color: '#3e2c9e',
       fontWeight: 500,
+      padding: '8px 10px',
+      background: '#f8f5ff',
+      border: '1px solid #e6deff',
+      borderRadius: '10px',
     },
     detailsLabel: {
-      minWidth: '110px',
+      minWidth: 'unset',
       color: '#7c6fb7',
       fontWeight: 600,
-      fontSize: '13px',
+      fontSize: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.4px',
     },
     detailsValue: {
       color: '#2d225a',
-      fontWeight: 500,
-      fontSize: '15px',
+      fontWeight: 600,
+      fontSize: '17px',
+      lineHeight: 1.35,
     },
     detailsStatusRow: {
       display: 'flex',
@@ -461,6 +765,14 @@ const styles = {
     boxShadow: "0 10px 18px rgba(75, 35, 182, 0.22)",
     borderColor: "#bca8ff",
   },
+  cardItemPromoted: {
+    animation: "promoteToTop 520ms cubic-bezier(0.22, 0.61, 0.36, 1)",
+    zIndex: 3,
+  },
+  cardItemTargeted: {
+    animation: "focusMentionCard 900ms ease",
+    boxShadow: "0 0 0 2px #7f5af0, 0 12px 24px rgba(95, 61, 198, 0.24)",
+  },
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
@@ -521,6 +833,16 @@ const styles = {
     fontSize: "11px",
     color: "#8b8aa2",
   },
+  footerMeta: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  },
+  updatedInfo: {
+    fontSize: "10px",
+    color: "#8f86b8",
+    lineHeight: 1.2,
+  },
   detailButton: {
     background: "#ede6ff",
     border: "none",
@@ -566,7 +888,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 1000,
+    zIndex: 4000,
   },
   modal: {
     background: "#fff",
@@ -892,7 +1214,7 @@ function DroppableColumn({ id, children, minHeight, padding }) {
 
 // Componente de card que pode ser arrastado
 // Representa um item individual no kanban
-function DraggableCard({ card, onOpen, densityCfg }) {
+function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargeted = false, domId }) {
   // useDraggable do dnd-kit para tornar o card arrastável
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: getCardKey(card) });
   const [isHovered, setIsHovered] = useState(false);
@@ -906,6 +1228,8 @@ function DraggableCard({ card, onOpen, densityCfg }) {
     ...styles.cardItem,
     padding: densityCfg?.cardPadding || styles.cardItem.padding,
     minWidth: densityCfg?.cardMinWidth || styles.cardItem.minWidth,
+    ...(isPromoted ? styles.cardItemPromoted : {}),
+    ...(isTargeted ? styles.cardItemTargeted : {}),
     ...(isHovered ? styles.cardItemHover : {}), // Adiciona efeito hover
   };
 
@@ -921,6 +1245,26 @@ function DraggableCard({ card, onOpen, densityCfg }) {
     return new Date(deadline) < new Date();
   };
 
+  const formatTimeSinceUpdate = (dateValue) => {
+    if (!dateValue) return "Atualizado agora";
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return "Atualizado agora";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+
+    if (diffMinutes < 1) return "Atualizado agora";
+    if (diffMinutes < 60) return `Atualizado há ${diffMinutes} min`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `Atualizado há ${diffHours} h`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `Atualizado há ${diffDays} d`;
+
+    return `Atualizado em ${date.toLocaleDateString("pt-BR")}`;
+  };
+
   // Manipulador para abrir o modal de detalhes do card
   const handleDetailClick = (e) => {
     e.stopPropagation(); // Evita propagação do evento para elementos pai
@@ -930,6 +1274,7 @@ function DraggableCard({ card, onOpen, densityCfg }) {
 
   return (
     <div
+      id={domId}
       ref={setNodeRef}
       style={style}
       onMouseEnter={() => setIsHovered(true)}  // Ativa hover
@@ -1008,9 +1353,12 @@ function DraggableCard({ card, onOpen, densityCfg }) {
 
       {/* Rodapé do card com vendedor e botão de detalhes */}
       <div style={styles.cardFooter}>
-        <div style={styles.vendorInfo}>
-          <User size={12} />
-          <span>{card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor"}</span>
+        <div style={styles.footerMeta}>
+          <div style={styles.vendorInfo}>
+            <User size={12} />
+            <span>{card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor"}</span>
+          </div>
+          <span style={styles.updatedInfo}>{formatTimeSinceUpdate(card.updatedAt || card.createdAt)}</span>
         </div>
         <button
           onClick={handleDetailClick}
@@ -1027,11 +1375,13 @@ function DraggableCard({ card, onOpen, densityCfg }) {
 
 // Componente principal do Kanban Board
 export default function Board() {
+  const trelloPrefs = readTrelloPrefs();
   // Estados principais
   const [cards, setCards] = useState([]);           // Lista de todos os cards
   const [selectedCard, setSelectedCard] = useState(null); // Card selecionado para detalhes
   const [statusEdit, setStatusEdit] = useState("Novo");    // Status temporário para edição
   const [commentText, setCommentText] = useState("");      // Texto do comentário sendo escrito
+  const [pendingAttachment, setPendingAttachment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
   const [isEditCardOpen, setIsEditCardOpen] = useState(false); // Controle do modal de edição
   const [editingCard, setEditingCard] = useState(null);    // Card sendo editado
@@ -1058,8 +1408,18 @@ export default function Board() {
   const [importRaw, setImportRaw] = useState("");
   const [importDefaultStatus, setImportDefaultStatus] = useState("Novo");
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingTrello, setIsImportingTrello] = useState(false);
+  const [isBulkDeletingCards, setIsBulkDeletingCards] = useState(false);
   const [importSummary, setImportSummary] = useState("");
   const [externalExportSummary, setExternalExportSummary] = useState("");
+  const [trelloBoardRef, setTrelloBoardRef] = useState(() => trelloPrefs.boardRef || "");
+  const [trelloKey, setTrelloKey] = useState(() => trelloPrefs.key || "");
+  const [trelloToken, setTrelloToken] = useState(() => trelloPrefs.token || "");
+  const [isDataActionsOpen, setIsDataActionsOpen] = useState(false);
+  const [promotedCardId, setPromotedCardId] = useState(null);
+  const [targetedCardId, setTargetedCardId] = useState(null);
+  const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [, setTimeTick] = useState(0);
 
   const densityPresets = {
     compacto: {
@@ -1130,7 +1490,7 @@ export default function Board() {
           const updatedCard = response.data;
           
           // Atualiza o estado local com o card modificado
-          setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(updatedCard) ? updatedCard : card)));
+          promoteUpdatedCardToTop(updatedCard);
           
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
           if (selectedCard && getCardKey(selectedCard) === getCardKey(updatedCard)) {
@@ -1156,17 +1516,82 @@ export default function Board() {
   const seller = userData?.nome || userData?.username || userData?.email || "Sem vendedor";
   const sellerId = userData?._id || userData?.id || null;
 
-  const mentionUsers = [
-    seller,
-    ...cards.map((c) => c?.vendedor?.nome || c?.vendedor || c?.vendedorId || "").filter(Boolean),
-    ...cards.flatMap((c) => (c?.comments || []).map((comment) => comment?.author || "")).filter(Boolean),
-  ].filter((name, index, arr) => arr.findIndex((n) => String(n).toLowerCase() === String(name).toLowerCase()) === index);
+  const mentionProfileLookup = useMemo(() => {
+    const map = new Map();
+
+    const upsertProfile = (candidate) => {
+      const name = String(candidate?.name || candidate?.nome || candidate?.author || "").trim();
+      if (!name) return;
+
+      const normalized = normalizePersonName(name);
+      if (!normalized) return;
+
+      const nextProfile = {
+        name,
+        avatar: candidate?.avatar || candidate?.authorAvatar || "",
+        role: candidate?.perfil || candidate?.role || "",
+      };
+
+      const existing = map.get(normalized);
+      if (!existing) {
+        map.set(normalized, nextProfile);
+        return;
+      }
+
+      map.set(normalized, {
+        name: existing.name || nextProfile.name,
+        avatar: existing.avatar || nextProfile.avatar,
+        role: existing.role || nextProfile.role,
+      });
+    };
+
+    upsertProfile({
+      name: userData?.nome || userData?.username || userData?.email,
+      avatar: userData?.avatar,
+      perfil: userData?.perfil,
+    });
+
+    directoryUsers.forEach((user) => upsertProfile(user));
+
+    cards.forEach((card) => {
+      upsertProfile(card?.vendedor);
+      (card?.comments || []).forEach((comment) => {
+        upsertProfile({ name: comment?.author, avatar: comment?.authorAvatar });
+      });
+    });
+
+    return map;
+  }, [cards, directoryUsers, userData]);
+
+  const mentionUsers = Array.from(mentionProfileLookup.values()).map((item) => item.name);
 
   // Efeito para carregar cards da API ao montar o componente
   useEffect(() => {
     api.get("/cards")
       .then((res) => setCards(res.data))
       .catch((err) => console.log(err));
+  }, []);
+
+  useEffect(() => {
+    const fetchDirectoryUsers = async () => {
+      try {
+        const response = await api.get("/users/admin", {
+          params: { page: 1, limit: 200, sortBy: "nome", sortOrder: "asc" },
+        });
+
+        const users = Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+
+        setDirectoryUsers(users);
+      } catch {
+        setDirectoryUsers([]);
+      }
+    };
+
+    fetchDirectoryUsers();
   }, []);
 
   // Colunas do Kanban - estado que permite adicionar/editar/remover colunas dinamicamente
@@ -1181,6 +1606,55 @@ export default function Board() {
       JSON.stringify({ density, searchTerm, statusFilter, vendorFilter, columns })
     );
   }, [density, searchTerm, statusFilter, vendorFilter, columns]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      KANBAN_TRELLO_PREFS_KEY,
+      JSON.stringify({
+        boardRef: trelloBoardRef,
+        key: trelloKey,
+        token: trelloToken,
+      })
+    );
+  }, [trelloBoardRef, trelloKey, trelloToken]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setTimeTick((prev) => prev + 1);
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const pendingCardId = localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
+    if (!pendingCardId || cards.length === 0) return;
+
+    const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
+    if (!targetCard) return;
+
+    // Garante que o card esteja visível mesmo com filtros ativos
+    setSearchTerm("");
+    setStatusFilter("");
+    setVendorFilter("");
+
+    setSelectedCard(targetCard);
+    setStatusEdit(targetCard.status || "Novo");
+    setTargetedCardId(String(getCardKey(targetCard)));
+    localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+
+    requestAnimationFrame(() => {
+      const domId = getCardDomId(getCardKey(targetCard));
+      const cardElement = document.getElementById(domId);
+      cardElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    });
+
+    const timer = setTimeout(() => {
+      setTargetedCardId((current) => (current === String(getCardKey(targetCard)) ? null : current));
+    }, 1400);
+
+    return () => clearTimeout(timer);
+  }, [cards]);
   
   // Estados para controle do modal de colunas
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
@@ -1231,6 +1705,50 @@ export default function Board() {
     setColumns((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleDeleteAllCardsInColumn = async (columnName) => {
+    const cardsInColumn = cards.filter((card) => card.status === columnName);
+    if (cardsInColumn.length === 0) {
+      alert("Essa coluna não possui cards para excluir.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Excluir TODOS os ${cardsInColumn.length} card(s) da coluna \"${columnName}\"? Essa ação não pode ser desfeita.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setIsBulkDeletingCards(true);
+
+    try {
+      const results = await Promise.allSettled(
+        cardsInColumn.map((card) => api.delete(`/cards/${getCardKey(card)}`))
+      );
+
+      const deletedIds = cardsInColumn
+        .filter((_, index) => results[index]?.status === "fulfilled")
+        .map((card) => getCardKey(card));
+
+      const failedCount = cardsInColumn.length - deletedIds.length;
+
+      if (deletedIds.length > 0) {
+        setCards((prev) => prev.filter((card) => !deletedIds.includes(getCardKey(card))));
+
+        if (selectedCard && deletedIds.includes(getCardKey(selectedCard))) {
+          handleCloseCard();
+        }
+      }
+
+      if (failedCount > 0) {
+        setError(`Alguns cards não puderam ser removidos (${failedCount}). Tente novamente.`);
+      }
+    } catch {
+      setError("Erro ao excluir todos os cards da coluna.");
+    } finally {
+      setIsBulkDeletingCards(false);
+    }
+  };
+
   // Manipulador de mudanças nos campos do formulário de novo card
   const handleInputChange = (field, value) => {
     // Tratamento especial para coordenadas
@@ -1264,6 +1782,7 @@ export default function Board() {
     setSelectedCard(card);
     setStatusEdit(card.status || "Novo");
     setCommentText("");
+    setPendingAttachment(null);
   };
 
   // Fecha modal de detalhes
@@ -1271,6 +1790,19 @@ export default function Board() {
     console.log('[Detalhes] Fechando modal de detalhes');
     setSelectedCard(null);
     setCommentText("");
+    setPendingAttachment(null);
+  };
+
+  const handleAttachmentSelect = (file) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result;
+      if (!base64) return;
+      setPendingAttachment({ name: file.name, type: file.type, data: base64 });
+    };
+    reader.readAsDataURL(file);
   };
 
   const getAvatarInitials = (name) => {
@@ -1286,7 +1818,10 @@ export default function Board() {
 
   // Adiciona comentário ao card
   const handleAddComment = async () => {
-    if (!selectedCard || !commentText.trim()) return;
+    if (!selectedCard) return;
+
+    const normalizedText = commentText.trim();
+    if (!normalizedText && !pendingAttachment) return;
 
     // Recupera dados do usuário para identificar autor
     const userData = JSON.parse(localStorage.getItem("user") || "null");
@@ -1296,10 +1831,11 @@ export default function Board() {
     // Cria novo comentário
     const newComment = {
       id: Date.now(), // ID temporário baseado no timestamp
-      text: commentText.trim(),
+      text: normalizedText,
       author,
       authorAvatar,
       createdAt: new Date().toISOString(),
+      ...(pendingAttachment ? { attachment: pendingAttachment } : {}),
     };
 
     const updatedComments = [...(selectedCard.comments || []), newComment];
@@ -1310,10 +1846,11 @@ export default function Board() {
       const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
       const updatedCard = response.data;
 
-      // Atualiza estados localmente
-      setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
+      // Atualiza estados localmente e promove o card ao topo da coluna
+      promoteUpdatedCardToTop(updatedCard);
       setSelectedCard(updatedCard);
       setCommentText(""); // Limpa campo de comentário
+      setPendingAttachment(null);
     } catch (err) {
       console.error("erro ao adicionar comentário", err);
       setError("Erro ao adicionar comentário");
@@ -1328,7 +1865,7 @@ export default function Board() {
     try {
       const response = await api.put(`/cards/${getCardKey(selectedCard)}`, payload);
       const updatedCard = response.data;
-      setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
+      promoteUpdatedCardToTop(updatedCard);
       setSelectedCard(updatedCard);
     } catch (err) {
       console.error("Erro ao salvar alterações do card", err);
@@ -1506,6 +2043,34 @@ export default function Board() {
     reader.readAsText(file);
   };
 
+  const importCardsFromParsed = async (parsed) => {
+    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, "Novo");
+    const extracted = extractImportCards(parsed, columns, fallbackStatus);
+
+    if (extracted.length === 0) {
+      setError("Nenhum card encontrado no JSON. Use um array de cards ou export do Trello.");
+      return false;
+    }
+
+    const payloads = extracted.map(({ card, status }) =>
+      mapImportedCard({ card, status, seller, sellerId })
+    );
+
+    const results = await Promise.allSettled(payloads.map((payload) => api.post("/cards", payload)));
+    const createdCards = results
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value.data);
+
+    const failedCount = results.length - createdCards.length;
+
+    if (createdCards.length > 0) {
+      setCards((prev) => [...createdCards, ...prev]);
+    }
+
+    setImportSummary(`Importação finalizada: ${createdCards.length} criado(s), ${failedCount} falha(s).`);
+    return true;
+  };
+
   const handleImportCards = async () => {
     setError("");
     setImportSummary("");
@@ -1524,37 +2089,110 @@ export default function Board() {
       return;
     }
 
-    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, "Novo");
-    const extracted = extractImportCards(parsed, columns, fallbackStatus);
-
-    if (extracted.length === 0) {
-      setError("Nenhum card encontrado no JSON. Use um array de cards ou export do Trello.");
-      return;
-    }
-
     setIsImporting(true);
     try {
-      const payloads = extracted.map(({ card, status }) =>
-        mapImportedCard({ card, status, seller, sellerId })
-      );
-
-      const results = await Promise.allSettled(payloads.map((payload) => api.post("/cards", payload)));
-      const createdCards = results
-        .filter((result) => result.status === "fulfilled")
-        .map((result) => result.value.data);
-
-      const failedCount = results.length - createdCards.length;
-
-      if (createdCards.length > 0) {
-        setCards((prev) => [...createdCards, ...prev]);
-      }
-
-      setImportSummary(`Importação finalizada: ${createdCards.length} criado(s), ${failedCount} falha(s).`);
+      await importCardsFromParsed(parsed);
     } catch (importError) {
       console.error("Erro ao importar cards", importError);
       setError("Erro ao importar cards. Tente novamente.");
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const fetchTrelloExportPayload = async () => {
+    const boardId = parseTrelloBoardId(trelloBoardRef);
+    const key = String(trelloKey || "").trim();
+    const token = String(trelloToken || "").trim();
+
+    if (!boardId || !key || !token) {
+      throw new Error("Preencha Board ID/URL, Key e Token do Trello.");
+    }
+
+    const auth = new URLSearchParams({ key, token }).toString();
+    const listsUrl = `https://api.trello.com/1/boards/${boardId}/lists?${auth}&fields=id,name`;
+    const cardsUrl = `https://api.trello.com/1/boards/${boardId}/cards?${auth}&fields=id,idList,name,desc,due,labels,shortUrl,dateLastActivity&attachments=true&attachment_fields=name,url,mimeType,date&members=true&member_fields=fullName,username,avatarUrl`;
+    const actionsUrl = `https://api.trello.com/1/boards/${boardId}/actions?${auth}&filter=commentCard&fields=data,date,idMemberCreator&memberCreator_fields=fullName,username,avatarUrl&limit=1000`;
+
+    const [listsRes, cardsRes, actionsRes] = await Promise.all([
+      fetch(listsUrl),
+      fetch(cardsUrl),
+      fetch(actionsUrl),
+    ]);
+
+    if (!listsRes.ok || !cardsRes.ok || !actionsRes.ok) {
+      throw new Error("Falha ao buscar dados do Trello. Confira Board/Key/Token.");
+    }
+
+    const [lists, cards, actions] = await Promise.all([listsRes.json(), cardsRes.json(), actionsRes.json()]);
+
+    const commentsByCard = new Map();
+    (Array.isArray(actions) ? actions : []).forEach((action) => {
+      const cardId = action?.data?.card?.id;
+      const commentText = action?.data?.text;
+      if (!cardId || !commentText) return;
+
+      const item = {
+        id: action?.id || `${cardId}-${Date.now()}`,
+        text: commentText,
+        author: action?.memberCreator?.fullName || action?.memberCreator?.username || "Usuário Trello",
+        authorAvatar: action?.memberCreator?.avatarUrl || "",
+        createdAt: action?.date || new Date().toISOString(),
+      };
+
+      if (!commentsByCard.has(cardId)) {
+        commentsByCard.set(cardId, []);
+      }
+      commentsByCard.get(cardId).push(item);
+    });
+
+    const normalizedCards = (Array.isArray(cards) ? cards : []).map((card) => {
+      const attachmentNotes = (card?.attachments || [])
+        .map((attachment) => `- ${attachment?.name || "Arquivo"}: ${attachment?.url || ""}`)
+        .filter(Boolean)
+        .join("\n");
+
+      const extraNotes = [
+        card?.desc || "",
+        card?.shortUrl ? `\nLink Trello: ${card.shortUrl}` : "",
+        attachmentNotes ? `\nAnexos Trello:\n${attachmentNotes}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const mainMember = card?.members?.[0];
+
+      return {
+        ...card,
+        titulo: card?.name || "",
+        desc: extraNotes,
+        observacoes: extraNotes,
+        prazo: card?.due || null,
+        comments: commentsByCard.get(card?.id) || [],
+        vendedor: mainMember?.fullName || mainMember?.username || "",
+      };
+    });
+
+    return {
+      lists: Array.isArray(lists) ? lists : [],
+      cards: normalizedCards,
+    };
+  };
+
+  const handleImportFromTrello = async () => {
+    setError("");
+    setImportSummary("");
+    setExternalExportSummary("");
+    setIsImportingTrello(true);
+
+    try {
+      const trelloPayload = await fetchTrelloExportPayload();
+      setImportRaw(JSON.stringify(trelloPayload, null, 2));
+      await importCardsFromParsed(trelloPayload);
+    } catch (trelloError) {
+      setError(trelloError?.message || "Erro ao importar do Trello.");
+    } finally {
+      setIsImportingTrello(false);
     }
   };
 
@@ -1702,9 +2340,29 @@ export default function Board() {
     [cards, activeId]
   );
 
+  const promoteUpdatedCardToTop = (updatedCard) => {
+    const updatedId = getCardKey(updatedCard);
+    setCards((prev) => [updatedCard, ...prev.filter((card) => getCardKey(card) !== updatedId)]);
+    setPromotedCardId(updatedId);
+    setTimeout(() => {
+      setPromotedCardId((current) => (current === updatedId ? null : current));
+    }, 420);
+  };
+
   // Renderização do componente principal
   return (
     <div style={styles.container}>
+      <style>
+        {`@keyframes promoteToTop {
+          0% { transform: translateY(12px) scale(0.995); opacity: 0.92; }
+          65% { transform: translateY(-1px) scale(1.004); opacity: 1; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes focusMentionCard {
+          0% { box-shadow: 0 0 0 0 rgba(127, 90, 240, 0.55), 0 8px 20px rgba(95, 61, 198, 0.2); }
+          100% { box-shadow: 0 0 0 12px rgba(127, 90, 240, 0), 0 8px 20px rgba(95, 61, 198, 0.18); }
+        }`}
+      </style>
       {/* Cabeçalho com título e botões de ação */}
       <div style={styles.header}>
         <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban de Entregas</h1>
@@ -1749,29 +2407,83 @@ export default function Board() {
           >
             <Plus size={15} /> Nova Coluna
           </button>
-          <button
-            style={{ ...styles.addButton, background: "linear-gradient(135deg, #cce5ff 0%, #8ec5ff 100%)", color: "#1a3f74" }}
-            onClick={() => {
-              setIsImportModalOpen(true);
-              setImportSummary("");
-              setExternalExportSummary("");
-              setError("");
-            }}
-          >
-            <FileUp size={15} /> Importar
-          </button>
-          <button
-            style={{ ...styles.addButton, background: "linear-gradient(135deg, #d8f7de 0%, #95e5a7 100%)", color: "#1f5b2e" }}
-            onClick={handleExportExcel}
-          >
-            <FileSpreadsheet size={15} /> Excel
-          </button>
-          <button
-            style={{ ...styles.addButton, background: "linear-gradient(135deg, #e7f0ff 0%, #bdd6ff 100%)", color: "#21468a" }}
-            onClick={handleExportCsv}
-          >
-            <Download size={15} /> CSV
-          </button>
+          <div style={{ position: "relative" }}>
+            <button
+              style={{ ...styles.addButton, background: "linear-gradient(135deg, #cce5ff 0%, #8ec5ff 100%)", color: "#1a3f74" }}
+              onClick={() => setIsDataActionsOpen((prev) => !prev)}
+            >
+              <FileUp size={15} /> Dados
+            </button>
+
+            {isDataActionsOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  minWidth: "190px",
+                  background: "#fff",
+                  border: "1px solid #d8cffb",
+                  borderRadius: 10,
+                  boxShadow: "0 14px 28px rgba(56, 36, 138, 0.2)",
+                  padding: 8,
+                  zIndex: 20,
+                  display: "grid",
+                  gap: 6,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImportModalOpen(true);
+                    setImportSummary("");
+                    setExternalExportSummary("");
+                    setError("");
+                    setIsDataActionsOpen(false);
+                  }}
+                  style={{ background: "#eef5ff", border: "1px solid #d0e0ff", color: "#1a3f74", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <FileUp size={14} /> Importar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsImportModalOpen(true);
+                    setImportSummary("");
+                    setExternalExportSummary("");
+                    setError("");
+                    setIsDataActionsOpen(false);
+                  }}
+                  style={{ background: "#e8f8ff", border: "1px solid #c9ebff", color: "#165d7a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Download size={14} /> Trello
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportExcel();
+                    setIsDataActionsOpen(false);
+                  }}
+                  style={{ background: "#e9faed", border: "1px solid #c8efd4", color: "#1f5b2e", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <FileSpreadsheet size={14} /> Excel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleExportCsv();
+                    setIsDataActionsOpen(false);
+                  }}
+                  style={{ background: "#eef4ff", border: "1px solid #d4e1ff", color: "#21468a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Download size={14} /> CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1840,6 +2552,24 @@ export default function Board() {
                         </span>
                         {/* Botão para editar coluna */}
                         <button 
+                          title="Excluir todos os cards da coluna" 
+                          disabled={isBulkDeletingCards || columnCards.length === 0}
+                          style={{
+                            background: "#fff7e8",
+                            border: "1px solid #ffe1b0",
+                            borderRadius: 6,
+                            color: "#9b5a10",
+                            cursor: isBulkDeletingCards || columnCards.length === 0 ? "not-allowed" : "pointer",
+                            fontSize: 14,
+                            padding: "2px 5px",
+                            marginLeft: 2,
+                            opacity: isBulkDeletingCards || columnCards.length === 0 ? 0.55 : 1,
+                          }} 
+                          onClick={() => handleDeleteAllCardsInColumn(col)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <button 
                           title="Editar coluna" 
                           style={{ background: "#efe8ff", border: "1px solid #d4c3ff", borderRadius: 6, color: "#6c3bff", cursor: "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2 }} 
                           onClick={() => openEditColumn(idx)}
@@ -1897,7 +2627,15 @@ export default function Board() {
                       <DroppableColumn id={`column-${col}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
                         {/* Mapeia e renderiza cada card da coluna */}
                         {columnCards.map((card) => (
-                          <DraggableCard key={getCardKey(card)} card={card} onOpen={handleOpenCard} densityCfg={densityCfg} />
+                          <DraggableCard
+                            key={getCardKey(card)}
+                            card={card}
+                            onOpen={handleOpenCard}
+                            densityCfg={densityCfg}
+                            isPromoted={promotedCardId === getCardKey(card)}
+                            isTargeted={targetedCardId === String(getCardKey(card))}
+                            domId={getCardDomId(getCardKey(card))}
+                          />
                         ))}
                         {/* Mensagem quando não há cards na coluna */}
                         {columnCards.length === 0 && (
@@ -2151,6 +2889,40 @@ export default function Board() {
                 Aceita JSON em array de cards ou export do Trello (com cards/lists).
               </p>
 
+              <div style={{ border: "1px solid #d8cffb", borderRadius: 10, padding: 10, background: "#f8f6ff" }}>
+                <strong style={{ display: "block", color: "#3f3292", fontSize: 13, marginBottom: 8 }}>Importar direto do Trello</strong>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <input
+                    style={styles.modalInput}
+                    value={trelloBoardRef}
+                    onChange={(e) => setTrelloBoardRef(e.target.value)}
+                    placeholder="Board ID ou URL do Trello"
+                  />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <input
+                      style={styles.modalInput}
+                      value={trelloKey}
+                      onChange={(e) => setTrelloKey(e.target.value)}
+                      placeholder="Trello Key"
+                    />
+                    <input
+                      style={styles.modalInput}
+                      value={trelloToken}
+                      onChange={(e) => setTrelloToken(e.target.value)}
+                      placeholder="Trello Token"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleImportFromTrello}
+                    disabled={isImportingTrello}
+                    style={{ ...styles.saveBtn, justifySelf: "start" }}
+                  >
+                    {isImportingTrello ? "Importando do Trello..." : "Trazer cards do Trello"}
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 10 }}>
                 <label style={{ ...styles.cancelBtn, textAlign: "center", cursor: "pointer" }}>
                   Selecionar arquivo JSON
@@ -2386,7 +3158,7 @@ export default function Board() {
                             try {
                               const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
                               const updatedCard = response.data;
-                              setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
+                              promoteUpdatedCardToTop(updatedCard);
                               setSelectedCard(updatedCard);
                             } catch (err) {
                               setError("Erro ao excluir comentário");
@@ -2398,21 +3170,37 @@ export default function Board() {
                             const cardUpdate = { ...selectedCard, comments: updatedComments };
                             api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate).then((response) => {
                               const updatedCard = response.data;
-                              setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
+                              promoteUpdatedCardToTop(updatedCard);
                               setSelectedCard(updatedCard);
                             });
                           }}><Pencil size={15} /></button>
                         </div>
                       </div>
-                      <p style={styles.detailsCommentText}>{comment.text}</p>
+                      <div style={styles.detailsCommentText}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       {comment.attachment && (
                         <div style={{ marginTop: 8 }}>
                           {comment.attachment.type && comment.attachment.type.startsWith('image/') ? (
-                            <img src={comment.attachment.data || URL.createObjectURL(new Blob([comment.attachment.data]))} alt={comment.attachment.name} style={{ maxWidth: 320, maxHeight: 220, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }} />
+                            <img src={comment.attachment.data || URL.createObjectURL(new Blob([comment.attachment.data]))} alt={comment.attachment.name || 'Imagem anexada'} style={{ maxWidth: 320, maxHeight: 220, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }} />
                           ) : comment.attachment.type === 'application/pdf' ? (
-                            <a href={comment.attachment.data} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#b71c1c', fontWeight: 600, fontSize: 15, textDecoration: 'none' }}>
-                              <span style={{ fontSize: 22, display: "inline-flex", alignItems: "center" }}><FileText size={20} /></span> Abrir PDF
-                            </a>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
+                                <FileText size={18} /> PDF
+                              </span>
+                              <a href={comment.attachment.data} target="_blank" rel="noopener noreferrer" style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Abrir</a>
+                              <a href={comment.attachment.data} download={comment.attachment.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const printableWindow = window.open(comment.attachment.data, '_blank', 'noopener,noreferrer');
+                                  if (printableWindow) {
+                                    setTimeout(() => printableWindow.print(), 600);
+                                  }
+                                }}
+                                style={{ border: 'none', background: 'transparent', color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                              >
+                                Imprimir
+                              </button>
+                            </div>
                           ) : (
                             <a href={comment.attachment.data} download={comment.attachment.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13 }}>
                               <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} /> {comment.attachment.name}
@@ -2435,37 +3223,9 @@ export default function Board() {
                   onChange={setCommentText}
                   onSend={handleAddComment}
                   mentionUsers={mentionUsers}
-                  onFile={async (file) => {
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = async (e) => {
-                      const base64 = e.target.result;
-                      const userData = JSON.parse(localStorage.getItem("user") || "null");
-                      const author = userData?.nome || userData?.username || userData?.email || "Usuário";
-                      const authorAvatar = userData?.avatar || "";
-                      const fileText = commentText && commentText.trim() ? commentText.trim() : file.name;
-                      const newComment = {
-                        id: Date.now(),
-                        text: fileText,
-                        author,
-                        authorAvatar,
-                        createdAt: new Date().toISOString(),
-                        attachment: { name: file.name, type: file.type, data: base64 },
-                      };
-                      const updatedComments = [...(selectedCard.comments || []), newComment];
-                      const cardUpdate = { ...selectedCard, comments: updatedComments };
-                      try {
-                        const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
-                        const updatedCard = response.data;
-                        setCards((prev) => prev.map((c) => (getCardKey(c) === getCardKey(updatedCard) ? updatedCard : c)));
-                        setSelectedCard(updatedCard);
-                        setCommentText("");
-                      } catch (err) {
-                        setError("Erro ao anexar arquivo");
-                      }
-                    };
-                    reader.readAsDataURL(file);
-                  }}
+                  onFile={handleAttachmentSelect}
+                  pendingAttachment={pendingAttachment}
+                  onClearAttachment={() => setPendingAttachment(null)}
                   placeholder="Escreva um comentário, use @ para menção, ou anexe arquivos/fotos..."
                 />
               </div>

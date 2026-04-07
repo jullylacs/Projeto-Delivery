@@ -18,7 +18,7 @@ User.hasMany(Card,   { foreignKey: "vendedor_id", as: "cards" });
 
 // Comment pertence a um Card
 Comment.belongsTo(Card, { foreignKey: "card_id", as: "card" });
-Card.hasMany(Comment,   { foreignKey: "card_id", as: "comments" });
+Card.hasMany(Comment,   { foreignKey: "card_id", as: "commentRecords" });
 
 // Comment pertence a um User (autor)
 Comment.belongsTo(User, { foreignKey: "usuario_id", as: "usuario" });

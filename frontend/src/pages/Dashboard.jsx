@@ -14,6 +14,54 @@ export default function Dashboard() {
   // Estado para armazenar mensagens de erro
   const [error, setError] = useState("");
 
+  const loadingStyles = {
+    container: {
+      padding: "24px",
+      background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
+      minHeight: "90vh",
+    },
+    card: {
+      background: "#fff",
+      border: "1px solid rgba(108,59,255,0.12)",
+      borderRadius: "14px",
+      padding: "18px",
+      boxShadow: "0 8px 18px rgba(62,44,158,0.08)",
+      marginBottom: "16px",
+    },
+    line: {
+      height: "14px",
+      borderRadius: "8px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "10px",
+    },
+    title: {
+      height: "28px",
+      width: "260px",
+      borderRadius: "10px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "10px",
+    },
+    subtitle: {
+      height: "14px",
+      width: "420px",
+      maxWidth: "100%",
+      borderRadius: "8px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "18px",
+    },
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+      gap: "16px",
+    },
+  };
+
   // useEffect que executa na montagem do componente para buscar os cards via API
   useEffect(() => {
     api.get("/cards") // Requisição GET para endpoint "/cards"
@@ -92,9 +140,30 @@ export default function Dashboard() {
   // Renderiza loading enquanto dados são carregados
   if (loading) {
     return (
-      <div style={{ padding: "22px" }}>
-        <h2>Dashboard</h2>
-        <p>Carregando dados...</p>
+      <div style={loadingStyles.container}>
+        <style>
+          {`@keyframes dashPulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}
+        </style>
+        <div style={loadingStyles.title} />
+        <div style={loadingStyles.subtitle} />
+
+        <div style={loadingStyles.grid}>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "45%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "30%" }} />
+            <div style={{ ...loadingStyles.line, width: "65%" }} />
+          </div>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "52%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "28%" }} />
+            <div style={{ ...loadingStyles.line, width: "75%" }} />
+          </div>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "48%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "24%" }} />
+            <div style={{ ...loadingStyles.line, width: "58%" }} />
+          </div>
+        </div>
       </div>
     );
   }

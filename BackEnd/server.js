@@ -1,28 +1,57 @@
 require("dotenv").config();
 
-const app = require("./src/app"); // Importa a aplicação Express
-const http = require("http");     // Core do Node para criar servidor HTTP
-const { Server } = require("socket.io"); // Importa Socket.IO para tempo real
+const app = require("./src/app");
+const http = require("http");
+const { Server } = require("socket.io");
+const { sequelize } = require("./src/models");
 
-// 🔹 Cria servidor HTTP usando Express
+// Cria servidor HTTP usando Express
 const server = http.createServer(app);
 
-// 🔹 Inicializa Socket.IO
+// 🔒 Configuração segura de Socket.IO
 const io = new Server(server, {
-  cors: { origin: "*" } // Permite qualquer front-end acessar o WebSocket
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ["websocket", "polling"]
 });
 
-// 🔹 Evento de conexão do cliente
+// Middleware de autenticação para Socket.IO
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error("Autenticação necessária"));
+  }
+  next();
+});
+
+// Evento de conexão do cliente
 io.on("connection", (socket) => {
-  console.log("Cliente conectado");
+  console.log("Cliente conectado:", socket.id);
 
-  // Aqui você pode adicionar eventos:
-  // ex: socket.on("novoCard", data => { ... })
+  socket.on("disconnect", () => {
+    console.log("Cliente desconectado:", socket.id);
+  });
 });
 
-// 🔹 Inicia o servidor na porta configurada
+// Inicia o servidor apenas se o banco estiver conectado
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "localhost";
-server.listen(PORT, HOST, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+
+async function startServer() {
+  try {
+    await sequelize.authenticate();
+    console.log("Banco de dados conectado com sucesso.");
+
+    server.listen(PORT, HOST, () => {
+      console.log(`Servidor rodando em http://${HOST}:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Falha ao conectar no banco de dados:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
