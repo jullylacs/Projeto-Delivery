@@ -214,6 +214,7 @@ const styles = {
 };
 
 export default function AdminUsers() {
+  // Estados da tabela de usuários
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -225,11 +226,12 @@ export default function AdminUsers() {
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("asc");
   const [hoveredRowId, setHoveredRowId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
   const [form, setForm] = useState({ nome: "", email: "", perfil: "comercial" });
 
   const totalFiltered = total;
 
+  // Busca usuários da API com filtros de busca, paginação e ordenação
   const loadUsers = async () => {
     try {
       setLoading(true);
@@ -267,6 +269,7 @@ export default function AdminUsers() {
     }
   };
 
+  // Restaura estado (filtros, página, ordenação) do localStorage ao montar o componente
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -283,6 +286,7 @@ export default function AdminUsers() {
     }
   }, []);
 
+  // Persiste estado atual no localStorage sempre que os filtros ou página mudam
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
@@ -296,21 +300,25 @@ export default function AdminUsers() {
     );
   }, [search, currentPage, pageSize, sortBy, sortOrder]);
 
+  // Atualiza campo de busca e volta para a primeira página
   const handleSearchChange = (value) => {
     setSearch(value);
     setCurrentPage(1);
   };
 
+  // Navega para a página indicada, validando os limites
   const goToPage = (page) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
   };
 
+  // Altera o número de itens por página e volta para a primeira página
   const handlePageSizeChange = (value) => {
     setPageSize(Number(value));
     setCurrentPage(1);
   };
 
+  // Alterna ordenação: ao clicar na mesma coluna, inverte asc/desc; em nova coluna, inicia com asc
   const handleSort = (column) => {
     if (sortBy === column) {
       setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -321,11 +329,13 @@ export default function AdminUsers() {
     setSortOrder("asc");
   };
 
+  // Retorna o indicador visual de ordenação (▲ ou ▼) para a coluna ativa
   const sortIndicator = (column) => {
     if (sortBy !== column) return "";
     return sortOrder === "asc" ? " ▲" : " ▼";
   };
 
+  // Extrai as iniciais do nome do usuário para o avatar
   const getUserInitials = (user) => {
     const name = String(user?.nome || "").trim();
     if (!name) return "US";
@@ -335,14 +345,17 @@ export default function AdminUsers() {
     return `${first}${second}`.toUpperCase();
   };
 
+  // Retorna o estilo (cor de fundo + texto) do badge de perfil
   const getRoleStyle = (role) => ROLE_STYLES[role] || ROLE_STYLES.comercial;
 
+  // Aplica efeito de hover nos botões de ação
   const handleButtonHoverIn = (event) => {
     event.currentTarget.style.transform = "translateY(-1px)";
     event.currentTarget.style.boxShadow = "0 6px 14px rgba(76, 45, 132, 0.16)";
     event.currentTarget.style.filter = "brightness(1.02)";
   };
 
+  // Remove o efeito de hover dos botões de ação
   const handleButtonHoverOut = (event) => {
     event.currentTarget.style.transform = "translateY(0)";
     event.currentTarget.style.boxShadow = "none";
@@ -353,6 +366,7 @@ export default function AdminUsers() {
     loadUsers();
   }, [search, currentPage, pageSize, sortBy, sortOrder]);
 
+  // Inicia o modo de edição inline de um usuário e carrega os dados no formulário
   const startEdit = (user) => {
     setEditingId(user.id);
     setForm({
@@ -362,11 +376,13 @@ export default function AdminUsers() {
     });
   };
 
+  // Cancela a edição e limpa o formulário
   const cancelEdit = () => {
     setEditingId(null);
     setForm({ nome: "", email: "", perfil: "comercial" });
   };
 
+  // Envia as alterações do formulário para a API e recarrega a tabela
   const saveEdit = async (id) => {
     try {
       await api.put(`/users/admin/${id}`, form);
@@ -377,6 +393,7 @@ export default function AdminUsers() {
     }
   };
 
+  // Confirma e exclui o usuário selecionado via API
   const deleteUser = async (id) => {
     const confirmed = window.confirm("Tem certeza que deseja excluir este usuário?");
     if (!confirmed) return;

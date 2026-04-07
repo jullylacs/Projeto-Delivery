@@ -4,10 +4,14 @@ const bcrypt = require("bcryptjs");
 const xss = require("xss");
 const { Op } = require("sequelize");
 
+// Valida formato de e-mail
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// Detecta se a senha já é um hash bcrypt (evita re-hash acidental)
 const isBcryptHash = (value) => typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
+// Perfis válidos aceitos pelo sistema
 const allowedPerfis = ["comercial", "operacional", "tecnico", "gestor", "admin"];
 
+// 🔹 Registro de novo usuário
 exports.register = async (req, res) => {
   try {
     const { nome, email, senha, perfil } = req.body;
@@ -52,6 +56,7 @@ exports.register = async (req, res) => {
   }
 };
 
+// 🔹 Autenticação: valida email/senha e gera token JWT
 exports.login = async (req, res) => {
   try {
     const { email, senha } = req.body;
@@ -106,6 +111,7 @@ exports.login = async (req, res) => {
   }
 };
 
+// 🔹 Busca o perfil de um usuário por ID (usado na página de perfil)
 exports.getUserProfile = async (req, res) => {
   try {
     const userId = req.params.id || req.userId;
@@ -114,6 +120,7 @@ exports.getUserProfile = async (req, res) => {
       return res.status(400).json({ message: "ID inválido" });
     }
 
+    // Busca excluindo a senha do retorno
     const user = await User.findByPk(userId, {
       attributes: { exclude: ["senha"] }
     });
@@ -129,6 +136,7 @@ exports.getUserProfile = async (req, res) => {
   }
 };
 
+// 🔹 Atualiza dados do próprio perfil (apenas o próprio usuário pode editar)
 exports.updateUserProfile = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -160,12 +168,14 @@ exports.updateUserProfile = async (req, res) => {
       avatar: avatar ? xss(avatar) : undefined
     };
 
+    // Remove campos undefined antes de enviar ao banco (Sequelize ignora undefined com update)
     Object.keys(updateData).forEach(key => 
       updateData[key] === undefined && delete updateData[key]
     );
 
     await User.update(updateData, { where: { id: userId } });
 
+    // Retorna o usuário atualizado sem a senha
     const updatedUser = await User.findByPk(userId, {
       attributes: { exclude: ["senha"] }
     });
@@ -181,6 +191,7 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
+// 🔹 Lista todos os usuários com paginação, busca e ordenação (admin only)
 exports.getAll = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
@@ -233,6 +244,7 @@ exports.getAll = async (req, res) => {
   }
 };
 
+// 🔹 Atualiza qualquer usuário pelo ID (rota exclusiva para admin)
 exports.adminUpdateUser = async (req, res) => {
   try {
     const userId = req.params.id;
@@ -280,6 +292,7 @@ exports.adminUpdateUser = async (req, res) => {
   }
 };
 
+// 🔹 Exclui um usuário pelo ID (rota exclusiva para admin, não pode excluir a si mesmo)
 exports.adminDeleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
