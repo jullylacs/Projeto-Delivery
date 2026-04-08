@@ -408,6 +408,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
             type="button"
             onClick={onToggleSidebar}
             aria-label={isSidebarOpen ? "Ocultar menu lateral" : "Mostrar menu lateral"}
+            title={isSidebarOpen ? "Ocultar sidebar" : "Mostrar sidebar"}
             style={{
               width: 36,
               height: 36,
@@ -416,17 +417,27 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
               background: "rgba(255,255,255,0.1)",
               color: "#fff",
               cursor: "pointer",
-              fontSize: 18,
+              fontSize: 16,
+              fontWeight: 700,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
-              transition: "background 0.2s",
+              transition: "background 0.2s, transform 0.2s",
             }}
             onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
             onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
           >
-            ☰
+            <span
+              style={{
+                display: "inline-block",
+                transform: isSidebarOpen ? "translateX(-1px)" : "translateX(1px)",
+                transition: "transform 200ms ease",
+                lineHeight: 1,
+              }}
+            >
+              {isSidebarOpen ? "◀" : "▶"}
+            </span>
           </button>
         )}
         <h2
