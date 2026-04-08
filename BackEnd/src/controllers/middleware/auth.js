@@ -15,6 +15,13 @@ module.exports = (req, res, next) => {
     ? authHeader.substring(7) 
     : authHeader;
 
+  const systemToken = process.env.SYSTEM_API_TOKEN;
+  if (systemToken && token === systemToken) {
+    req.userId = 0;
+    req.user = { id: 0, email: "system@local", isSystem: true };
+    return next();
+  }
+
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     console.error("JWT_SECRET não configurado");

@@ -39,14 +39,16 @@ const Card = sequelize.define("Card", {
   // Prazo contratual
   prazo: DataTypes.DATE,
 
-  // Status atual do card
-  status: {
-    type: DataTypes.STRING,
-    defaultValue: "Novo"
+  // Referência à coluna real no banco
+  coluna_id: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: "columns",
+      key: "id"
+    },
+    onDelete: "SET NULL",
+    allowNull: true
   },
-
-  // Coluna atual do Kanban
-  coluna: DataTypes.STRING,
 
   // Observações adicionais
   observacoes: DataTypes.TEXT,

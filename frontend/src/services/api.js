@@ -4,7 +4,13 @@ import axios from "axios";
 const apiProtocol = import.meta.env.VITE_API_PROTOCOL || "http";
 const apiHost = import.meta.env.VITE_API_HOST || "localhost";
 const apiPort = import.meta.env.VITE_API_PORT || "3000";
-const apiBaseUrl = import.meta.env.VITE_API_URL || `${apiProtocol}://${apiHost}${apiPort ? `:${apiPort}` : ""}`;
+const apiBasePath = import.meta.env.VITE_API_BASE_PATH || "/api/v1";
+const fallbackBase = `${apiProtocol}://${apiHost}${apiPort ? `:${apiPort}` : ""}`;
+const explicitBaseUrl = import.meta.env.VITE_API_URL;
+const normalizedBasePath = String(apiBasePath).startsWith("/") ? apiBasePath : `/${apiBasePath}`;
+const apiBaseUrl = explicitBaseUrl
+  ? String(explicitBaseUrl).replace(/\/$/, "")
+  : `${fallbackBase}${normalizedBasePath}`;
 
 // Cria uma instância do Axios com configuração padrão
 const api = axios.create({

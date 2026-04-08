@@ -3,15 +3,18 @@ const cors = require("cors");
 const helmet = require("helmet");
 const { globalLimiter } = require("./middleware/rateLimiter");
 const { sequelize } = require("./models");
+const buildOpenApiSpec = require("./docs/openapi");
 
 const app = express();
 const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || "5mb";
+const apiBasePath = process.env.API_BASE_PATH || "/api/v1";
+const legacyRoutesEnabled = String(process.env.ENABLE_LEGACY_ROUTES || "true").toLowerCase() === "true";
 
 // 🔒 CORS Seguro - apenas frontend autorizado
 const corsOptions = {
   origin: process.env.FRONTEND_URL || "http://localhost:5173",
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
 };
 
@@ -40,11 +43,61 @@ app.get("/health/db", async (req, res) => {
   }
 });
 
-// 🔹 Rotas da aplicação
-app.use("/cards",       require("./routes/cardRoutes"));
-app.use("/users",       require("./routes/userRoutes"));
-app.use("/schedules",   require("./routes/scheduleRoutes"));
-app.use("/technicians", require("./routes/technicianRoutes"));
+const cardRoutes = require("./routes/cardRoutes");
+const columnRoutes = require("./routes/columnRoutes");
+const userRoutes = require("./routes/userRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const scheduleRoutes = require("./routes/scheduleRoutes");
+const technicianRoutes = require("./routes/technicianRoutes");
+
+// 🔹 Rotas versionadas da aplicação
+app.use(`${apiBasePath}/cards`, cardRoutes);
+app.use(`${apiBasePath}/columns`, columnRoutes);
+app.use(`${apiBasePath}/users`, userRoutes);
+app.use(`${apiBasePath}/notifications`, notificationRoutes);
+app.use(`${apiBasePath}/schedules`, scheduleRoutes);
+app.use(`${apiBasePath}/technicians`, technicianRoutes);
+
+// OpenAPI + Swagger UI (sem dependência local)
+app.get(`${apiBasePath}/openapi.json`, (req, res) => {
+  res.json(buildOpenApiSpec(req));
+});
+
+app.get(`${apiBasePath}/docs`, (req, res) => {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Delivery API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+    <style>body{margin:0;background:#f7f5ff;}#swagger-ui{max-width:1200px;margin:0 auto;}</style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        url: '${apiBasePath}/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis],
+      });
+    </script>
+  </body>
+</html>`);
+});
+
+// Rotas legadas sem prefixo (compatibilidade temporária)
+if (legacyRoutesEnabled) {
+  app.use("/cards", cardRoutes);
+  app.use("/columns", columnRoutes);
+  app.use("/users", userRoutes);
+  app.use("/notifications", notificationRoutes);
+  app.use("/schedules", scheduleRoutes);
+  app.use("/technicians", technicianRoutes);
+}
 
 app.use((err, req, res, next) => {
   if (err?.type === "entity.too.large") {

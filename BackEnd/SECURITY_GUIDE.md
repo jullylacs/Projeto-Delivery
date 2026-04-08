@@ -11,6 +11,26 @@
 - ✅ Tokens com expiração de **24 horas**
 - ✅ Validação de Bearer Token (Authorization header)
 
+### 2.1 **Importante: JWT_SECRET não é token de acesso**
+- `JWT_SECRET` é a chave usada para **assinar e validar** JWTs.
+- Para consumir a API, use um token gerado no endpoint de login (`/users/login`) no header `Authorization: Bearer <token>`.
+
+### 2.2 **Token fixo opcional de sistema**
+- Para integrações internas (machine-to-machine), é possível definir `SYSTEM_API_TOKEN` no `.env`.
+- Quando enviado em `Authorization: Bearer <SYSTEM_API_TOKEN>`, o backend aceita autenticação de sistema.
+- Recomendação: use apenas em ambientes controlados e com rotação periódica do valor.
+
+### 2.3 **Refresh Token (implementado)**
+- Login retorna `token` (access token) + `refreshToken`.
+- Endpoint de renovação: `POST /api/v1/users/refresh`.
+- Endpoint de logout/revogação: `POST /api/v1/users/logout`.
+- Access token continua no header `Authorization: Bearer <token>`.
+
+### 2.4 **Prefixo de API versionada**
+- Prefixo principal: `/api/v1`.
+- Exemplo: `/api/v1/cards`, `/api/v1/users/login`, `/api/v1/notifications`.
+- Rotas legadas sem prefixo podem ser desligadas com `ENABLE_LEGACY_ROUTES=false`.
+
 ### 3. **Rate Limiting**
 - **Login**: Máximo 5 tentativas em 15 minutos
 - **Global**: 100 requisições por IP em 15 minutos

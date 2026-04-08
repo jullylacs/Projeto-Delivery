@@ -1,150 +1,126 @@
-import { useNavigate } from "react-router-dom"; // Hook para navegação programática
+import { useLocation, useNavigate } from "react-router-dom"; // Hook para navegação programática
 import { useState, useEffect, useRef } from "react";     // Hooks de estado e ciclo de vida
 import api from "../../services/api";
 
-const NOTIFICATION_READ_KEY = "readNotifications";
 const USER_UPDATED_EVENT = "user-updated";
 const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
+const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 
-const readReadNotifications = () => {
-  try {
-    const raw = localStorage.getItem(NOTIFICATION_READ_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+const normalizeAvatar = (value) => {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const decoder = document.createElement("textarea");
+  decoder.innerHTML = trimmed;
+  return decoder.value.trim();
 };
 
-const getCardId = (card) => card?._id || card?.id || card?.uuid || String(Math.random());
-
-const buildSlaNotifications = (cards) => {
-  const now = new Date();
-
-  return cards
-    .filter((card) => {
-      if (!card?.prazo) return false;
-      return card.status !== "Concluído" && card.status !== "Inativo";
-    })
-    .map((card) => {
-      const deadline = new Date(card.prazo);
-      if (Number.isNaN(deadline.getTime())) return null;
-
-      const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-      const baseId = getCardId(card);
-
-      if (deadline < now) {
-        return {
-          id: `${baseId}-late-${deadline.toISOString()}`,
-          title: card.empresa || card.nome || card.title || "Card sem título",
-          message: "Prazo vencido. Requer atenção imediata.",
-          when: deadline,
-          priority: "high",
-        };
-      }
-
-      if (diffDays >= 0 && diffDays <= 3) {
-        return {
-          id: `${baseId}-due-${deadline.toISOString()}`,
-          title: card.empresa || card.nome || card.title || "Card sem título",
-          message: `Prazo vence em ${diffDays} dia(s).`,
-          when: deadline,
-          priority: "medium",
-        };
-      }
-
-      return null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => {
-      if (a.priority === b.priority) {
-        return a.when - b.when;
-      }
-
-      return a.priority === "high" ? -1 : 1;
-    });
-};
-
-const normalizeName = (value) =>
-  String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-
-const commentMentionsUser = (commentText, userName) => {
-  const safeText = normalizeName(commentText);
-  const safeUser = normalizeName(userName);
-  if (!safeText || !safeUser) return false;
-  return safeText.includes(`@${safeUser}`);
-};
-
-const buildMentionNotifications = (cards, currentUserName) => {
-  if (!currentUserName) return [];
-
-  return cards
-    .flatMap((card) => {
-      const cardId = getCardId(card);
-      const title = card?.cliente || card?.titulo || card?.nome || "Card sem título";
-      const comments = Array.isArray(card?.comments) ? card.comments : [];
-
-      return comments
-        .filter((comment) => {
-          if (!comment?.text) return false;
-          const author = normalizeName(comment.author);
-          const me = normalizeName(currentUserName);
-          if (author && me && author === me) return false;
-          return commentMentionsUser(comment.text, currentUserName);
-        })
-        .map((comment, index) => {
-          const when = comment?.createdAt ? new Date(comment.createdAt) : new Date();
-          const safeWhen = Number.isNaN(when.getTime()) ? new Date() : when;
-          const commentId = comment?.id || `${safeWhen.toISOString()}-${index}`;
-          const snippet = String(comment.text || "")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, 100);
-
-          return {
-            id: `mention-${cardId}-${commentId}`,
-            type: "mention",
-            cardId,
-            title,
-            message: `${comment.author || "Alguém"} mencionou você${snippet ? `: ${snippet}` : "."}`,
-            when: safeWhen,
-            priority: "high",
-          };
-        });
-    })
-    .sort((a, b) => b.when - a.when);
-};
 
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
 export default function Header() {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
+  const location = useLocation();
   const [showMenu, setShowMenu] = useState(false); // Controla visibilidade do menu dropdown
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [readNotifications, setReadNotifications] = useState(() => readReadNotifications());
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState("");
   const [user, setUser] = useState(null); // Armazena dados do usuário logado
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const userMenuRef = useRef(null);
   const notificationsRef = useRef(null);
 
-  const unreadCount = notifications.filter((item) => !readNotifications.includes(item.id)).length;
+  const avatarSrc = normalizeAvatar(user?.avatar);
+  const hasAvatar = avatarSrc.length > 0;
+  const showAvatarImage = hasAvatar && !avatarLoadError;
 
-  const markAllAsRead = () => {
-    const allIds = notifications.map((item) => item.id);
-    setReadNotifications(allIds);
+  const unreadCount = notifications.filter((item) => !item.readAt).length;
+
+  const logNotificationLoadError = (error) => {
+    const status = error?.response?.status;
+    const method = (error?.config?.method || "").toUpperCase();
+    const url = error?.config?.url || "(url desconhecida)";
+    const message = error?.response?.data?.message || error?.message || "erro desconhecido";
+    console.error(`[Notifications] Falha ${method} ${url} (status: ${status || "n/a"}) - ${message}`);
   };
 
-  const markOneAsRead = (notificationId) => {
-    setReadNotifications((prev) => (prev.includes(notificationId) ? prev : [...prev, notificationId]));
+  const refreshNotifications = async ({ silent = false } = {}) => {
+    try {
+      if (!silent) setNotificationsLoading(true);
+      setNotificationsError("");
+      await api.post("/notifications/sync");
+      const response = await api.get("/notifications", { params: { limit: 120 } });
+      const list = Array.isArray(response.data) ? response.data : [];
+      setNotifications(list.map((item) => ({
+        ...item,
+        when: item.when ? new Date(item.when) : new Date(),
+      })));
+    } catch (error) {
+      logNotificationLoadError(error);
+      setNotificationsError("Falha ao carregar notificações.");
+      if (!silent) setNotifications([]);
+    } finally {
+      if (!silent) setNotificationsLoading(false);
+    }
   };
 
-  // Carrega dados do usuário do localStorage ao montar o componente
+  const markAllAsRead = async () => {
+    try {
+      await api.patch("/notifications/read-all");
+      setNotifications((prev) => prev.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+    } catch (error) {
+      logNotificationLoadError(error);
+    }
+  };
+
+  const markOneAsRead = async (notificationId) => {
+    try {
+      await api.patch(`/notifications/${notificationId}/read`);
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === notificationId ? { ...item, readAt: item.readAt || new Date().toISOString() } : item))
+      );
+    } catch (error) {
+      logNotificationLoadError(error);
+    }
+  };
+
+  const clearReadNotifications = async () => {
+    try {
+      await api.delete("/notifications/read");
+      setNotifications((prev) => prev.filter((item) => !item.readAt));
+    } catch (error) {
+      logNotificationLoadError(error);
+    }
+  };
+
+  const openNotificationCard = async (item) => {
+    await markOneAsRead(item.id);
+    setShowNotifications(false);
+
+    const normalizedCardId = item?.cardId ?? item?.card_id ?? item?.metadata?.cardId ?? item?.metadata?.card_id;
+
+    if (normalizedCardId !== undefined && normalizedCardId !== null && String(normalizedCardId).trim() !== "") {
+      const focusCardId = String(normalizedCardId).trim();
+      localStorage.setItem(KANBAN_FOCUS_CARD_KEY, focusCardId);
+
+      window.dispatchEvent(
+        new CustomEvent(KANBAN_FOCUS_EVENT, {
+          detail: { cardId: focusCardId },
+        })
+      );
+    }
+
+    if (location.pathname !== "/kanban") {
+      navigate("/kanban");
+    }
+  };
+
+  // Carrega dados do usuário do localStorage e sincroniza com a API
   useEffect(() => {
     const syncUser = () => {
       const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca o objeto 'user'
-      setUser(userData); // Atualiza estado do usuário
+      setUser({ ...userData, avatar: normalizeAvatar(userData?.avatar) }); // Atualiza estado do usuário
     };
 
     const handleStorage = (event) => {
@@ -153,7 +129,22 @@ export default function Header() {
       }
     };
 
+    // Leitura inicial do localStorage (exibição imediata)
     syncUser();
+
+    // Busca dados frescos da API para garantir que o avatar esteja atualizado
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser?._id || storedUser?.id;
+    if (userId) {
+      api.get(`/users/${userId}`)
+        .then((res) => {
+          const normalizedUser = { ...res.data, avatar: normalizeAvatar(res.data?.avatar) };
+          localStorage.setItem("user", JSON.stringify(normalizedUser));
+          setUser(normalizedUser);
+        })
+        .catch(() => {}); // Em caso de erro, mantém os dados do localStorage
+    }
+
     window.addEventListener("storage", handleStorage);
     window.addEventListener(USER_UPDATED_EVENT, syncUser);
 
@@ -164,28 +155,12 @@ export default function Header() {
   }, []); // Executa apenas na montagem
 
   useEffect(() => {
-    localStorage.setItem(NOTIFICATION_READ_KEY, JSON.stringify(readNotifications));
-  }, [readNotifications]);
+    setAvatarLoadError(false);
+  }, [avatarSrc]);
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const response = await api.get("/cards");
-        const cards = Array.isArray(response.data) ? response.data : [];
-        const userData = JSON.parse(localStorage.getItem("user") || "{}");
-        const currentUserName = userData?.nome || userData?.username || userData?.email || "";
-        const slaItems = buildSlaNotifications(cards);
-        const mentionItems = buildMentionNotifications(cards, currentUserName);
-
-        // Menções primeiro, depois SLA
-        setNotifications([...mentionItems, ...slaItems]);
-      } catch {
-        setNotifications([]);
-      }
-    };
-
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
+    refreshNotifications();
+    const interval = setInterval(() => refreshNotifications({ silent: true }), 60000);
 
     return () => clearInterval(interval);
   }, []);
@@ -258,9 +233,6 @@ export default function Header() {
             onClick={() => {
               setShowNotifications((prev) => !prev);
               setShowMenu(false);
-              if (!showNotifications && unreadCount > 0) {
-                markAllAsRead();
-              }
             }}
             style={{
               width: "40px",
@@ -312,63 +284,140 @@ export default function Header() {
                 background: "#fff",
                 borderRadius: "10px",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                minWidth: "320px",
-                maxWidth: "360px",
+                minWidth: "520px",
+                maxWidth: "680px",
                 zIndex: 2200,
                 overflow: "hidden",
               }}
             >
               <div
                 style={{
-                  padding: "12px 14px",
+                  padding: "10px 12px",
                   borderBottom: "1px solid #efe8ff",
-                  fontSize: "13px",
-                  color: "#4e3ca4",
-                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
                 }}
               >
-                Notificações ({notifications.length})
+                <span style={{ fontSize: "13px", color: "#4e3ca4", fontWeight: 700 }}>
+                  Notificações ({notifications.length})
+                </span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={markAllAsRead}
+                    style={{
+                      border: "1px solid #ddd2ff",
+                      background: "#f8f5ff",
+                      color: "#4d3ba2",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                    }}
+                  >
+                    Marcar lidas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearReadNotifications}
+                    style={{
+                      border: "1px solid #ffd8d8",
+                      background: "#fff6f6",
+                      color: "#b42318",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                    }}
+                  >
+                    Limpar lidas
+                  </button>
+                </div>
               </div>
 
-              <div style={{ maxHeight: "320px", overflowY: "auto" }}>
-                {notifications.length === 0 ? (
+              <div style={{ maxHeight: "620px", overflowY: "auto" }}>
+                {notificationsLoading ? (
+                  <div style={{ padding: "14px", color: "#7b6cae", fontSize: "13px" }}>
+                    Carregando notificações...
+                  </div>
+                ) : notificationsError ? (
+                  <div style={{ padding: "14px", color: "#b42318", fontSize: "13px" }}>
+                    {notificationsError}
+                  </div>
+                ) : notifications.length === 0 ? (
                   <div style={{ padding: "14px", color: "#7b6cae", fontSize: "13px" }}>
                     Sem notificações no momento.
                   </div>
                 ) : (
                   notifications.map((item) => (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
-                      onClick={() => {
-                        markOneAsRead(item.id);
-                        setShowNotifications(false);
-                        if (item.type === "mention" && item.cardId !== undefined && item.cardId !== null) {
-                          localStorage.setItem(KANBAN_FOCUS_CARD_KEY, String(item.cardId));
-                        }
-                        navigate("/kanban");
-                      }}
                       style={{
                         width: "100%",
                         textAlign: "left",
                         border: "none",
-                        background: readNotifications.includes(item.id) ? "#fff" : "#f6f1ff",
+                        background: item.readAt ? "#fff" : "#f6f1ff",
                         borderBottom: "1px solid #f3edff",
-                        cursor: "pointer",
                         padding: "10px 12px",
+                        opacity: item.readAt ? 0.82 : 1,
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                         <strong style={{ color: "#3f3292", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</strong>
                         <span style={{ fontSize: "10px", color: item.priority === "high" ? "#d32f2f" : "#7b54e8", fontWeight: 700 }}>
-                          {item.type === "mention" ? "MENÇÃO" : item.priority === "high" ? "ALTO" : "MÉDIO"}
+                          {item.kind === "mention" ? "MENÇÃO" : item.priority === "high" ? "ALTO" : "MÉDIO"}
                         </span>
                       </div>
                       <div style={{ color: "#685d95", fontSize: "12px", marginTop: 4 }}>{item.message}</div>
-                      <div style={{ color: "#8d83b3", fontSize: "11px", marginTop: 4 }}>
-                        {item.when.toLocaleDateString("pt-BR")}
+                      <div style={{ color: "#8d83b3", fontSize: "11px", marginTop: 4, display: "flex", justifyContent: "space-between" }}>
+                        <span>{item.when.toLocaleDateString("pt-BR")}</span>
+                        <span>{item.readAt ? "Lida" : "Não lida"}</span>
                       </div>
-                    </button>
+
+                      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                        {!item.readAt && (
+                          <button
+                            type="button"
+                            onClick={() => markOneAsRead(item.id)}
+                            style={{
+                              border: "1px solid #ddd2ff",
+                              background: "#f8f5ff",
+                              color: "#4d3ba2",
+                              borderRadius: 6,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              padding: "4px 8px",
+                            }}
+                          >
+                            Marcar lida
+                          </button>
+                        )}
+
+                        {item.cardId !== undefined && item.cardId !== null && (
+                          <button
+                            type="button"
+                            onClick={() => openNotificationCard(item)}
+                            style={{
+                              border: "1px solid #d7ccff",
+                              background: "#ede7ff",
+                              color: "#3f3292",
+                              borderRadius: 6,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              padding: "4px 8px",
+                            }}
+                          >
+                            Ir para card
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -407,20 +456,32 @@ export default function Header() {
                 width: "36px",
                 height: "36px",
                 borderRadius: "50%",
-                background: user?.avatar
-                  ? `url(${user.avatar})` // Se tiver imagem
-                  : "linear-gradient(135deg, #9d4edd6a, #c77dff)", // Caso não
-                backgroundSize: "cover",
-                backgroundPosition: "center",
+                background: showAvatarImage
+                  ? "transparent"
+                  : "linear-gradient(135deg, #9d4edd6a, #c77dff)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: "bold",
-                fontSize: "12px"
+                fontSize: "12px",
+                overflow: "hidden"
               }}
             >
+              {showAvatarImage && (
+                <img
+                  src={avatarSrc}
+                  alt="Avatar"
+                  onError={() => setAvatarLoadError(true)}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "50%",
+                  }}
+                />
+              )}
               {/* Mostra iniciais se não houver avatar */}
-              {!user?.avatar && getInitials(user?.nome)}
+              {!showAvatarImage && getInitials(user?.nome)}
             </div>
 
             {/* Nome do usuário */}

@@ -7,7 +7,12 @@ const Column = sequelize.define("Column", {
   // Nome da coluna (ex: Novo, Em análise, Concluído)
   nome: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+    unique: true,
+    validate: {
+      notEmpty: true,
+      len: [1, 120],
+    }
   },
 
   // Posição de exibição no Kanban

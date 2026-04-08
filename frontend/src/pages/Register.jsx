@@ -10,8 +10,7 @@ export default function Register() {
     nome: "",
     email: "",
     senha: "",
-    confirmarSenha: "",
-    perfil: "comercial" // perfil padrão ao registrar
+    confirmarSenha: ""
   });
   const [loading, setLoading] = useState(false); // Indica carregamento do submit
   const [error, setError] = useState(""); // Mensagem de erro do formulário
@@ -83,22 +82,20 @@ export default function Register() {
       // Log para depuração
       console.log("Tentando registrar com:", {
         nome: formData.nome,
-        email: formData.email,
-        perfil: formData.perfil
+        email: formData.email
       });
 
       // Requisição POST para criar usuário
       const response = await api.post("/users/register", {
         nome: formData.nome.trim(),
         email: formData.email.trim().toLowerCase(),
-        senha: formData.senha,
-        perfil: formData.perfil
+        senha: formData.senha
       });
 
       console.log("Resposta do servidor:", response.data);
 
       // Sucesso
-      setSuccess("Conta criada com sucesso! Redirecionando para login...");
+      setSuccess(response?.data?.message || "Cadastro enviado para aprovação. Redirecionando para login...");
       setTimeout(() => navigate("/login"), 1200);
     } catch (error) {
       console.error("Erro detalhado no registro:", error);
@@ -241,33 +238,6 @@ export default function Register() {
               onFocus={(e) => e.target.style.borderColor = "#c77dff"}
               onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.2)"}
             />
-          </div>
-
-          {/* Select Perfil */}
-          <div style={{ marginBottom: "15px" }}>
-            <select
-              name="perfil"
-              value={formData.perfil}
-              onChange={handleChange}
-              style={{
-                width: "100%",
-                padding: "12px 15px",
-                borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.2)",
-                background: "rgba(255,255,255,0.1)",
-                color: "#fff",
-                fontSize: "14px",
-                boxSizing: "border-box",
-                cursor: "pointer",
-                outline: "none"
-              }}
-            >
-              <option value="comercial" style={{ background: "#240046" }}>👔 Comercial</option>
-              <option value="operacional" style={{ background: "#240046" }}>📋 Operacional</option>
-              <option value="tecnico" style={{ background: "#240046" }}>🔧 Técnico</option>
-              <option value="gestor" style={{ background: "#240046" }}>👨‍💼 Gestor</option>
-              <option value="admin" style={{ background: "#240046" }}>🔐 Admin</option>
-            </select>
           </div>
 
           {/* Campo Senha */}

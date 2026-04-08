@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,16 +28,14 @@ import CommentInput from "./CommentInput";
 
 const KANBAN_PREFS_KEY = "kanbanPrefs";
 const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
+const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
-const DEFAULT_COLUMNS = [
-  "Novo",
-  "Em análise",
-  "Agendamento",
-  "Agendado",
-  "Em execução",
-  "Concluído",
-  "Inativo",
-];
+const normalizeColumnEntity = (item, index = 0) => ({
+  id: Number(item?.id ?? item?._id ?? index + 1),
+  nome: String(item?.nome || "").trim(),
+  ordem: Number.isFinite(Number(item?.ordem)) ? Number(item.ordem) : index,
+  limiteWip: item?.limiteWip ?? null,
+});
 
 const readKanbanPrefs = () => {
   try {
@@ -187,12 +185,29 @@ const downloadBlobFile = (content, mimeType, fileName) => {
 
 const getCardKey = (card) => card?._id || card?.id;
 const getCardDomId = (cardId) => `kanban-card-${String(cardId ?? "").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+const getCardColumnId = (card) => {
+  const candidate = card?.coluna_id ?? card?.colunaId ?? card?.column?.id;
+  const parsed = Number(candidate);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const normalizePersonName = (value) =>
   String(value || "")
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+
+const getReactionUserDisplayName = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "Usuário";
+  if (raw.includes("@")) {
+    const localPart = raw.split("@")[0]?.trim();
+    return localPart || "Usuário";
+  }
+  return raw;
+};
+
+const getReactionUserKey = (value) => normalizePersonName(getReactionUserDisplayName(value));
 
 const roleLabelByKey = {
   comercial: "Comercial",
@@ -206,6 +221,25 @@ const formatRoleLabel = (role) => {
   const key = normalizePersonName(role);
   if (!key) return "Cargo não informado";
   return roleLabelByKey[key] || String(role);
+};
+
+const profileBadgePalette = {
+  comercial: { bg: "#e9f1ff", text: "#1d4ed8", border: "#bfd3ff" },
+  operacional: { bg: "#e8fbf1", text: "#047857", border: "#bae6d1" },
+  tecnico: { bg: "#fff3e8", text: "#b45309", border: "#fed7aa" },
+  gestor: { bg: "#f1ecff", text: "#6d28d9", border: "#ddd6fe" },
+  admin: { bg: "#ffecec", text: "#b91c1c", border: "#fecaca" },
+  default: { bg: "#efe8ff", text: "#5135b0", border: "#d6c8ff" },
+};
+
+const getProfileBadgeStyle = (perfil) => {
+  const key = normalizePersonName(perfil);
+  const palette = profileBadgePalette[key] || profileBadgePalette.default;
+  return {
+    background: palette.bg,
+    color: palette.text,
+    border: `1px solid ${palette.border}`,
+  };
 };
 
 function MentionToken({ mentionText, profile }) {
@@ -458,15 +492,15 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
     detailsModalCard: {
-      background: '#f5f3ff',
-      borderRadius: '22px',
-      boxShadow: '0 20px 45px rgba(49, 22, 118, 0.25), 0 2px 8px rgba(0,0,0,0.08)',
-      padding: '20px 22px',
-      width: 'min(1160px, calc(100vw - 28px))',
+      background: 'linear-gradient(165deg, #f8f6ff 0%, #f1ecff 42%, #ede7ff 100%)',
+      borderRadius: '24px',
+      boxShadow: '0 24px 52px rgba(57, 31, 136, 0.24), 0 3px 14px rgba(0,0,0,0.08)',
+      padding: '22px 24px',
+      width: 'min(1280px, calc(100vw - 24px))',
       maxHeight: '90vh',
       margin: '0 auto',
       position: 'relative',
-      border: '1px solid #d9d0ff',
+      border: '1px solid #d2c6ff',
       minHeight: '620px',
       fontFamily: 'inherit',
       display: 'flex',
@@ -476,7 +510,7 @@ const styles = {
     },
     detailsContent: {
       display: 'grid',
-      gridTemplateColumns: '0.95fr 1.05fr',
+      gridTemplateColumns: '0.55fr 1.45fr',
       gap: '14px',
       minHeight: 0,
       flex: 1,
@@ -485,9 +519,9 @@ const styles = {
     detailsMain: {
       display: 'flex',
       flexDirection: 'column',
-      background: '#f2edff',
-      border: '1px solid #ddd2ff',
-      borderRadius: '16px',
+      background: '#f7f4ff',
+      border: '1px solid #d9ccff',
+      borderRadius: '18px',
       padding: '18px',
       minHeight: 0,
     },
@@ -502,6 +536,10 @@ const styles = {
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: '18px',
+      padding: '10px 12px',
+      borderRadius: '14px',
+      background: 'linear-gradient(135deg, rgba(132, 99, 255, 0.16), rgba(85, 57, 196, 0.14))',
+      border: '1px solid rgba(111, 87, 226, 0.26)',
     },
     detailsTitle: {
       margin: 0,
@@ -565,11 +603,12 @@ const styles = {
       gap: '12px',
       flexWrap: 'wrap',
       justifyContent: 'flex-start',
-      background: '#f2edff',
+      background: '#f7f4ff',
+      borderRadius: '12px',
     },
     detailsObservacoes: {
       background: '#ede7ff',
-      borderRadius: '14px',
+      gridTemplateColumns: 'minmax(360px, 420px) minmax(0, 1fr)',
       padding: '16px 18px',
       color: '#4b3b9a',
       fontSize: '14px',
@@ -581,9 +620,10 @@ const styles = {
       marginTop: 0,
       background: '#f0ecff',
       borderRadius: '16px',
-      padding: '14px',
+      padding: '16px',
+      minWidth: 0,
       boxShadow: 'inset 0 0 0 1px #ddd3ff',
-      minHeight: '480px',
+      minHeight: '540px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-start',
@@ -591,6 +631,7 @@ const styles = {
     },
     detailsCommentsHeader: {
       display: 'flex',
+      minWidth: 0,
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: '12px',
@@ -599,6 +640,7 @@ const styles = {
     },
     detailsCommentsList: {
       flex: 1,
+      flexWrap: 'wrap',
       minHeight: 0,
       overflowY: 'auto',
       paddingRight: '6px',
@@ -645,6 +687,9 @@ const styles = {
     padding: "20px",
     minHeight: "80vh",
     background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   header: {
     marginBottom: "28px",
@@ -679,11 +724,15 @@ const styles = {
     gap: "8px",
   },
   tableContainer: {
+    width: "100%",
+    maxWidth: "100%",
     overflowX: "auto",
+    overflowY: "hidden",
     borderRadius: "16px",
     background: "#faf9ff",
     border: "1px solid #d6d0ff",
     padding: "12px",
+    boxSizing: "border-box",
   },
   table: {
     width: "max-content",
@@ -1379,8 +1428,17 @@ export default function Board() {
   // Estados principais
   const [cards, setCards] = useState([]);           // Lista de todos os cards
   const [selectedCard, setSelectedCard] = useState(null); // Card selecionado para detalhes
-  const [statusEdit, setStatusEdit] = useState("Novo");    // Status temporário para edição
+  const [statusEdit, setStatusEdit] = useState("");    // Coluna temporária para edição (id em string)
   const [commentText, setCommentText] = useState("");      // Texto do comentário sendo escrito
+  const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false);
+  const [replyDraftByCommentId, setReplyDraftByCommentId] = useState({});
+  const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
+  const [editingReplyKey, setEditingReplyKey] = useState(null);
+  const [editingReplyText, setEditingReplyText] = useState("");
+  const [hoveredReactionKey, setHoveredReactionKey] = useState(null);
+  const [vendorEdit, setVendorEdit] = useState("");
+  const [vendorSearchCreate, setVendorSearchCreate] = useState("");
+  const [vendorSearchDetails, setVendorSearchDetails] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
   const [isEditCardOpen, setIsEditCardOpen] = useState(false); // Controle do modal de edição
@@ -1399,6 +1457,7 @@ export default function Board() {
     sla: 0,
     prazo: "",
     observacoes: "",
+    vendedorId: "",
   });
   const [error, setError] = useState("");                  // Mensagem de erro
   const [activeId, setActiveId] = useState(null);          // ID do card sendo arrastado
@@ -1418,8 +1477,21 @@ export default function Board() {
   const [isDataActionsOpen, setIsDataActionsOpen] = useState(false);
   const [promotedCardId, setPromotedCardId] = useState(null);
   const [targetedCardId, setTargetedCardId] = useState(null);
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState(null);
   const [directoryUsers, setDirectoryUsers] = useState([]);
   const [, setTimeTick] = useState(0);
+  const [columnDefs, setColumnDefs] = useState([]);
+  const [isColumnsReady, setIsColumnsReady] = useState(false);
+
+  const columns = useMemo(
+    () => [...columnDefs].sort((a, b) => a.ordem - b.ordem).map((item) => item.nome),
+    [columnDefs]
+  );
+  const orderedColumnDefs = useMemo(
+    () => [...columnDefs].sort((a, b) => a.ordem - b.ordem),
+    [columnDefs]
+  );
+  const defaultColumnName = columns[0] || "Novo";
 
   const densityPresets = {
     compacto: {
@@ -1470,23 +1542,34 @@ export default function Board() {
 
     // Verifica se soltou em uma coluna (IDs começam com "column-")
     if (String(over.id).startsWith("column-")) {
-      const targetStatus = String(over.id).replace("column-", ""); // Extrai o nome do status
+      const targetColumnId = Number(String(over.id).replace("column-", ""));
+      const targetColumn = columnDefs.find((item) => item.id === targetColumnId);
+      if (!targetColumn) return;
       const movedCard = cards.find((card) => getCardKey(card) === active.id);
+      const movedCardColumnId = getCardColumnId(movedCard);
       
-      // Se o status é diferente, atualiza
-      if (movedCard && movedCard.status !== targetStatus) {
-        const optimisticCard = { ...movedCard, status: targetStatus, coluna: targetStatus };
+      // Se a coluna é diferente, atualiza
+      if (movedCard && movedCardColumnId !== targetColumn.id) {
+        const optimisticCard = {
+          ...movedCard,
+          status: targetColumn.nome,
+          coluna: targetColumn.nome,
+          coluna_id: targetColumn?.id ?? movedCard?.coluna_id,
+          colunaId: targetColumn?.id ?? movedCard?.colunaId,
+        };
 
         setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? optimisticCard : card)));
 
         if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
           setSelectedCard(optimisticCard);
-          setStatusEdit(targetStatus);
+          setStatusEdit(String(targetColumn.id));
         }
 
         try {
-          // Envia requisição PUT para atualizar o status
-          const response = await api.put(`/cards/${getCardKey(movedCard)}`, optimisticCard);
+          // Envia requisição PUT priorizando colunaId como fonte de verdade
+          const response = await api.put(`/cards/${getCardKey(movedCard)}`, {
+            colunaId: targetColumn?.id,
+          });
           const updatedCard = response.data;
           
           // Atualiza o estado local com o card modificado
@@ -1495,14 +1578,14 @@ export default function Board() {
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
           if (selectedCard && getCardKey(selectedCard) === getCardKey(updatedCard)) {
             setSelectedCard(updatedCard);
-            setStatusEdit(updatedCard.status);
+            setStatusEdit(String(getCardColumnId(updatedCard) || ""));
           }
         } catch (e) {
           setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? movedCard : card)));
 
           if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
             setSelectedCard(movedCard);
-            setStatusEdit(movedCard.status);
+            setStatusEdit(String(getCardColumnId(movedCard) || ""));
           }
 
           console.error("Falha ao mover card", e);
@@ -1565,6 +1648,42 @@ export default function Board() {
 
   const mentionUsers = Array.from(mentionProfileLookup.values()).map((item) => item.name);
 
+  const vendorOptions = useMemo(() => {
+    const source = Array.isArray(directoryUsers) ? directoryUsers : [];
+    return source.map((user) => ({
+      id: String(user?._id || user?.id || ""),
+      label: user?.nome || user?.username || user?.email || "Usuário",
+      perfil: user?.perfil || "",
+    })).filter((item) => item.id);
+  }, [directoryUsers]);
+
+  const selectedVendorOption = useMemo(
+    () => vendorOptions.find((item) => item.id === String(newCard.vendedorId || "")) || null,
+    [vendorOptions, newCard.vendedorId]
+  );
+
+  const selectedDetailVendor = useMemo(
+    () => vendorOptions.find((item) => item.id === String(vendorEdit || "")) || null,
+    [vendorOptions, vendorEdit]
+  );
+
+  const currentDetailVendor = useMemo(() => {
+    const vendorId = String(selectedCard?.vendedor?.id || selectedCard?.vendedor_id || selectedCard?.vendedorId || "");
+    return vendorOptions.find((item) => item.id === vendorId) || null;
+  }, [vendorOptions, selectedCard]);
+
+  const filteredCreateVendors = useMemo(() => {
+    const query = vendorSearchCreate.trim().toLowerCase();
+    if (!query) return vendorOptions;
+    return vendorOptions.filter((option) => option.label.toLowerCase().includes(query));
+  }, [vendorOptions, vendorSearchCreate]);
+
+  const filteredDetailVendors = useMemo(() => {
+    const query = vendorSearchDetails.trim().toLowerCase();
+    if (!query) return vendorOptions;
+    return vendorOptions.filter((option) => option.label.toLowerCase().includes(query));
+  }, [vendorOptions, vendorSearchDetails]);
+
   // Efeito para carregar cards da API ao montar o componente
   useEffect(() => {
     api.get("/cards")
@@ -1572,40 +1691,88 @@ export default function Board() {
       .catch((err) => console.log(err));
   }, []);
 
+  const loadColumnsFromApi = useCallback(async () => {
+    try {
+      const res = await api.get("/columns");
+      const incoming = Array.isArray(res.data) ? res.data : [];
+      const normalized = incoming
+        .map((item, index) => normalizeColumnEntity(item, index))
+        .filter((item) => item.nome);
+
+      setColumnDefs(normalized);
+      setIsColumnsReady(true);
+
+      if (normalized.length === 0) {
+        setError("A API não retornou colunas. Verifique seed/migrações da tabela columns.");
+      }
+
+      return normalized;
+    } catch {
+      setColumnDefs([]);
+      setIsColumnsReady(false);
+      const apiBase = api?.defaults?.baseURL || "API";
+      setError(`Não foi possível carregar colunas da API (${apiBase}). Verifique backend e VITE_API_URL.`);
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    loadColumnsFromApi();
+  }, [loadColumnsFromApi]);
+
   useEffect(() => {
     const fetchDirectoryUsers = async () => {
       try {
-        const response = await api.get("/users/admin", {
-          params: { page: 1, limit: 200, sortBy: "nome", sortOrder: "asc" },
-        });
-
-        const users = Array.isArray(response?.data?.data)
-          ? response.data.data
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
-
+        const response = await api.get("/users/assignable");
+        const users = Array.isArray(response?.data) ? response.data : [];
         setDirectoryUsers(users);
       } catch {
-        setDirectoryUsers([]);
+        try {
+          const fallback = await api.get("/users/admin", {
+            params: { page: 1, limit: 200, sortBy: "nome", sortOrder: "asc" },
+          });
+
+          const users = Array.isArray(fallback?.data?.data)
+            ? fallback.data.data
+            : Array.isArray(fallback?.data)
+              ? fallback.data
+              : [];
+
+          setDirectoryUsers(users);
+        } catch {
+          setDirectoryUsers([]);
+        }
       }
     };
 
     fetchDirectoryUsers();
   }, []);
 
-  // Colunas do Kanban - estado que permite adicionar/editar/remover colunas dinamicamente
-  const [columns, setColumns] = useState(() => {
-    const prefs = readKanbanPrefs();
-    return Array.isArray(prefs.columns) && prefs.columns.length > 0 ? prefs.columns : DEFAULT_COLUMNS;
-  });
+  useEffect(() => {
+    if (!columns.includes(importDefaultStatus)) {
+      setImportDefaultStatus(defaultColumnName);
+    }
+  }, [columns, importDefaultStatus, defaultColumnName]);
+
+  useEffect(() => {
+    if (!statusFilter) return;
+    if (/^\d+$/.test(String(statusFilter))) return;
+
+    const legacy = orderedColumnDefs.find(
+      (item) => item.nome.toLowerCase() === String(statusFilter).toLowerCase()
+    );
+
+    if (legacy?.id) {
+      setStatusFilter(String(legacy.id));
+    }
+  }, [statusFilter, orderedColumnDefs]);
 
   useEffect(() => {
     localStorage.setItem(
       KANBAN_PREFS_KEY,
-      JSON.stringify({ density, searchTerm, statusFilter, vendorFilter, columns })
+      JSON.stringify({ density, searchTerm, statusFilter, vendorFilter })
     );
-  }, [density, searchTerm, statusFilter, vendorFilter, columns]);
+  }, [density, searchTerm, statusFilter, vendorFilter]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1626,12 +1793,11 @@ export default function Board() {
     return () => clearInterval(intervalId);
   }, []);
 
-  useEffect(() => {
-    const pendingCardId = localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
-    if (!pendingCardId || cards.length === 0) return;
+  const focusCardById = useCallback((pendingCardId) => {
+    if (!pendingCardId || cards.length === 0) return false;
 
     const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
-    if (!targetCard) return;
+    if (!targetCard) return false;
 
     // Garante que o card esteja visível mesmo com filtros ativos
     setSearchTerm("");
@@ -1639,9 +1805,8 @@ export default function Board() {
     setVendorFilter("");
 
     setSelectedCard(targetCard);
-    setStatusEdit(targetCard.status || "Novo");
+    setStatusEdit(String(getCardColumnId(targetCard) || ""));
     setTargetedCardId(String(getCardKey(targetCard)));
-    localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
 
     requestAnimationFrame(() => {
       const domId = getCardDomId(getCardKey(targetCard));
@@ -1649,18 +1814,44 @@ export default function Board() {
       cardElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
     });
 
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       setTargetedCardId((current) => (current === String(getCardKey(targetCard)) ? null : current));
     }, 1400);
 
-    return () => clearTimeout(timer);
+    return true;
   }, [cards]);
+
+  useEffect(() => {
+    const pendingCardId = localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
+    if (!pendingCardId) return;
+
+    const focused = focusCardById(pendingCardId);
+    if (focused) {
+      localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+    }
+  }, [cards, focusCardById]);
+
+  useEffect(() => {
+    const handleFocusEvent = (event) => {
+      const eventCardId = String(event?.detail?.cardId || "").trim();
+      const pendingCardId = eventCardId || localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
+      if (!pendingCardId) return;
+
+      const focused = focusCardById(pendingCardId);
+      if (focused) {
+        localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+      }
+    };
+
+    window.addEventListener(KANBAN_FOCUS_EVENT, handleFocusEvent);
+    return () => window.removeEventListener(KANBAN_FOCUS_EVENT, handleFocusEvent);
+  }, [focusCardById]);
   
   // Estados para controle do modal de colunas
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [columnModalType, setColumnModalType] = useState("add"); // add | edit
   const [columnName, setColumnName] = useState("");
-  const [editingColumnIndex, setEditingColumnIndex] = useState(null);
+  const [editingColumnId, setEditingColumnId] = useState(null);
   
   // CRUD de colunas - funções para gerenciar colunas dinâmicas
   
@@ -1669,51 +1860,144 @@ export default function Board() {
     setColumnModalType("add");
     setColumnName("");
     setIsColumnModalOpen(true);
-    setEditingColumnIndex(null);
+    setEditingColumnId(null);
   };
   
   // Abre modal para editar coluna existente
-  const openEditColumn = (idx) => {
+  const openEditColumn = (column) => {
     setColumnModalType("edit");
-    setColumnName(columns[idx]);
+    setColumnName(column?.nome || "");
     setIsColumnModalOpen(true);
-    setEditingColumnIndex(idx);
+    setEditingColumnId(column?.id ?? null);
+  };
+
+  const persistColumnOrder = async (orderedColumnDefs) => {
+    if (!isColumnsReady) {
+      setError("As colunas ainda não foram carregadas da API.");
+      return;
+    }
+
+    const orderedIds = orderedColumnDefs.map((item) => item.id).filter(Boolean);
+    if (orderedIds.length !== orderedColumnDefs.length) return;
+
+    try {
+      const response = await api.put("/columns/reorder", { ids: orderedIds });
+      const normalized = (Array.isArray(response.data) ? response.data : [])
+        .map((item, index) => normalizeColumnEntity(item, index))
+        .filter((item) => item.nome);
+      if (normalized.length > 0) {
+        setColumnDefs(normalized);
+      }
+    } catch {
+      setError("Não foi possível salvar a ordenação das colunas.");
+      await loadColumnsFromApi();
+    }
+  };
+
+  const moveColumn = async (fromIndex, toIndex) => {
+    if (!isColumnsReady) {
+      setError("As colunas ainda não foram carregadas da API.");
+      return;
+    }
+
+    if (toIndex < 0 || toIndex >= columnDefs.length) return;
+
+    const reordered = [...columnDefs];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const optimistic = reordered.map((item, index) => ({ ...item, ordem: index }));
+    setColumnDefs(optimistic);
+    await persistColumnOrder(optimistic);
+  };
+
+  const handleColumnDragStart = (index) => {
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDrop = async (targetIndex) => {
+    if (draggedColumnIndex === null || draggedColumnIndex === targetIndex) {
+      setDraggedColumnIndex(null);
+      return;
+    }
+
+    await moveColumn(draggedColumnIndex, targetIndex);
+    setDraggedColumnIndex(null);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
   };
   
   // Salva coluna (nova ou editada)
-  const handleSaveColumn = () => {
+  const handleSaveColumn = async () => {
     const name = columnName.trim();
     if (!name) return;
-    if (columnModalType === "add") {
-      setColumns((prev) => [...prev, name]); // Adiciona nova coluna
-    } else if (columnModalType === "edit" && editingColumnIndex !== null) {
-      setColumns((prev) => prev.map((col, i) => (i === editingColumnIndex ? name : col))); // Edita coluna existente
+    if (!isColumnsReady) {
+      setError("As colunas ainda não foram carregadas da API.");
+      return;
     }
-    setIsColumnModalOpen(false);
-    setColumnName("");
-    setEditingColumnIndex(null);
+
+    try {
+      if (columnModalType === "add") {
+        await api.post("/columns", { nome: name });
+        await loadColumnsFromApi();
+      } else if (columnModalType === "edit" && editingColumnId !== null) {
+        const target = columnDefs.find((item) => item.id === editingColumnId);
+        if (!target?.id) return;
+        const response = await api.put(`/columns/${target.id}`, { nome: name, ordem: target.ordem });
+        normalizeColumnEntity(response.data, target.ordem);
+        await loadColumnsFromApi();
+      }
+
+      setIsColumnModalOpen(false);
+      setColumnName("");
+      setEditingColumnId(null);
+      setError("");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Erro ao salvar coluna.");
+    }
   };
   
   // Exclui coluna (apenas se não tiver cards)
-  const handleDeleteColumn = (idx) => {
-    const col = columns[idx];
-    const hasCards = cards.some((c) => c.status === col);
+  const handleDeleteColumn = async (column) => {
+    if (!isColumnsReady) {
+      setError("As colunas ainda não foram carregadas da API.");
+      return;
+    }
+
+    const target = columnDefs.find((item) => item.id === column?.id);
+    if (!target) return;
+
+    const hasCards = cards.some((c) => {
+      const cardColumnId = getCardColumnId(c);
+      return cardColumnId === target.id;
+    });
     if (hasCards) {
       alert("Não é possível excluir uma coluna que possui cards. Mova os cards antes.");
       return;
     }
-    setColumns((prev) => prev.filter((_, i) => i !== idx));
+
+    try {
+      await api.delete(`/columns/${target.id}`);
+      await loadColumnsFromApi();
+    } catch (err) {
+      setError(err?.response?.data?.message || "Erro ao excluir coluna.");
+    }
   };
 
-  const handleDeleteAllCardsInColumn = async (columnName) => {
-    const cardsInColumn = cards.filter((card) => card.status === columnName);
+  const handleDeleteAllCardsInColumn = async (column) => {
+    const cardsInColumn = cards.filter((card) => {
+      const cardColumnId = getCardColumnId(card);
+      return cardColumnId === column.id;
+    });
     if (cardsInColumn.length === 0) {
       alert("Essa coluna não possui cards para excluir.");
       return;
     }
 
     const confirmed = window.confirm(
-      `Excluir TODOS os ${cardsInColumn.length} card(s) da coluna \"${columnName}\"? Essa ação não pode ser desfeita.`
+      `Excluir TODOS os ${cardsInColumn.length} card(s) da coluna \"${column.nome}\"? Essa ação não pode ser desfeita.`
     );
     if (!confirmed) return;
 
@@ -1780,8 +2064,11 @@ export default function Board() {
   const handleOpenCard = (card) => {
     console.log('[Detalhes] handleOpenCard chamado', card);
     setSelectedCard(card);
-    setStatusEdit(card.status || "Novo");
+    setStatusEdit(String(getCardColumnId(card) || ""));
+    setVendorEdit(String(card?.vendedor?.id || card?.vendedor_id || ""));
+    setVendorSearchDetails("");
     setCommentText("");
+    setIsCommentComposerOpen(false);
     setPendingAttachment(null);
   };
 
@@ -1789,8 +2076,193 @@ export default function Board() {
   const handleCloseCard = () => {
     console.log('[Detalhes] Fechando modal de detalhes');
     setSelectedCard(null);
+    setVendorEdit("");
+    setVendorSearchDetails("");
     setCommentText("");
+    setIsCommentComposerOpen(false);
+    setReplyDraftByCommentId({});
+    setActiveReplyCommentId(null);
+    setEditingReplyKey(null);
+    setEditingReplyText("");
     setPendingAttachment(null);
+  };
+
+  const persistCommentsOnSelectedCard = async (nextComments) => {
+    if (!selectedCard) return null;
+
+    const cardUpdate = {
+      comments: nextComments,
+      colunaId: getCardColumnId(selectedCard),
+    };
+
+    const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
+    const updatedCard = response.data;
+    promoteUpdatedCardToTop(updatedCard);
+    setSelectedCard(updatedCard);
+    return updatedCard;
+  };
+
+  const handleToggleReaction = async (commentId, emoji) => {
+    if (!selectedCard) return;
+    const reactionUser = userData?.nome || userData?.username || userData?.email || `user-${sellerId || "anon"}`;
+    const reactionUserKey = getReactionUserKey(reactionUser);
+    const reactionUserDisplay = getReactionUserDisplayName(reactionUser);
+    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
+
+    const nextComments = currentComments.map((comment) => {
+      if (String(comment.id) !== String(commentId)) return comment;
+
+      const reactions = comment?.reactions && typeof comment.reactions === "object" ? { ...comment.reactions } : {};
+      const currentUsers = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
+      const alreadyReacted = currentUsers.some((name) => getReactionUserKey(name) === reactionUserKey);
+
+      const nextUsers = alreadyReacted
+        ? currentUsers.filter((name) => getReactionUserKey(name) !== reactionUserKey)
+        : [...currentUsers, reactionUserDisplay];
+
+      if (nextUsers.length > 0) reactions[emoji] = nextUsers;
+      else delete reactions[emoji];
+
+      return {
+        ...comment,
+        reactions,
+      };
+    });
+
+    try {
+      await persistCommentsOnSelectedCard(nextComments);
+    } catch {
+      setError("Erro ao reagir ao comentário");
+    }
+  };
+
+  const handleAddReply = async (commentId) => {
+    if (!selectedCard) return;
+    const rawReply = String(replyDraftByCommentId?.[commentId] || "").trim();
+    if (!rawReply) return;
+
+    const author = userData?.nome || userData?.username || userData?.email || "Usuário";
+    const authorAvatar = userData?.avatar || "";
+    const nowIso = new Date().toISOString();
+
+    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
+    const nextComments = currentComments.map((comment) => {
+      if (String(comment.id) !== String(commentId)) return comment;
+
+      const replies = Array.isArray(comment.replies) ? [...comment.replies] : [];
+      replies.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        text: rawReply,
+        author,
+        authorAvatar,
+        createdAt: nowIso,
+      });
+
+      return {
+        ...comment,
+        replies,
+      };
+    });
+
+    try {
+      await persistCommentsOnSelectedCard(nextComments);
+      setReplyDraftByCommentId((prev) => ({ ...prev, [commentId]: "" }));
+      setActiveReplyCommentId(null);
+    } catch {
+      setError("Erro ao responder comentário");
+    }
+  };
+
+  const getReplyEditKey = (commentId, replyId) => `${String(commentId)}::${String(replyId)}`;
+
+  const handleStartEditReply = (commentId, reply) => {
+    setEditingReplyKey(getReplyEditKey(commentId, reply?.id));
+    setEditingReplyText(String(reply?.text || ""));
+  };
+
+  const handleCancelEditReply = () => {
+    setEditingReplyKey(null);
+    setEditingReplyText("");
+  };
+
+  const handleSaveEditReply = async (commentId, replyId) => {
+    if (!selectedCard) return;
+
+    const nextText = String(editingReplyText || "").trim();
+    if (!nextText) return;
+
+    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
+    const nowIso = new Date().toISOString();
+    const nextComments = currentComments.map((comment) => {
+      if (String(comment.id) !== String(commentId)) return comment;
+
+      const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
+      const replies = currentReplies.map((reply) => {
+        if (String(reply.id) !== String(replyId)) return reply;
+
+        return {
+          ...reply,
+          text: nextText,
+          editedAt: nowIso,
+        };
+      });
+
+      return {
+        ...comment,
+        replies,
+      };
+    });
+
+    try {
+      await persistCommentsOnSelectedCard(nextComments);
+      handleCancelEditReply();
+    } catch {
+      setError("Erro ao editar resposta");
+    }
+  };
+
+  const handleDeleteReply = async (commentId, replyId) => {
+    if (!selectedCard) return;
+
+    const confirmed = window.confirm("Tem certeza que deseja excluir esta resposta?");
+    if (!confirmed) return;
+
+    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
+    const nextComments = currentComments.map((comment) => {
+      if (String(comment.id) !== String(commentId)) return comment;
+
+      const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
+      const replies = currentReplies.filter((reply) => String(reply.id) !== String(replyId));
+
+      return {
+        ...comment,
+        replies,
+      };
+    });
+
+    try {
+      await persistCommentsOnSelectedCard(nextComments);
+      if (editingReplyKey === getReplyEditKey(commentId, replyId)) {
+        handleCancelEditReply();
+      }
+    } catch {
+      setError("Erro ao excluir resposta");
+    }
+  };
+
+  const handleChangeVendor = async () => {
+    if (!selectedCard) return;
+    if (!vendorEdit) {
+      setError("Selecione um vendedor válido.");
+      return;
+    }
+
+    try {
+      await handleSaveCardChanges({ vendedorId: Number(vendorEdit) });
+      setError("");
+    } catch {
+      setError("Erro ao atualizar vendedor.");
+    }
   };
 
   const handleAttachmentSelect = (file) => {
@@ -1839,17 +2311,12 @@ export default function Board() {
     };
 
     const updatedComments = [...(selectedCard.comments || []), newComment];
-    const cardUpdate = { ...selectedCard, comments: updatedComments };
 
     try {
       // Envia para API
-      const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
-      const updatedCard = response.data;
-
-      // Atualiza estados localmente e promove o card ao topo da coluna
-      promoteUpdatedCardToTop(updatedCard);
-      setSelectedCard(updatedCard);
+      await persistCommentsOnSelectedCard(updatedComments);
       setCommentText(""); // Limpa campo de comentário
+      setIsCommentComposerOpen(false);
       setPendingAttachment(null);
     } catch (err) {
       console.error("erro ao adicionar comentário", err);
@@ -1861,7 +2328,31 @@ export default function Board() {
   const handleSaveCardChanges = async (updates = {}) => {
     if (!selectedCard) return;
 
-    const payload = { ...selectedCard, ...updates };
+    const payload = { ...updates };
+    const explicitColumnId = updates?.colunaId ?? updates?.coluna_id;
+
+    if (explicitColumnId !== undefined && explicitColumnId !== null && String(explicitColumnId).trim() !== "") {
+      payload.colunaId = Number(explicitColumnId);
+    } else {
+      const requestedColumnName = String(updates?.status || updates?.coluna || "").trim();
+      if (requestedColumnName) {
+        const target = columnDefs.find((item) => item.nome === requestedColumnName);
+        if (!target?.id) {
+          setError("Coluna inválida para atualização do card.");
+          return;
+        }
+        payload.colunaId = target.id;
+      } else {
+        const currentColumnId = getCardColumnId(selectedCard);
+        if (currentColumnId) {
+          payload.colunaId = currentColumnId;
+        }
+      }
+    }
+
+    delete payload.status;
+    delete payload.coluna;
+
     try {
       const response = await api.put(`/cards/${getCardKey(selectedCard)}`, payload);
       const updatedCard = response.data;
@@ -1897,11 +2388,13 @@ export default function Board() {
       id: undefined,
       _id: undefined,
       titulo: `${selectedCard.titulo || selectedCard.cliente || "Card"} (cópia)`, // Adiciona "(cópia)" ao título
-      status: "Novo",          // Reseta status para Novo
-      coluna: "Novo",          // Reseta coluna
+      colunaId: columnDefs.find((item) => item.nome === defaultColumnName)?.id,
       createdAt: undefined,    // Remove timestamps
       updatedAt: undefined,
     };
+
+    delete duplicatePayload.status;
+    delete duplicatePayload.coluna;
 
     try {
       const response = await api.post("/cards", duplicatePayload);
@@ -1914,9 +2407,9 @@ export default function Board() {
   };
 
   // Altera status do card
-  const handleChangeStatus = async (newStatus) => {
+  const handleChangeStatus = async (newColumnId) => {
     if (!selectedCard) return;
-    await handleSaveCardChanges({ status: newStatus, coluna: newStatus });
+    await handleSaveCardChanges({ colunaId: Number(newColumnId) });
   };
 
   // Cria novo card com validação de campos obrigatórios
@@ -1968,10 +2461,8 @@ export default function Board() {
           lat: newCard.coordenadas.lat?.trim() || "",
           lng: newCard.coordenadas.lng?.trim() || "",
         },
-        status: "Novo",
-        coluna: "Novo",
-        vendedor: seller,
-        vendedorId: sellerId,
+        colunaId: columnDefs.find((item) => item.nome === defaultColumnName)?.id,
+        vendedorId: newCard.vendedorId || sellerId,
         ip: "",
         comments: []
       };
@@ -1997,7 +2488,9 @@ export default function Board() {
           sla: 0,
           prazo: "",
           observacoes: "",
+          vendedorId: "",
         });
+        setVendorSearchCreate("");
         setError("");
       }
     } catch (e) {
@@ -2044,17 +2537,44 @@ export default function Board() {
   };
 
   const importCardsFromParsed = async (parsed) => {
-    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, "Novo");
+    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, defaultColumnName);
     const extracted = extractImportCards(parsed, columns, fallbackStatus);
+    const fallbackColumn = orderedColumnDefs[0] || null;
+    const columnIdByName = new Map(
+      orderedColumnDefs.map((column) => [String(column.nome || "").trim().toLowerCase(), Number(column.id)])
+    );
 
     if (extracted.length === 0) {
       setError("Nenhum card encontrado no JSON. Use um array de cards ou export do Trello.");
       return false;
     }
 
-    const payloads = extracted.map(({ card, status }) =>
-      mapImportedCard({ card, status, seller, sellerId })
-    );
+    const payloads = extracted
+      .map(({ card, status }) => {
+        const basePayload = mapImportedCard({ card, status, seller, sellerId });
+        const resolvedColumnId = columnIdByName.get(String(status || "").trim().toLowerCase()) || Number(fallbackColumn?.id);
+
+        if (!Number.isFinite(resolvedColumnId)) {
+          return null;
+        }
+
+        return {
+          ...basePayload,
+          colunaId: resolvedColumnId,
+        };
+      })
+      .filter(Boolean)
+      .map((payload) => {
+        const nextPayload = { ...payload };
+        delete nextPayload.status;
+        delete nextPayload.coluna;
+        return nextPayload;
+      });
+
+    if (payloads.length === 0) {
+      setError("Não foi possível mapear as colunas importadas para IDs válidos.");
+      return false;
+    }
 
     const results = await Promise.allSettled(payloads.map((payload) => api.post("/cards", payload)));
     const createdCards = results
@@ -2210,7 +2730,7 @@ export default function Board() {
       return null;
     }
 
-    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, "Novo");
+    const fallbackStatus = normalizeImportStatus(importDefaultStatus, columns, defaultColumnName);
     const extracted = extractImportCards(parsed, columns, fallbackStatus);
 
     if (extracted.length === 0) {
@@ -2299,7 +2819,9 @@ export default function Board() {
 
   // Filtra cards para uma coluna específica com base nos filtros ativos
   const cardsByColumn = useMemo(() => {
-    const grouped = Object.fromEntries(columns.map((column) => [column, []]));
+    const grouped = Object.fromEntries(
+      orderedColumnDefs.map((column) => [String(column.id), []])
+    );
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     cards.forEach((card) => {
@@ -2315,7 +2837,9 @@ export default function Board() {
       }
 
       if (matches && statusFilter) {
-        matches = card.status === statusFilter;
+        const filterColumnId = Number(statusFilter);
+        const cardColumnId = getCardColumnId(card);
+        matches = Number.isFinite(filterColumnId) && cardColumnId === filterColumnId;
       }
 
       if (matches && vendorFilter) {
@@ -2325,15 +2849,20 @@ export default function Board() {
 
       if (!matches) return;
 
-      if (!grouped[card.status]) {
-        grouped[card.status] = [];
+      let targetColumnId = getCardColumnId(card);
+
+      if (!targetColumnId) return;
+
+      const bucketKey = String(targetColumnId);
+      if (!grouped[bucketKey]) {
+        grouped[bucketKey] = [];
       }
 
-      grouped[card.status].push(card);
+      grouped[bucketKey].push(card);
     });
 
     return grouped;
-  }, [cards, columns, searchTerm, statusFilter, vendorFilter]);
+  }, [cards, orderedColumnDefs, searchTerm, statusFilter, vendorFilter]);
 
   const activeCard = useMemo(
     () => cards.find((card) => getCardKey(card) === activeId) || null,
@@ -2505,8 +3034,8 @@ export default function Board() {
           style={styles.modalInput}
         >
           <option value="">Todos os Status</option>
-          {columns.map((status) => (
-            <option key={status} value={status}>{status}</option>
+          {orderedColumnDefs.map((column) => (
+            <option key={column.id} value={String(column.id)}>{column.nome}</option>
           ))}
         </select>
         
@@ -2539,13 +3068,29 @@ export default function Board() {
             <thead>
               <tr>
                 {/* Renderiza cabeçalho com cada coluna e controles de edição */}
-                {columns.map((col, idx) => {
-                  const columnCards = cardsByColumn[col] || [];
+                {orderedColumnDefs.map((column, idx) => {
+                  const col = column.nome;
+                  const columnCards = cardsByColumn[String(column.id)] || [];
                   return (
-                    <th key={col} style={{ ...styles.th, minWidth: densityCfg.columnWidth }}>
+                    <th
+                      key={column.id || col}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(idx)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleColumnDrop(idx)}
+                      onDragEnd={handleColumnDragEnd}
+                      style={{
+                        ...styles.th,
+                        minWidth: densityCfg.columnWidth,
+                        cursor: "grab",
+                        opacity: draggedColumnIndex === idx ? 0.65 : 1,
+                      }}
+                    >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
                         {/* Nome da coluna */}
-                        <span>{col}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <GripVertical size={14} /> {col}
+                        </span>
                         {/* Contador de cards na coluna */}
                         <span style={{ background: "#f4efff", padding: "2px 8px", borderRadius: "8px", fontSize: "12px", color: "#5f3dc6", border: "1px solid #d6c7ff" }}>
                           {columnCards.length}
@@ -2565,22 +3110,38 @@ export default function Board() {
                             marginLeft: 2,
                             opacity: isBulkDeletingCards || columnCards.length === 0 ? 0.55 : 1,
                           }} 
-                          onClick={() => handleDeleteAllCardsInColumn(col)}
+                          onClick={() => handleDeleteAllCardsInColumn(column)}
                         >
                           <Trash2 size={14} />
                         </button>
                         <button 
                           title="Editar coluna" 
                           style={{ background: "#efe8ff", border: "1px solid #d4c3ff", borderRadius: 6, color: "#6c3bff", cursor: "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2 }} 
-                          onClick={() => openEditColumn(idx)}
+                          onClick={() => openEditColumn(column)}
                         >
                           <Pencil size={14} />
+                        </button>
+                        <button
+                          title="Mover coluna para a esquerda"
+                          disabled={idx === 0}
+                          style={{ background: "#edf2ff", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === 0 ? "not-allowed" : "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2, opacity: idx === 0 ? 0.55 : 1 }}
+                          onClick={() => moveColumn(idx, idx - 1)}
+                        >
+                          ←
+                        </button>
+                        <button
+                          title="Mover coluna para a direita"
+                          disabled={idx === orderedColumnDefs.length - 1}
+                          style={{ background: "#edf2ff", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === orderedColumnDefs.length - 1 ? "not-allowed" : "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2, opacity: idx === orderedColumnDefs.length - 1 ? 0.55 : 1 }}
+                          onClick={() => moveColumn(idx, idx + 1)}
+                        >
+                          →
                         </button>
                         {/* Botão para excluir coluna */}
                         <button 
                           title="Excluir coluna" 
                           style={{ background: "#fff1f1", border: "1px solid #ffd2d2", borderRadius: 6, color: "#b33524", cursor: "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2 }} 
-                          onClick={() => handleDeleteColumn(idx)}
+                          onClick={() => handleDeleteColumn(column)}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -2618,13 +3179,14 @@ export default function Board() {
             <tbody>
               <tr>
                 {/* Renderiza cada coluna com seus cards */}
-                {columns.map((col) => {
-                  const columnCards = cardsByColumn[col] || [];
+                {orderedColumnDefs.map((column) => {
+                  const col = column.nome;
+                  const columnCards = cardsByColumn[String(column.id)] || [];
 
                   return (
-                    <td key={col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
+                    <td key={column.id || col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
                       {/* Área droppable para receber cards arrastados */}
-                      <DroppableColumn id={`column-${col}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
+                      <DroppableColumn id={`column-${column.id}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
                         {/* Mapeia e renderiza cada card da coluna */}
                         {columnCards.map((card) => (
                           <DraggableCard
@@ -2682,11 +3244,11 @@ export default function Board() {
               <div style={styles.createHeroSide}>
                 <div style={styles.createMetaCard}>
                   <p style={styles.createMetaLabel}>Responsável</p>
-                  <p style={styles.createMetaValue}>{seller}</p>
+                  <p style={styles.createMetaValue}>{selectedVendorOption?.label || seller}</p>
                 </div>
                 <div style={styles.createMetaCard}>
                   <p style={styles.createMetaLabel}>Status inicial</p>
-                  <p style={styles.createMetaValue}>Novo</p>
+                  <p style={styles.createMetaValue}>{defaultColumnName}</p>
                 </div>
               </div>
             </div>
@@ -2806,6 +3368,38 @@ export default function Board() {
                         onBlur={handleCreateFieldBlur}
                       />
                     </div>
+                  </div>
+
+                  <div style={styles.createField}>
+                    <label style={styles.createLabel}><User size={13} /> Vendedor responsável</label>
+                    <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#2f3a56" }}>Selecionado:</span>
+                      <span style={{ ...getProfileBadgeStyle(selectedVendorOption?.perfil), borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                        {selectedVendorOption?.label || `${seller} (atual)`}
+                      </span>
+                    </div>
+                    <input
+                      style={{ ...styles.createInput, marginBottom: 8 }}
+                      value={vendorSearchCreate}
+                      onChange={(e) => setVendorSearchCreate(e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                      placeholder="Buscar vendedor..."
+                    />
+                    <select
+                      style={styles.createInput}
+                      value={newCard.vendedorId || ""}
+                      onChange={(e) => handleInputChange("vendedorId", e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                    >
+                      <option value="">{seller} (usuário atual)</option>
+                      {filteredCreateVendors.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}{option.perfil ? ` - ${option.perfil}` : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -3051,12 +3645,41 @@ export default function Board() {
                   onChange={(e) => setStatusEdit(e.target.value)} 
                   style={styles.modalInput}
                 >
-                  {columns.map((status) => (
-                    <option key={status} value={status}>{status}</option>
+                  {orderedColumnDefs.map((column) => (
+                    <option key={column.id} value={String(column.id)}>{column.nome}</option>
                   ))}
                 </select>
                 <button onClick={() => handleChangeStatus(statusEdit)} style={styles.saveBtn}>
                   Atualizar
+                </button>
+              </div>
+
+              <div style={styles.detailsStatusRow}>
+                <span style={styles.detailsLabel}><User size={14} /> Vendedor:</span>
+                <span style={{ ...getProfileBadgeStyle(currentDetailVendor?.perfil), borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "normal" }}>
+                  Atual: {selectedCard?.vendedor?.nome || selectedCard?.vendedor || selectedCard?.vendedorId || "Sem vendedor"}
+                </span>
+                <input
+                  value={vendorSearchDetails}
+                  onChange={(e) => setVendorSearchDetails(e.target.value)}
+                  style={{ ...styles.modalInput, minWidth: 180 }}
+                  placeholder="Buscar..."
+                />
+                <select
+                  value={vendorEdit}
+                  onChange={(e) => setVendorEdit(e.target.value)}
+                  style={styles.modalInput}
+                >
+                  <option value="">Selecione</option>
+                  {filteredDetailVendors.map((item) => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+                <span style={{ ...getProfileBadgeStyle(selectedDetailVendor?.perfil), borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "normal" }}>
+                  Selecionado: {selectedDetailVendor?.label || "-"}
+                </span>
+                <button onClick={handleChangeVendor} style={styles.saveBtn}>
+                  Atualizar vendedor
                 </button>
               </div>
             </div>
@@ -3154,17 +3777,14 @@ export default function Board() {
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }} title="Excluir comentário" onClick={async () => {
                             const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
-                            const cardUpdate = { ...selectedCard, comments: updatedComments };
                             try {
-                              const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
-                              const updatedCard = response.data;
-                              promoteUpdatedCardToTop(updatedCard);
-                              setSelectedCard(updatedCard);
+                              await persistCommentsOnSelectedCard(updatedComments);
                             } catch (err) {
                               setError("Erro ao excluir comentário");
                             }
                           }}><Trash2 size={15} /></button>
                           <button style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }} title="Editar comentário" onClick={() => {
+                            setIsCommentComposerOpen(true);
                             setCommentText(comment.text);
                             const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
                             const cardUpdate = { ...selectedCard, comments: updatedComments };
@@ -3177,6 +3797,244 @@ export default function Board() {
                         </div>
                       </div>
                       <div style={styles.detailsCommentText}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
+                          const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
+                          const meReactionKey = getReactionUserKey(userData?.nome || userData?.username || userData?.email || `user-${sellerId || "anon"}`);
+                          const uniqueUsers = Array.from(
+                            users.reduce((map, name) => {
+                              const key = getReactionUserKey(name);
+                              if (!key || map.has(key)) return map;
+                              map.set(key, getReactionUserDisplayName(name));
+                              return map;
+                            }, new Map())
+                          ).map((entry) => entry[1]);
+                          const count = uniqueUsers.length;
+                          const reactedByMe = users.some((name) => getReactionUserKey(name) === meReactionKey);
+                          const reactionKey = `${comment.id}-${emoji}`;
+                          const isHoveredReaction = hoveredReactionKey === reactionKey;
+                          const visibleUsers = uniqueUsers.slice(0, 6);
+                          const hasMoreUsers = uniqueUsers.length > visibleUsers.length;
+
+                          return (
+                            <div
+                              key={reactionKey}
+                              style={{ position: 'relative', display: 'inline-flex' }}
+                              onMouseEnter={() => setHoveredReactionKey(reactionKey)}
+                              onMouseLeave={() => setHoveredReactionKey((current) => (current === reactionKey ? null : current))}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleToggleReaction(comment.id, emoji)}
+                                style={{
+                                  border: reactedByMe ? '1px solid #8f7cff' : '1px solid #e1d8ff',
+                                  background: reactedByMe ? '#efe9ff' : '#fff',
+                                  color: '#4b3b9a',
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  padding: '3px 8px',
+                                }}
+                              >
+                                {emoji}{count > 0 ? ` ${count}` : ''}
+                              </button>
+
+                              {count > 0 && isHoveredReaction && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 'calc(100% + 8px)',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: '#ffffff',
+                                    border: '1px solid #e3d9ff',
+                                    boxShadow: '0 8px 22px rgba(75, 59, 154, 0.2)',
+                                    borderRadius: 10,
+                                    padding: '7px 9px',
+                                    minWidth: 150,
+                                    maxWidth: 220,
+                                    zIndex: 25,
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  <div style={{ color: '#4b3b9a', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>
+                                    Reagiram {emoji}
+                                  </div>
+                                  {visibleUsers.map((name, index) => (
+                                    <div
+                                      key={`${reactionKey}-user-${index}`}
+                                      style={{ color: '#6558a0', fontSize: 11, lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                      title={String(name || 'Usuário')}
+                                    >
+                                      {String(name || 'Usuário')}
+                                    </div>
+                                  ))}
+                                  {hasMoreUsers && (
+                                    <div style={{ color: '#7f74b4', fontSize: 10, marginTop: 2 }}>
+                                      +{uniqueUsers.length - visibleUsers.length} mais
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveReplyCommentId((prev) => (String(prev) === String(comment.id) ? null : comment.id))}
+                          style={{
+                            border: '1px solid #d8cdfd',
+                            background: '#fff',
+                            color: '#4b3b9a',
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: '3px 10px',
+                          }}
+                        >
+                          Responder
+                        </button>
+                      </div>
+
+                      {Array.isArray(comment.replies) && comment.replies.length > 0 && (
+                        <div style={{ marginTop: 10, paddingLeft: 14, borderLeft: '2px solid #e1d8ff', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {[...comment.replies]
+                            .sort((a, b) => {
+                              const aTime = new Date(a?.createdAt || 0).getTime();
+                              const bTime = new Date(b?.createdAt || 0).getTime();
+                              return bTime - aTime;
+                            })
+                            .map((reply) => {
+                              const replyEditKey = getReplyEditKey(comment.id, reply.id);
+                              const isEditingThisReply = editingReplyKey === replyEditKey;
+
+                              return (
+                                <div key={reply.id} style={{ background: '#faf8ff', border: '1px solid #ece6ff', borderRadius: 10, padding: '8px 10px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ fontSize: 12, color: '#5c4ca8', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                      <button
+                                        type="button"
+                                        title="Editar resposta"
+                                        onClick={() => handleStartEditReply(comment.id, reply)}
+                                        style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
+                                      >
+                                        <Pencil size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        title="Excluir resposta"
+                                        onClick={() => handleDeleteReply(comment.id, reply.id)}
+                                        style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {isEditingThisReply ? (
+                                    <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                                      <input
+                                        type="text"
+                                        value={editingReplyText}
+                                        onChange={(e) => setEditingReplyText(e.target.value)}
+                                        placeholder="Edite a resposta..."
+                                        style={{
+                                          flex: 1,
+                                          border: '1px solid #d8cdfd',
+                                          background: '#fff',
+                                          color: '#3f3292',
+                                          borderRadius: 8,
+                                          fontSize: 12,
+                                          padding: '7px 9px',
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveEditReply(comment.id, reply.id)}
+                                        style={{
+                                          border: 'none',
+                                          background: '#6f57e8',
+                                          color: '#fff',
+                                          borderRadius: 8,
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '7px 9px',
+                                        }}
+                                      >
+                                        Salvar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleCancelEditReply}
+                                        style={{
+                                          border: '1px solid #d8cdfd',
+                                          background: '#fff',
+                                          color: '#4b3b9a',
+                                          borderRadius: 8,
+                                          fontSize: 12,
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          padding: '7px 9px',
+                                        }}
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: 13, color: '#4f3dab', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
+                                  )}
+
+                                  <small style={{ color: '#8d83b3', fontSize: 10 }}>
+                                    {reply.createdAt ? new Date(reply.createdAt).toLocaleString('pt-BR') : ''}
+                                    {reply.editedAt ? ' (editado)' : ''}
+                                  </small>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {String(activeReplyCommentId) === String(comment.id) && (
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                          <input
+                            type="text"
+                            value={replyDraftByCommentId?.[comment.id] || ''}
+                            onChange={(e) => setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: e.target.value }))}
+                            placeholder="Escreva uma resposta..."
+                            style={{
+                              flex: 1,
+                              border: '1px solid #d8cdfd',
+                              background: '#fff',
+                              color: '#3f3292',
+                              borderRadius: 8,
+                              fontSize: 12,
+                              padding: '8px 10px',
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddReply(comment.id)}
+                            style={{
+                              border: 'none',
+                              background: '#6f57e8',
+                              color: '#fff',
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              padding: '8px 10px',
+                            }}
+                          >
+                            Enviar
+                          </button>
+                        </div>
+                      )}
+
                       {comment.attachment && (
                         <div style={{ marginTop: 8 }}>
                           {comment.attachment.type && comment.attachment.type.startsWith('image/') ? (
@@ -3217,17 +4075,61 @@ export default function Board() {
               </div>
 
               <div style={styles.detailsComposer}>
-                {/* Novo formulário de comentário com menção e upload */}
-                <CommentInput
-                  value={commentText}
-                  onChange={setCommentText}
-                  onSend={handleAddComment}
-                  mentionUsers={mentionUsers}
-                  onFile={handleAttachmentSelect}
-                  pendingAttachment={pendingAttachment}
-                  onClearAttachment={() => setPendingAttachment(null)}
-                  placeholder="Escreva um comentário, use @ para menção, ou anexe arquivos/fotos..."
-                />
+                {!isCommentComposerOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsCommentComposerOpen(true)}
+                    style={{
+                      border: "1px solid #d8cdfd",
+                      background: "#ffffff",
+                      color: "#4b3b9a",
+                      borderRadius: "8px",
+                      padding: "8px 12px",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    <MessageCircle size={14} />
+                    Escreva um comentário
+                  </button>
+                ) : (
+                  <>
+                    <CommentInput
+                      value={commentText}
+                      onChange={setCommentText}
+                      onSend={handleAddComment}
+                      mentionUsers={mentionUsers}
+                      onFile={handleAttachmentSelect}
+                      pendingAttachment={pendingAttachment}
+                      onClearAttachment={() => setPendingAttachment(null)}
+                      placeholder="Escreva um comentário, use @ para menção, ou anexe arquivos/fotos..."
+                    />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCommentComposerOpen(false);
+                          setCommentText("");
+                          setPendingAttachment(null);
+                        }}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: "#6f5db1",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             </div>
@@ -3255,6 +4157,7 @@ export default function Board() {
             {/* Componente CardModal reutilizável para edição */}
             <CardModal 
               card={editingCard} 
+              vendorOptions={vendorOptions}
               onSave={async (updatedCard) => {
                 try {
                   // Envia atualização para API
@@ -3267,7 +4170,7 @@ export default function Board() {
                   // Se o card editado está selecionado, atualiza também
                   if (selectedCard && getCardKey(selectedCard) === getCardKey(savedCard)) {
                     setSelectedCard(savedCard);
-                    setStatusEdit(savedCard.status);
+                    setStatusEdit(String(getCardColumnId(savedCard) || ""));
                   }
                   
                   // Fecha modal de edição

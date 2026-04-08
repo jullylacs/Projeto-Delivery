@@ -2,7 +2,6 @@
 import { useNavigate } from "react-router-dom"; // Hook para navegaÃ§Ã£o programÃ¡tica
 import api from "../services/api"; // InstÃ¢ncia de API configurada para comunicaÃ§Ã£o com backend
 
-const ALLOWED_PERFIS = ["comercial", "operacional", "tecnico", "gestor", "admin"];
 const MAX_AVATAR_UPLOAD_MB = 10;
 const TARGET_AVATAR_BASE64_BYTES = 900 * 1024;
 const MAX_AVATAR_DIMENSION = 1024;
@@ -76,6 +75,16 @@ export default function Profile() {
   const [successMessage, setSuccessMessage] = useState("");
   const navigate = useNavigate(); // Hook para navegaÃ§Ã£o programÃ¡tica
 
+  const normalizeAvatar = (value) => {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    const decoder = document.createElement("textarea");
+    decoder.innerHTML = trimmed;
+    return decoder.value.trim();
+  };
+
   // Carrega perfil do usuÃ¡rio ao montar o componente
   useEffect(() => {
     const userData = readStoredUser(); // Busca dados do usuÃ¡rio no localStorage
@@ -92,10 +101,14 @@ export default function Profile() {
   // FunÃ§Ã£o para buscar perfil do usuÃ¡rio pelo ID
   const fetchUserProfile = async (userId) => {
     try {
-      const response = await api.get(`/users/${userId}`); // RequisiÃ§Ã£o GET para backend
-      setUser(response.data); // Salva dados do usuÃ¡rio
-      setFormData(response.data); // Preenche formulÃ¡rio com os dados atuais
-      setAvatarPreview(response.data.avatar); // Define avatar
+      const response = await api.get(`/users/${userId}`); // Requisição GET para backend
+      const normalizedUser = { ...response.data, avatar: normalizeAvatar(response.data?.avatar) };
+      setUser(normalizedUser); // Salva dados do usuário
+      setFormData(normalizedUser); // Preenche formulário com os dados atuais
+      setAvatarPreview(normalizedUser.avatar); // Define avatar
+      // Sincroniza localStorage para que o Header reflita o avatar atual
+      localStorage.setItem("user", JSON.stringify(normalizedUser));
+      window.dispatchEvent(new Event("user-updated"));
       setLoading(false); // Desativa loading
     } catch (err) {
       console.error("Erro ao buscar perfil:", err); // Loga erro
@@ -168,9 +181,18 @@ export default function Profile() {
         return;
       }
 
-      const response = await api.put(`/users/${userId}`, formData); // RequisiÃ§Ã£o PUT para atualizar perfil
-      setUser(response.data); // Atualiza estado do usuÃ¡rio
-      localStorage.setItem("user", JSON.stringify(response.data)); // Atualiza localStorage
+      const payload = {
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        departamento: formData.departamento,
+        avatar: formData.avatar,
+      };
+
+      const response = await api.put(`/users/${userId}`, payload); // RequisiÃ§Ã£o PUT para atualizar perfil
+      const normalizedUser = { ...response.data, avatar: normalizeAvatar(response.data?.avatar) };
+      setUser(normalizedUser); // Atualiza estado do usuÃ¡rio
+      localStorage.setItem("user", JSON.stringify(normalizedUser)); // Atualiza localStorage
       window.dispatchEvent(new Event("user-updated"));
       setIsEditing(false); // Sai do modo ediÃ§Ã£o
       setError(""); // Limpa erro
@@ -186,6 +208,7 @@ export default function Profile() {
     comercial: { label: "Comercial", color: "#1e40af" },
     operacional: { label: "Operacional", color: "#059669" },
     tecnico: { label: "Tecnico", color: "#d97706" },
+    delivery: { label: "Delivery", color: "#9b1b5a" },
     gestor: { label: "Gestor", color: "#7c3aed" },
     admin: { label: "Admin", color: "#dc2626" }
   };
@@ -420,34 +443,9 @@ export default function Profile() {
               }}>
                 Cargo
               </label>
-              {isEditing ? (
-                <select
-                  name="perfil"
-                  value={ALLOWED_PERFIS.includes(formData.perfil) ? formData.perfil : "comercial"}
-                  onChange={handleChange}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #d6d0ff",
-                    borderRadius: "8px",
-                    backgroundColor: "#faf9ff",
-                    color: "#1f2b46",
-                    fontSize: "14px",
-                    boxSizing: "border-box",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="comercial">Comercial</option>
-                  <option value="operacional">Operacional</option>
-                  <option value="tecnico">Tecnico</option>
-                  <option value="gestor">Gestor</option>
-                  <option value="admin">Admin</option>
-                </select>
-              ) : (
-                <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {perfis[user.perfil]?.label || user.perfil}
-                </p>
-              )}
+              <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
+                {perfis[user.perfil]?.label || user.perfil}
+              </p>
             </div>
 
             {/* Telefone */}

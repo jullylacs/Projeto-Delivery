@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
-const PERFIS = ["comercial", "operacional", "tecnico", "gestor", "admin"];
+const PERFIS = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"];
 const PAGE_SIZE_OPTIONS = [8, 12, 20, 50];
 const STORAGE_KEY = "adminUsersTableState";
 
@@ -10,7 +10,14 @@ const ROLE_STYLES = {
   gestor: { bg: "#e8ecff", fg: "#2f3d99", label: "Gestor" },
   tecnico: { bg: "#dff5ff", fg: "#0e5a7a", label: "Tecnico" },
   operacional: { bg: "#e9f8eb", fg: "#1c6d30", label: "Operacional" },
+  delivery: { bg: "#fff0f6", fg: "#9b1b5a", label: "Delivery" },
   comercial: { bg: "#f6ecff", fg: "#6b2cb3", label: "Comercial" },
+  convidado: { bg: "#fff4d9", fg: "#7a5b00", label: "Convidado" },
+};
+
+const APPROVAL_STYLES = {
+  approved: { bg: "#e6f7ec", fg: "#1f6a2f", label: "Aprovado" },
+  pending: { bg: "#fff4d9", fg: "#7a5b00", label: "Pendente" },
 };
 
 const styles = {
@@ -227,7 +234,7 @@ export default function AdminUsers() {
   const [sortOrder, setSortOrder] = useState("asc");
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
-  const [form, setForm] = useState({ nome: "", email: "", perfil: "comercial" });
+  const [form, setForm] = useState({ nome: "", email: "", perfil: "convidado" });
 
   const totalFiltered = total;
 
@@ -372,14 +379,14 @@ export default function AdminUsers() {
     setForm({
       nome: user.nome || "",
       email: user.email || "",
-      perfil: user.perfil || "comercial",
+      perfil: user.perfil || "convidado",
     });
   };
 
   // Cancela a edição e limpa o formulário
   const cancelEdit = () => {
     setEditingId(null);
-    setForm({ nome: "", email: "", perfil: "comercial" });
+    setForm({ nome: "", email: "", perfil: "convidado" });
   };
 
   // Envia as alterações do formulário para a API e recarrega a tabela
@@ -390,6 +397,15 @@ export default function AdminUsers() {
       cancelEdit();
     } catch (err) {
       setError(err.response?.data?.message || "Erro ao salvar alterações");
+    }
+  };
+
+  const approveUser = async (id) => {
+    try {
+      await api.patch(`/users/admin/${id}/approve`);
+      await loadUsers();
+    } catch (err) {
+      setError(err.response?.data?.message || "Erro ao aprovar usuário");
     }
   };
 
@@ -539,6 +555,9 @@ export default function AdminUsers() {
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("perfil")}>
                 Perfil{sortIndicator("perfil")}
               </th>
+              <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("aprovado")}>
+                Aprovacao{sortIndicator("aprovado")}
+              </th>
               <th style={styles.th}>Acoes</th>
             </tr>
           </thead>
@@ -546,6 +565,7 @@ export default function AdminUsers() {
             {users.map((user) => {
               const editing = editingId === user.id;
               const roleStyle = getRoleStyle(user.perfil);
+              const approvalStyle = user.aprovado ? APPROVAL_STYLES.approved : APPROVAL_STYLES.pending;
 
               return (
                 <tr
@@ -605,6 +625,11 @@ export default function AdminUsers() {
                       </span>
                     )}
                   </td>
+                  <td style={styles.td}>
+                    <span style={{ ...styles.badge, background: approvalStyle.bg, color: approvalStyle.fg }}>
+                      {approvalStyle.label}
+                    </span>
+                  </td>
                   <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                     {editing ? (
@@ -614,6 +639,11 @@ export default function AdminUsers() {
                       </>
                     ) : (
                       <>
+                        {!user.aprovado && (
+                          <button style={styles.saveBtn} onClick={() => approveUser(user.id)} onMouseEnter={handleButtonHoverIn} onMouseLeave={handleButtonHoverOut}>
+                            Aprovar
+                          </button>
+                        )}
                         <button style={styles.actionBtn} onClick={() => startEdit(user)} onMouseEnter={handleButtonHoverIn} onMouseLeave={handleButtonHoverOut}>Editar</button>
                         <button style={styles.removeBtn} onClick={() => deleteUser(user.id)} onMouseEnter={handleButtonHoverIn} onMouseLeave={handleButtonHoverOut}>
                           Excluir
@@ -627,7 +657,7 @@ export default function AdminUsers() {
             })}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
+                <td colSpan={6} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
                   Nenhum usuário encontrado para a busca.
                 </td>
               </tr>

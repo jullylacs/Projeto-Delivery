@@ -4,13 +4,25 @@ const sequelize = require("../config/db");
 // 🔹 Model de agendamentos de instalações
 const Schedule = sequelize.define("Schedule", {
 
+  // Título resumido da atividade (usado na Agenda)
+  titulo: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  // Notas livres da atividade
+  notas: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+
   // Referência ao card (demanda) vinculada ao agendamento
   // Equivalente ao: card: { type: ObjectId, ref: "Card" } do Mongoose
   card_id: {
     type: DataTypes.INTEGER,
     references: { model: "cards", key: "id" },
     onDelete: "CASCADE",
-    allowNull: false
+    allowNull: true
   },
 
   // Referência ao técnico responsável pela execução

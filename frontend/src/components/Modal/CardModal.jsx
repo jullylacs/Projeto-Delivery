@@ -122,7 +122,29 @@ const styles = {
   },
 };
 
-export default function CardModal({ card, onSave, onClose }) {
+const profileBadgePalette = {
+  comercial: { bg: "#e9f1ff", text: "#1d4ed8", border: "#bfd3ff" },
+  operacional: { bg: "#e8fbf1", text: "#047857", border: "#bae6d1" },
+  tecnico: { bg: "#fff3e8", text: "#b45309", border: "#fed7aa" },
+  gestor: { bg: "#f1ecff", text: "#6d28d9", border: "#ddd6fe" },
+  admin: { bg: "#ffecec", text: "#b91c1c", border: "#fecaca" },
+  default: { bg: "#efe8ff", text: "#5135b0", border: "#d6c8ff" },
+};
+
+const normalizeProfileKey = (value) => String(value || "").trim().toLowerCase();
+
+const getProfileBadgeStyle = (perfil) => {
+  const key = normalizeProfileKey(perfil);
+  const palette = profileBadgePalette[key] || profileBadgePalette.default;
+  return {
+    background: palette.bg,
+    color: palette.text,
+    border: `1px solid ${palette.border}`,
+  };
+};
+
+export default function CardModal({ card, onSave, onClose, vendorOptions = [] }) {
+  const [vendorSearch, setVendorSearch] = useState("");
   // Estado para armazenar dados do formulário, inicializado com valores do card (ou vazio)
   const [formData, setFormData] = useState({
     titulo: card.titulo || "",
@@ -134,6 +156,7 @@ export default function CardModal({ card, onSave, onClose }) {
     sla: card.sla || 0,
     prazo: card.prazo ? card.prazo.split("T")[0] : "", // Converte ISO para YYYY-MM-DD
     observacoes: card.observacoes || "",
+    vendedorId: String(card?.vendedor?.id || card?.vendedor_id || card?.vendedorId || ""),
     coordenadas: {
       lat: card.coordenadas?.lat || "",
       lng: card.coordenadas?.lng || "",
@@ -142,6 +165,14 @@ export default function CardModal({ card, onSave, onClose }) {
 
   // Estado para armazenar mensagens de erro de validação
   const [errors, setErrors] = useState({});
+
+  const filteredVendorOptions = vendorOptions.filter((option) =>
+    option.label.toLowerCase().includes(vendorSearch.trim().toLowerCase())
+  );
+
+  const selectedVendor = vendorOptions.find(
+    (option) => option.id === String(formData.vendedorId || "")
+  );
 
   // Função para atualizar campos do formulário
   const handleChange = (field, value) => {
@@ -302,6 +333,41 @@ export default function CardModal({ card, onSave, onClose }) {
                 placeholder="0,00"
               />
             </div>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Vendedor Responsável</label>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#4f4199" }}>Selecionado:</span>
+              <span style={{ ...getProfileBadgeStyle(selectedVendor?.perfil), borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                {selectedVendor?.perfil ? `${selectedVendor.perfil} - ` : ""}
+                {selectedVendor?.label || "Manter vendedor atual"}
+              </span>
+            </div>
+            <input
+              style={{ ...styles.input, marginBottom: 8 }}
+              value={vendorSearch}
+              onChange={(e) => setVendorSearch(e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
+              placeholder="Buscar vendedor..."
+            />
+            <select
+              style={styles.input}
+              value={formData.vendedorId || ""}
+              onChange={(e) => handleChange("vendedorId", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
+            >
+              <option value="">Manter vendedor atual</option>
+              {filteredVendorOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}{option.perfil ? ` - ${option.perfil}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import api from "../services/api";
 
 // Nomes dos meses para exibição
 const MONTH_NAMES = [
@@ -48,6 +49,23 @@ const VIEW_MODE = {
   week: "week",
   day: "day",
 };
+
+const UI_STATUS_TO_API = {
+  planejado: "pendente",
+  andamento: "em_execucao",
+  concluido: "finalizado",
+};
+
+const API_STATUS_TO_UI = {
+  pendente: "planejado",
+  confirmado: "planejado",
+  reagendado: "planejado",
+  em_execucao: "andamento",
+  finalizado: "concluido",
+};
+
+const toUiStatus = (apiStatus) => API_STATUS_TO_UI[apiStatus] || "planejado";
+const toApiStatus = (uiStatus) => UI_STATUS_TO_API[uiStatus] || "pendente";
 
 const isSameDay = (left, right) =>
   left.getFullYear() === right.getFullYear() &&
@@ -102,7 +120,6 @@ export default function Agenda() {
   const [taskNotes, setTaskNotes] = useState(""); // Notas da tarefa
   const [taskStatus, setTaskStatus] = useState("planejado"); // Status inicial da tarefa
   const [tasks, setTasks] = useState({}); // Objeto que armazena tarefas por data
-  const [isTasksHydrated, setIsTasksHydrated] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState(null); // ID da tarefa que está sendo editada
   const [editingNoteValue, setEditingNoteValue] = useState(""); // Valor temporário da nota em edição
   const [draggedTaskId, setDraggedTaskId] = useState(null);
@@ -112,33 +129,49 @@ export default function Agenda() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskModalDate, setTaskModalDate] = useState(() => new Date());
   const [taskModalPosition, setTaskModalPosition] = useState({ x: 0, y: 0 });
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [apiError, setApiError] = useState("");
   const taskModalRef = useRef(null);
 
-  // Carrega tarefas do localStorage ao iniciar o componente
+  // Carrega tarefas da API ao iniciar o componente
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("agendaTasks");
-      if (!stored) {
-        setIsTasksHydrated(true);
-        return;
+    const loadSchedules = async () => {
+      setApiError("");
+
+      try {
+        const response = await api.get("/schedules");
+        const list = Array.isArray(response.data) ? response.data : [];
+        const grouped = {};
+
+        list.forEach((item) => {
+          if (!item?.data) return;
+
+          const day = parseDateOrNow(item.data);
+          const key = getLocalDateKey(day);
+          const task = {
+            id: item.id,
+            title: String(item.titulo || "").trim() || "(Sem título)",
+            time: String(item.horario || "").trim() || "--",
+            notes: String(item.notas || "").trim(),
+            status: toUiStatus(item.status),
+          };
+
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(task);
+        });
+
+        setTasks(grouped);
+      } catch {
+        setApiError("Não foi possível carregar tarefas da API.");
+        setTasks({});
+      } finally {
+        setIsLoadingTasks(false);
       }
 
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed === "object") {
-        setTasks(parsed);
-      }
-    } catch {
-      setTasks({});
-    } finally {
-      setIsTasksHydrated(true);
-    }
+    };
+
+    loadSchedules();
   }, []);
-
-  // Salva tarefas no localStorage sempre que o estado 'tasks' muda
-  useEffect(() => {
-    if (!isTasksHydrated) return;
-    localStorage.setItem("agendaTasks", JSON.stringify(tasks));
-  }, [tasks, isTasksHydrated]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -229,40 +262,63 @@ export default function Agenda() {
   };
 
   // Função para adicionar uma nova tarefa
-  const addTask = (e, targetDate = selectedDate) => {
+  const addTask = async (e, targetDate = selectedDate) => {
     e.preventDefault();
     if (!taskTitle.trim()) return; // Evita adicionar tarefas vazias
 
     const targetKey = getLocalDateKey(targetDate);
 
-    // Cria objeto da nova tarefa
-    const newTask = {
-      id: Date.now(), // ID único baseado em timestamp
-      title: taskTitle.trim(),
-      time: taskTime || "--", // Horário opcional
-      notes: taskNotes.trim(), // Notas opcionais
-      status: taskStatus,
-    };
+    try {
+      const payload = {
+        titulo: taskTitle.trim(),
+        notas: taskNotes.trim(),
+        data: new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).toISOString(),
+        horario: taskTime || null,
+        status: toApiStatus(taskStatus),
+        card_id: null,
+        tecnico_id: null,
+      };
 
-    // Atualiza o estado 'tasks', adicionando a tarefa no dia selecionado
-    setTasks((prev) => ({
-      ...prev,
-      [targetKey]: [...(prev[targetKey] || []), newTask],
-    }));
+      const response = await api.post("/schedules", payload);
+      const created = response.data;
+      const newTask = {
+        id: created.id,
+        title: created.titulo || payload.titulo,
+        time: created.horario || "--",
+        notes: created.notas || payload.notas,
+        status: toUiStatus(created.status || payload.status),
+      };
 
-    clearTaskForm();
-    setIsTaskModalOpen(false);
+      setTasks((prev) => ({
+        ...prev,
+        [targetKey]: [...(prev[targetKey] || []), newTask],
+      }));
+
+      clearTaskForm();
+      setIsTaskModalOpen(false);
+      setApiError("");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      setApiError(`Não foi possível salvar a tarefa na API.${message ? ` (${message})` : ""}`);
+    }
   };
 
   // Função para remover uma tarefa pelo ID
-  const removeTask = (id) => {
-    setTasks((prev) => {
-      const updated = (prev[selectedKey] || []).filter((t) => t.id !== id); // Filtra a tarefa
-      const next = { ...prev };
-      if (updated.length > 0) next[selectedKey] = updated; // Mantém a lista se ainda houver tarefas
-      else delete next[selectedKey]; // Remove a chave se não houver tarefas restantes
-      return next;
-    });
+  const removeTask = async (id) => {
+    try {
+      await api.delete(`/schedules/${id}`);
+      setTasks((prev) => {
+        const updated = (prev[selectedKey] || []).filter((t) => t.id !== id); // Filtra a tarefa
+        const next = { ...prev };
+        if (updated.length > 0) next[selectedKey] = updated; // Mantém a lista se ainda houver tarefas
+        else delete next[selectedKey]; // Remove a chave se não houver tarefas restantes
+        return next;
+      });
+      setApiError("");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      setApiError(`Não foi possível remover a tarefa da API.${message ? ` (${message})` : ""}`);
+    }
   };
 
   // Inicia edição de nota de uma tarefa
@@ -278,24 +334,38 @@ export default function Agenda() {
   };
 
   // Salva nota editada
-  const saveEditNote = (task) => {
-    setTasks((prev) => {
-      const updated = (prev[selectedKey] || []).map((t) =>
-        t.id === task.id ? { ...t, notes: editingNoteValue } : t
-      );
-      return { ...prev, [selectedKey]: updated };
-    });
-    setEditingNoteId(null);
-    setEditingNoteValue("");
+  const saveEditNote = async (task) => {
+    try {
+      await api.put(`/schedules/${task.id}`, { notas: editingNoteValue });
+      setTasks((prev) => {
+        const updated = (prev[selectedKey] || []).map((t) =>
+          t.id === task.id ? { ...t, notes: editingNoteValue } : t
+        );
+        return { ...prev, [selectedKey]: updated };
+      });
+      setEditingNoteId(null);
+      setEditingNoteValue("");
+      setApiError("");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      setApiError(`Não foi possível salvar a nota na API.${message ? ` (${message})` : ""}`);
+    }
   };
 
-  const moveTaskStatus = (taskId, nextStatus) => {
-    setTasks((prev) => {
-      const updated = (prev[selectedKey] || []).map((t) =>
-        t.id === taskId ? { ...t, status: nextStatus } : t
-      );
-      return { ...prev, [selectedKey]: updated };
-    });
+  const moveTaskStatus = async (taskId, nextStatus) => {
+    try {
+      await api.put(`/schedules/${taskId}`, { status: toApiStatus(nextStatus) });
+      setTasks((prev) => {
+        const updated = (prev[selectedKey] || []).map((t) =>
+          t.id === taskId ? { ...t, status: nextStatus } : t
+        );
+        return { ...prev, [selectedKey]: updated };
+      });
+      setApiError("");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      setApiError(`Não foi possível atualizar o status na API.${message ? ` (${message})` : ""}`);
+    }
   };
 
   const handleTaskDragStart = (taskId, event) => {
@@ -614,6 +684,18 @@ export default function Agenda() {
           ))}
         </div>
       </div>
+
+      {apiError && (
+        <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #f3b3b3", background: "#ffe9e9", color: "#9b1f1f", fontSize: 13, fontWeight: 600 }}>
+          {apiError}
+        </div>
+      )}
+
+      {isLoadingTasks && (
+        <div style={{ marginBottom: 10, color: "#6b7a95", fontSize: 13, fontWeight: 600 }}>
+          Carregando tarefas da API...
+        </div>
+      )}
 
       <div
         style={{

@@ -19,7 +19,11 @@ Plataforma web para operacao de campo com Kanban, Agenda e colaboracao em cards.
 - [Melhorias recentes](#melhorias-recentes)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Como rodar localmente](#como-rodar-localmente)
+- [Configuracao de ambiente](#configuracao-de-ambiente)
+- [API e autenticacao](#api-e-autenticacao)
+- [Documentacao OpenAPI](#documentacao-openapi)
 - [Scripts uteis](#scripts-uteis)
+- [Deploy](#deploy)
 - [Roadmap tecnico](#roadmap-tecnico)
 - [Observacoes](#observacoes)
 
@@ -65,9 +69,10 @@ flowchart LR
 
 ### Autenticacao e usuarios
 - Login e cadastro com validacoes alinhadas entre frontend e backend.
-- Perfis de acesso aplicados (comercial, operacional, tecnico, gestor, admin).
+- Perfis de acesso aplicados (convidado, comercial, operacional, tecnico, delivery, gestor, admin).
 - Painel administrativo com paginacao server-side.
 - Persistencia de filtros/ordenacao/paginacao da tela administrativa.
+- Access token + refresh token (rotacao via endpoint de refresh).
 
 ### Kanban
 - Criacao, edicao, duplicacao, exclusao e movimentacao de cards.
@@ -115,6 +120,9 @@ flowchart LR
 - Correcao de persistencia de comentarios nos cards.
 - Ajuste de associacao Sequelize para evitar conflito de nomes.
 - Rate limiting global parametrizavel para evitar bloqueios indevidos em dev.
+- Rotas protegidas em cards, schedules e technicians.
+- Prefixo de API versionada em /api/v1.
+- OpenAPI JSON + Swagger UI embutido.
 
 ### Frontend
 - Menus de dados agrupados em popover.
@@ -168,6 +176,76 @@ npm run dev
 
 App padrao: http://localhost:5173
 
+Rodar frontend + backend juntos (raiz):
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Configuracao de ambiente
+
+### Backend (.env)
+Exemplo de variaveis recomendadas:
+
+```env
+NODE_ENV=development
+HOST=localhost
+PORT=3000
+
+DB_DIALECT=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=delivery_sys
+DB_USER=postgres
+DB_PASS=postgres
+
+FRONTEND_URL=http://localhost:5173
+
+JWT_SECRET=defina_uma_chave_forte
+JWT_REFRESH_SECRET=defina_outra_chave_forte
+JWT_ACCESS_EXPIRES_IN=24h
+JWT_REFRESH_EXPIRES_IN=30d
+
+API_BASE_PATH=/api/v1
+ENABLE_LEGACY_ROUTES=true
+
+# Opcional para integracoes internas
+SYSTEM_API_TOKEN=
+```
+
+### Frontend (.env)
+```env
+VITE_API_URL=http://localhost:3000/api/v1
+```
+
+---
+
+## API e autenticacao
+
+### Base path principal
+- /api/v1
+
+### Fluxo de auth
+1. POST /api/v1/users/login
+2. Recebe token (access token) + refreshToken
+3. Usa Authorization: Bearer <token> nas rotas protegidas
+4. Quando expirar, chama POST /api/v1/users/refresh com refreshToken
+5. Para encerrar sessao, POST /api/v1/users/logout
+
+### Observacoes importantes
+- JWT_SECRET nao e token de uso em request; e a chave de assinatura do JWT.
+- Rotas legadas sem /api/v1 existem por compatibilidade e podem ser desligadas via ENABLE_LEGACY_ROUTES=false.
+
+---
+
+## Documentacao OpenAPI
+
+Com o backend rodando:
+- JSON OpenAPI: http://localhost:3000/api/v1/openapi.json
+- Swagger UI: http://localhost:3000/api/v1/docs
+
 ---
 
 ## Scripts uteis
@@ -176,10 +254,33 @@ App padrao: http://localhost:5173
 - npm run dev
 - npm run db:migrate
 - npm run db:undo
+- npm run db:undo:all
 
 ### Frontend
 - npm run dev
 - npm run build
+
+### Raiz
+- npm run dev
+- npm run dev:backend
+- npm run dev:frontend
+- npm run dev:frontend:host
+
+---
+
+## Deploy
+
+Arquivos de apoio ja incluidos no projeto:
+- deploy/nginx/delivery.nvxnetworks.com.conf
+- deploy/nginx/README.md
+- deploy/pm2/ecosystem.config.cjs
+- deploy/pm2/delivery-backend.service
+- deploy/pm2/README.md
+
+Modelo de publicacao recomendado:
+1. Frontend em https://delivery.nvxnetworks.com/
+2. Backend em https://delivery.nvxnetworks.com/api/v1/
+3. PM2 + systemd para manter backend sempre ativo
 
 ---
 

@@ -6,7 +6,6 @@ import api from "../services/api"; // Instância de API para comunicação com b
 export default function Login() {
   const [email, setEmail] = useState(""); // Estado para armazenar o email digitado
   const [senha, setSenha] = useState(""); // Estado para armazenar a senha digitada
-  const [perfil, setPerfil] = useState("comercial"); // Estado para armazenar o perfil selecionado
   const [loading, setLoading] = useState(false); // Estado que indica se a requisição está em andamento
   const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate(); // Hook para redirecionar usuário após login
@@ -24,7 +23,7 @@ export default function Login() {
     try {
       setLoading(true); // Ativa loading
       setErrorMessage("");
-      const res = await api.post("/users/login", { email, senha, perfil }); // Chamada POST para login
+      const res = await api.post("/users/login", { email, senha }); // Chamada POST para login
       localStorage.setItem("token", res.data.token); // Salva token no localStorage
       localStorage.setItem("user", JSON.stringify(res.data.user)); // Salva dados do usuário no localStorage
       navigate("/dashboard"); // Redireciona para dashboard
@@ -122,31 +121,6 @@ export default function Login() {
           }}
         />
 
-        {/* Select de perfil */}
-        <select
-          value={perfil} // Valor vinculado ao estado perfil
-          onChange={e => setPerfil(e.target.value)} // Atualiza estado ao selecionar
-          style={{
-            width: "100%",
-            padding: "12px 15px",
-            marginBottom: "20px",
-            borderRadius: "8px",
-            border: "1px solid rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.1)",
-            color: "#fff",
-            fontSize: "14px",
-            boxSizing: "border-box",
-            cursor: "pointer"
-          }}
-        >
-          {/* Opções de perfil */}
-          <option value="comercial">👔 Comercial</option>
-          <option value="operacional">📋 Operacional</option>
-          <option value="tecnico">🔧 Técnico</option>
-          <option value="gestor">👨‍💼 Gestor</option>
-          <option value="admin">🔐 Admin</option>
-        </select>
-        
         {/* Botão de login */}
         <button
           onClick={login} // Chama função de login ao clicar

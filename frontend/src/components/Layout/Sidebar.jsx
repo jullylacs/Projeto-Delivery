@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 // useLocation: fornece informação da rota atual
 
 // Componente da barra lateral com menu de navegação
-export default function Sidebar() {
+export default function Sidebar({ isOpen = true }) {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
   const location = useLocation(); // Hook para detectar a rota atual
   const userRaw = localStorage.getItem("user");
@@ -14,20 +14,26 @@ export default function Sidebar() {
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
     { name: "Agenda", icon: "📅", path: "/agenda" },
-    ...(user?.perfil === "admin" ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
+    ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
   ];
 
   return (
     <div
       style={{
         width: "250px", // largura fixa da sidebar
+        minWidth: "250px",
+        flexShrink: 0,
         height: "100vh", // altura completa da tela
         background: "linear-gradient(180deg, #2c0b52, #4f238f)", // gradiente roxo
         color: "#fff",
         display: "flex",
         flexDirection: "column",
         padding: "25px 15px",
-        borderRight: "1px solid rgba(255,255,255,0.05)" // linha separando do conteúdo
+        borderRight: "1px solid rgba(255,255,255,0.05)", // linha separando do conteúdo
+        transform: isOpen ? "translateX(0)" : "translateX(-100%)",
+        opacity: isOpen ? 1 : 0,
+        transition: "transform 320ms ease, opacity 240ms ease",
+        pointerEvents: isOpen ? "auto" : "none",
       }}
     >
       

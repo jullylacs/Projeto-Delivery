@@ -25,8 +25,23 @@ const User = sequelize.define("User", {
 
   // Perfil/role do usuário
   perfil: {
-    type: DataTypes.ENUM("comercial", "operacional", "tecnico", "gestor", "admin"),
-    defaultValue: "comercial"
+    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"),
+    defaultValue: "convidado"
+  },
+
+  // Controle de aprovação de novos cadastros
+  aprovado: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  aprovado_por: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  aprovado_em: {
+    type: DataTypes.DATE,
+    allowNull: true,
   },
 
   // Campos adicionais usados no updateUserProfile
