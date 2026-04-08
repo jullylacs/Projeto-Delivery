@@ -10,9 +10,37 @@ const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || "5mb";
 const apiBasePath = process.env.API_BASE_PATH || "/api/v1";
 const legacyRoutesEnabled = String(process.env.ENABLE_LEGACY_ROUTES || "true").toLowerCase() === "true";
 
+function normalizeOrigin(origin) {
+  return String(origin || "").trim().replace(/\/$/, "").toLowerCase();
+}
+
+function getAllowedOrigins() {
+  const raw = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL || "http://localhost:5173";
+  return [...new Set(
+    raw
+      .split(",")
+      .map((value) => normalizeOrigin(value))
+      .filter(Boolean)
+  )];
+}
+
+const allowedOrigins = getAllowedOrigins();
+
 // 🔒 CORS Seguro - apenas frontend autorizado
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin(origin, callback) {
+    // Permite ferramentas sem Origin (curl, health checks, server-to-server).
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const normalizedRequestOrigin = normalizeOrigin(origin);
+    if (allowedOrigins.includes(normalizedRequestOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]

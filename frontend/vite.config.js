@@ -10,8 +10,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'), // @ aponta para src
     },
   },
-server: {
-  host: "localhost",
-  port: 5173
-}
+  server: {
+    host: true,
+    port: 5173,
+    allowedHosts: [
+      'delivery.nvxnetworks.com',
+      'www.delivery.nvxnetworks.com',
+      'localhost',
+      '127.0.0.1',
+      '10.0.254.32',
+    ],
+  },
 });
