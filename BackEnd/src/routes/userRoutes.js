@@ -12,6 +12,7 @@ router.post("/logout", auth, controller.logout);
 
 // Rotas administrativas
 router.get("/admin", auth, requireManagerOrAdmin, controller.getAll);
+router.patch("/admin/approve-all", auth, requireManagerOrAdmin, controller.adminApproveAllUsers);
 router.put("/admin/:id", auth, requireManagerOrAdmin, controller.adminUpdateUser);
 router.patch("/admin/:id/approve", auth, requireManagerOrAdmin, controller.adminApproveUser);
 router.delete("/admin/:id", auth, requireAdmin, controller.adminDeleteUser);

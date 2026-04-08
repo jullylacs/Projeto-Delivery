@@ -1440,6 +1440,8 @@ export default function Board() {
   const [vendorSearchCreate, setVendorSearchCreate] = useState("");
   const [vendorSearchDetails, setVendorSearchDetails] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
   const [isEditCardOpen, setIsEditCardOpen] = useState(false); // Controle do modal de edição
   const [editingCard, setEditingCard] = useState(null);    // Card sendo editado
@@ -2085,7 +2087,23 @@ export default function Board() {
     setEditingReplyKey(null);
     setEditingReplyText("");
     setPendingAttachment(null);
+    setPreviewImage(null);
+    setPreviewZoom(1);
   };
+
+  useEffect(() => {
+    if (!previewImage) return;
+
+    const handleEscToClose = (event) => {
+      if (event.key === "Escape") {
+        setPreviewImage(null);
+        setPreviewZoom(1);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscToClose);
+    return () => window.removeEventListener("keydown", handleEscToClose);
+  }, [previewImage]);
 
   const persistCommentsOnSelectedCard = async (nextComments) => {
     if (!selectedCard) return null;
@@ -4038,7 +4056,21 @@ export default function Board() {
                       {comment.attachment && (
                         <div style={{ marginTop: 8 }}>
                           {comment.attachment.type && comment.attachment.type.startsWith('image/') ? (
-                            <img src={comment.attachment.data || URL.createObjectURL(new Blob([comment.attachment.data]))} alt={comment.attachment.name || 'Imagem anexada'} style={{ maxWidth: 320, maxHeight: 220, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }} />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewImage({ src: comment.attachment.data, name: comment.attachment.name || 'Imagem anexada' });
+                                setPreviewZoom(1);
+                              }}
+                              style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'zoom-in' }}
+                              title="Clique para ampliar"
+                            >
+                              <img
+                                src={comment.attachment.data}
+                                alt={comment.attachment.name || 'Imagem anexada'}
+                                style={{ maxWidth: 320, maxHeight: 220, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }}
+                              />
+                            </button>
                           ) : comment.attachment.type === 'application/pdf' ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
@@ -4133,6 +4165,147 @@ export default function Board() {
               </div>
             </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(22, 11, 53, 0.72)',
+            backdropFilter: 'blur(2px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 4200,
+            padding: 20,
+          }}
+          onClick={() => {
+            setPreviewImage(null);
+            setPreviewZoom(1);
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              maxWidth: '92vw',
+              maxHeight: '88vh',
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onWheel={(event) => {
+              event.preventDefault();
+              const delta = event.deltaY > 0 ? -0.1 : 0.1;
+              setPreviewZoom((prev) => Math.min(3, Math.max(0.6, Number((prev + delta).toFixed(2)))));
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: -12,
+                left: -12,
+                display: 'flex',
+                gap: 6,
+                zIndex: 2,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewZoom((prev) => Math.min(3, Number((prev + 0.2).toFixed(2))))}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: '#ffffff',
+                  color: '#3d2f91',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(33, 17, 88, 0.3)',
+                }}
+                title="Aumentar zoom"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewZoom((prev) => Math.max(0.6, Number((prev - 0.2).toFixed(2))))}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: '#ffffff',
+                  color: '#3d2f91',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(33, 17, 88, 0.3)',
+                }}
+                title="Diminuir zoom"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewZoom(1)}
+                style={{
+                  height: 30,
+                  borderRadius: 999,
+                  border: 'none',
+                  background: '#ffffff',
+                  color: '#3d2f91',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 16px rgba(33, 17, 88, 0.3)',
+                  padding: '0 10px',
+                  fontSize: 11,
+                }}
+                title="Resetar zoom"
+              >
+                {Math.round(previewZoom * 100)}%
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewImage(null);
+                setPreviewZoom(1);
+              }}
+              style={{
+                position: 'absolute',
+                top: -12,
+                right: -12,
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                border: 'none',
+                background: '#ffffff',
+                color: '#3d2f91',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 6px 16px rgba(33, 17, 88, 0.3)',
+              }}
+              title="Fechar"
+            >
+              ×
+            </button>
+            <img
+              src={previewImage.src}
+              alt={previewImage.name || 'Imagem anexada'}
+              style={{
+                display: 'block',
+                maxWidth: '92vw',
+                maxHeight: '88vh',
+                borderRadius: 12,
+                boxShadow: '0 18px 40px rgba(14, 6, 38, 0.45)',
+                border: '1px solid rgba(233, 228, 255, 0.45)',
+                transform: `scale(${previewZoom})`,
+                transformOrigin: 'center center',
+                transition: 'transform 120ms ease',
+              }}
+            />
           </div>
         </div>
       )}

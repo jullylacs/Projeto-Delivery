@@ -232,6 +232,8 @@ export default function AdminUsers() {
   const [pageSize, setPageSize] = useState(8);
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("asc");
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
   const [form, setForm] = useState({ nome: "", email: "", perfil: "convidado" });
@@ -251,6 +253,10 @@ export default function AdminUsers() {
         sortBy,
         sortOrder,
       };
+
+      if (showOnlyPending) {
+        params.approved = false;
+      }
 
       const res = await api.get("/users/admin", { params });
 
@@ -288,6 +294,7 @@ export default function AdminUsers() {
       if (Number.isInteger(parsed.pageSize) && PAGE_SIZE_OPTIONS.includes(parsed.pageSize)) setPageSize(parsed.pageSize);
       if (typeof parsed.sortBy === "string") setSortBy(parsed.sortBy);
       if (parsed.sortOrder === "asc" || parsed.sortOrder === "desc") setSortOrder(parsed.sortOrder);
+      if (typeof parsed.showOnlyPending === "boolean") setShowOnlyPending(parsed.showOnlyPending);
     } catch {
       // Ignora estado inválido salvo no navegador.
     }
@@ -303,9 +310,10 @@ export default function AdminUsers() {
         pageSize,
         sortBy,
         sortOrder,
+        showOnlyPending,
       })
     );
-  }, [search, currentPage, pageSize, sortBy, sortOrder]);
+  }, [search, currentPage, pageSize, sortBy, sortOrder, showOnlyPending]);
 
   // Atualiza campo de busca e volta para a primeira página
   const handleSearchChange = (value) => {
@@ -322,6 +330,11 @@ export default function AdminUsers() {
   // Altera o número de itens por página e volta para a primeira página
   const handlePageSizeChange = (value) => {
     setPageSize(Number(value));
+    setCurrentPage(1);
+  };
+
+  const handleTogglePendingFilter = () => {
+    setShowOnlyPending((prev) => !prev);
     setCurrentPage(1);
   };
 
@@ -371,7 +384,7 @@ export default function AdminUsers() {
 
   useEffect(() => {
     loadUsers();
-  }, [search, currentPage, pageSize, sortBy, sortOrder]);
+  }, [search, currentPage, pageSize, sortBy, sortOrder, showOnlyPending]);
 
   // Inicia o modo de edição inline de um usuário e carrega os dados no formulário
   const startEdit = (user) => {
@@ -406,6 +419,26 @@ export default function AdminUsers() {
       await loadUsers();
     } catch (err) {
       setError(err.response?.data?.message || "Erro ao aprovar usuário");
+    }
+  };
+
+  const approveAllUsers = async () => {
+    const confirmed = window.confirm("Deseja aprovar todos os usuários pendentes?");
+    if (!confirmed) return;
+
+    try {
+      setIsApprovingAll(true);
+      setError("");
+      const res = await api.patch("/users/admin/approve-all");
+      await loadUsers();
+      const updated = Number(res?.data?.updated || 0);
+      if (updated === 0) {
+        setError("Nenhum usuário pendente para aprovar.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Erro ao aprovar todos os usuários");
+    } finally {
+      setIsApprovingAll(false);
     }
   };
 
@@ -531,6 +564,33 @@ export default function AdminUsers() {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          style={{
+            ...styles.actionBtn,
+            borderColor: showOnlyPending ? "#7f5dff" : "#d4c8fb",
+            background: showOnlyPending ? "#efe8ff" : "#faf7ff",
+          }}
+          onClick={handleTogglePendingFilter}
+          onMouseEnter={handleButtonHoverIn}
+          onMouseLeave={handleButtonHoverOut}
+        >
+          {showOnlyPending ? "Mostrando pendentes" : "Filtrar não aprovados"}
+        </button>
+        <button
+          type="button"
+          style={{
+            ...styles.saveBtn,
+            opacity: isApprovingAll ? 0.7 : 1,
+            cursor: isApprovingAll ? "wait" : "pointer",
+          }}
+          onClick={approveAllUsers}
+          disabled={isApprovingAll}
+          onMouseEnter={handleButtonHoverIn}
+          onMouseLeave={handleButtonHoverOut}
+        >
+          {isApprovingAll ? "Aprovando..." : "Aprovar todos"}
+        </button>
       </div>
 
       {error && (

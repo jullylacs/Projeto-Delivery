@@ -389,6 +389,7 @@ exports.updateUserProfile = async (req, res) => {
 exports.getAll = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
+    const approvedFilterRaw = String(req.query.approved || "").trim().toLowerCase();
     const page = Math.max(1, Number.parseInt(req.query.page || "1", 10));
     const limitRaw = Number.parseInt(req.query.limit || "10", 10);
     const limit = Number.isNaN(limitRaw) ? 10 : Math.min(Math.max(limitRaw, 1), 100);
@@ -397,14 +398,18 @@ exports.getAll = async (req, res) => {
     const sortBy = allowedSortBy.includes(req.query.sortBy) ? req.query.sortBy : "id";
     const sortOrder = String(req.query.sortOrder || "asc").toLowerCase() === "desc" ? "DESC" : "ASC";
 
-    const where = q
-      ? {
-          [Op.or]: [
-            { nome: { [Op.iLike]: `%${q}%` } },
-            { email: { [Op.iLike]: `%${q}%` } },
-          ],
-        }
-      : undefined;
+    const where = {};
+
+    if (q) {
+      where[Op.or] = [
+        { nome: { [Op.iLike]: `%${q}%` } },
+        { email: { [Op.iLike]: `%${q}%` } },
+      ];
+    }
+
+    if (approvedFilterRaw === "true" || approvedFilterRaw === "false") {
+      where.aprovado = approvedFilterRaw === "true";
+    }
 
     const offset = (page - 1) * limit;
 
@@ -591,5 +596,25 @@ exports.getAssignableUsers = async (req, res) => {
   } catch (err) {
     console.error("Erro ao listar usuários atribuíveis:", err);
     return res.status(500).json({ message: "Erro ao listar usuários" });
+  }
+};
+
+exports.adminApproveAllUsers = async (req, res) => {
+  try {
+    const [updatedRows] = await User.update(
+      {
+        aprovado: true,
+        aprovado_por: Number(req.userId),
+        aprovado_em: new Date(),
+      },
+      {
+        where: { aprovado: false },
+      }
+    );
+
+    return res.json({ updated: updatedRows });
+  } catch (err) {
+    console.error("Erro ao aprovar todos os usuários:", err);
+    return res.status(500).json({ message: "Erro ao aprovar todos os usuários" });
   }
 };
