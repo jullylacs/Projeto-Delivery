@@ -24,6 +24,7 @@ export default function Sidebar({ isOpen = true }) {
         minWidth: "250px",
         flexShrink: 0,
         height: "100vh", // altura completa da tela
+        boxSizing: "border-box",
         background: "linear-gradient(180deg, #2c0b52, #4f238f)", // gradiente roxo
         color: "#fff",
         display: "flex",

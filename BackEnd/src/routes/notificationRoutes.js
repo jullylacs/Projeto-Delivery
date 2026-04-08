@@ -6,6 +6,6 @@ router.post("/sync", auth, controller.syncMine);
 router.get("/", auth, controller.listMine);
 router.patch("/read-all", auth, controller.markAllAsRead);
 router.patch("/:id/read", auth, controller.markOneAsRead);
-router.delete("/read", auth, controller.clearRead);
+router.patch("/clear-read", auth, controller.clearRead);
 
 module.exports = router;

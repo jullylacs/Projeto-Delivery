@@ -56,42 +56,9 @@ function MainLayout() {
   }, [isSidebarOpen]);
 
   return (
-    <div style={{ display: "flex", background: "#f2efff", color: "#1f2b46", width: "100%", minWidth: 0, overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", height: "100vh", background: "#f2efff", color: "#1f2b46", width: "100%", minWidth: 0, overflow: "hidden", position: "relative" }}>
       <LastRouteTracker />
       {/* Layout principal: sidebar à esquerda e conteúdo à direita */}
-
-      <button
-        type="button"
-        onClick={() => setIsSidebarOpen((prev) => !prev)}
-        aria-label={isSidebarOpen ? "Ocultar menu lateral" : "Mostrar menu lateral"}
-        style={{
-          position: "fixed",
-          top: 82,
-          left: isSidebarOpen ? 262 : 12,
-          width: 42,
-          height: 42,
-          borderRadius: "50%",
-          border: "1px solid rgba(120, 84, 214, 0.28)",
-          background: "linear-gradient(135deg, #ffffff, #f2eaff)",
-          color: "#4a2ea6",
-          boxShadow: "0 8px 20px rgba(78, 47, 156, 0.22)",
-          cursor: "pointer",
-          zIndex: 3300,
-          fontSize: 18,
-          fontWeight: 700,
-          transition: "left 320ms ease, transform 180ms ease, box-shadow 180ms ease",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-1px) scale(1.03)";
-          e.currentTarget.style.boxShadow = "0 12px 24px rgba(78, 47, 156, 0.28)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0) scale(1)";
-          e.currentTarget.style.boxShadow = "0 8px 20px rgba(78, 47, 156, 0.22)";
-        }}
-      >
-        {isSidebarOpen ? "←" : "☰"}
-      </button>
 
       <div
         style={{
@@ -107,7 +74,7 @@ function MainLayout() {
 
       <div style={{ flex: 1, minWidth: 0, background: "#f2efff", color: "#1f2b46", overflow: "hidden" }}>
         {/* Área principal: Header no topo e conteúdo abaixo */}
-        <Header />
+        <Header onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
 
         <div
           style={{

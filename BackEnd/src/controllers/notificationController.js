@@ -407,7 +407,7 @@ exports.listMine = async (req, res) => {
     const limit = Number.isNaN(limitRaw) ? 80 : Math.min(Math.max(limitRaw, 1), 200);
 
     const rows = await Notification.findAll({
-      where: { usuario_id: userId },
+      where: { usuario_id: userId, limpa: false },
       order: [["createdAt", "DESC"], ["id", "DESC"]],
       limit,
     });
@@ -459,11 +459,14 @@ exports.markAllAsRead = async (req, res) => {
 exports.clearRead = async (req, res) => {
   try {
     const userId = Number(req.userId);
-    const deleted = await Notification.destroy({
-      where: { usuario_id: userId, lida: true },
-    });
+    const now = new Date();
 
-    return res.json({ deleted });
+    const [cleared] = await Notification.update(
+      { limpa: true, limpaEm: now },
+      { where: { usuario_id: userId, lida: true, limpa: false } }
+    );
+
+    return res.json({ cleared });
   } catch (err) {
     console.error("Erro ao limpar notificações lidas:", err);
     return res.status(500).json({ message: "Erro ao limpar notificações" });

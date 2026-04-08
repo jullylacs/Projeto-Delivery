@@ -31,6 +31,15 @@ const Notification = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    limpa: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    limpaEm: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     usuario_id: {
       type: DataTypes.INTEGER,
       allowNull: false,

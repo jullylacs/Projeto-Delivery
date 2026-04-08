@@ -1267,10 +1267,13 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
   // useDraggable do dnd-kit para tornar o card arrastável
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: getCardKey(card) });
   const [isHovered, setIsHovered] = useState(false);
+  const safeTransformX = Number.isFinite(transform?.x) ? transform.x : 0;
+  const safeTransformY = Number.isFinite(transform?.y) ? transform.y : 0;
+  const draggableTransform = transform ? `translate3d(${safeTransformX}px, ${safeTransformY}px, 0)` : undefined;
   
   // Estilo dinâmico baseado no estado de arrasto e hover
   const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: draggableTransform,
     opacity: isDragging ? 0.5 : 1, // Reduz opacidade durante arrasto
     transition: isDragging ? "none" : styles.cardItem.transition,
     willChange: "transform",
@@ -1568,9 +1571,9 @@ export default function Board() {
         }
 
         try {
-          // Envia requisição PUT priorizando colunaId como fonte de verdade
+          // Envia requisição PUT priorizando coluna_id como fonte de verdade
           const response = await api.put(`/cards/${getCardKey(movedCard)}`, {
-            colunaId: targetColumn?.id,
+            coluna_id: targetColumn?.id,
           });
           const updatedCard = response.data;
           
@@ -2276,7 +2279,7 @@ export default function Board() {
     }
 
     try {
-      await handleSaveCardChanges({ vendedorId: Number(vendorEdit) });
+      await handleSaveCardChanges({ vendedor_id: Number(vendorEdit) });
       setError("");
     } catch {
       setError("Erro ao atualizar vendedor.");
@@ -4333,8 +4336,13 @@ export default function Board() {
               vendorOptions={vendorOptions}
               onSave={async (updatedCard) => {
                 try {
-                  // Envia atualização para API
-                  const response = await api.put(`/cards/${getCardKey(editingCard)}`, updatedCard);
+                  // Envia atualização para API remapeando vendedorId → vendedor_id
+                  const payload = { ...updatedCard };
+                  if (payload.vendedorId !== undefined && payload.vendedorId !== "") {
+                    payload.vendedor_id = Number(payload.vendedorId);
+                  }
+                  delete payload.vendedorId;
+                  const response = await api.put(`/cards/${getCardKey(editingCard)}`, payload);
                   const savedCard = response.data;
                   
                   // Atualiza estado dos cards

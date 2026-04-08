@@ -18,7 +18,7 @@ const normalizeAvatar = (value) => {
 
 
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
-export default function Header() {
+export default function Header({ onToggleSidebar, isSidebarOpen }) {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false); // Controla visibilidade do menu dropdown
@@ -29,7 +29,6 @@ export default function Header() {
   const [user, setUser] = useState(null); // Armazena dados do usuário logado
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const userMenuRef = useRef(null);
-  const notificationsRef = useRef(null);
 
   const avatarSrc = normalizeAvatar(user?.avatar);
   const hasAvatar = avatarSrc.length > 0;
@@ -87,7 +86,7 @@ export default function Header() {
 
   const clearReadNotifications = async () => {
     try {
-      await api.delete("/notifications/read");
+      await api.patch("/notifications/clear-read");
       setNotifications((prev) => prev.filter((item) => !item.readAt));
     } catch (error) {
       logNotificationLoadError(error);
@@ -170,10 +169,6 @@ export default function Header() {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowMenu(false);
       }
-
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
-        setShowNotifications(false);
-      }
     };
 
     document.addEventListener("mousedown", onClickOutside);
@@ -199,6 +194,197 @@ export default function Header() {
   };
 
   return (
+    <>
+      {/* Backdrop do painel de notificações */}
+      {showNotifications && (
+        <div
+          onClick={() => setShowNotifications(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 3099,
+            background: "rgba(0,0,0,0.28)",
+          }}
+        />
+      )}
+
+      {/* Painel lateral de notificações */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "400px",
+          maxWidth: "100vw",
+          height: "100vh",
+          background: "#fff",
+          boxShadow: "-4px 0 28px rgba(76,29,149,0.18)",
+          zIndex: 3100,
+          display: "flex",
+          flexDirection: "column",
+          transform: showNotifications ? "translateX(0)" : "translateX(110%)",
+          transition: "transform 320ms cubic-bezier(0.4,0,0.2,1)",
+          visibility: showNotifications ? "visible" : "hidden",
+        }}
+      >
+        {/* Cabeçalho do painel */}
+        <div
+          style={{
+            padding: "16px 16px 12px",
+            borderBottom: "1px solid #efe8ff",
+            background: "#f8f5ff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: "14px", color: "#4e3ca4", fontWeight: 700 }}>
+            🔔 Notificações ({notifications.length})
+          </span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              style={{
+                border: "1px solid #ddd2ff",
+                background: "#fff",
+                color: "#4d3ba2",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: "4px 10px",
+              }}
+            >
+              Marcar lidas
+            </button>
+            <button
+              type="button"
+              onClick={clearReadNotifications}
+              style={{
+                border: "1px solid #ffd8d8",
+                background: "#fff6f6",
+                color: "#b42318",
+                borderRadius: 6,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: "4px 10px",
+              }}
+            >
+              Limpar lidas
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNotifications(false)}
+              style={{
+                border: "none",
+                background: "rgba(0,0,0,0.06)",
+                color: "#555",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: "4px 8px",
+                lineHeight: 1,
+              }}
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Lista de notificações */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {notificationsLoading ? (
+            <div style={{ padding: "20px 16px", color: "#7b6cae", fontSize: "13px" }}>
+              Carregando notificações...
+            </div>
+          ) : notificationsError ? (
+            <div style={{ padding: "20px 16px", color: "#b42318", fontSize: "13px" }}>
+              {notificationsError}
+            </div>
+          ) : notifications.length === 0 ? (
+            <div style={{ padding: "40px 16px", color: "#7b6cae", fontSize: "13px", textAlign: "center" }}>
+              Sem notificações no momento.
+            </div>
+          ) : (
+            notifications.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  background: item.readAt ? "#fff" : "#f6f1ff",
+                  borderBottom: "1px solid #f0ebff",
+                  padding: "12px 16px",
+                  opacity: item.readAt ? 0.82 : 1,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <strong style={{ color: "#3f3292", fontSize: "13px", lineHeight: 1.3 }}>{item.title}</strong>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: item.priority === "high" ? "#d32f2f" : "#7b54e8",
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.kind === "mention" ? "MENÇÃO" : item.priority === "high" ? "ALTO" : "MÉDIO"}
+                  </span>
+                </div>
+                <div style={{ color: "#685d95", fontSize: "12px", marginTop: 5, lineHeight: 1.45 }}>{item.message}</div>
+                <div style={{ color: "#8d83b3", fontSize: "11px", marginTop: 6, display: "flex", justifyContent: "space-between" }}>
+                  <span>{item.when.toLocaleDateString("pt-BR")}</span>
+                  <span>{item.readAt ? "Lida" : "Não lida"}</span>
+                </div>
+                <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  {!item.readAt && (
+                    <button
+                      type="button"
+                      onClick={() => markOneAsRead(item.id)}
+                      style={{
+                        border: "1px solid #ddd2ff",
+                        background: "#f8f5ff",
+                        color: "#4d3ba2",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        padding: "4px 10px",
+                      }}
+                    >
+                      Marcar lida
+                    </button>
+                  )}
+                  {item.cardId !== undefined && item.cardId !== null && (
+                    <button
+                      type="button"
+                      onClick={() => openNotificationCard(item)}
+                      style={{
+                        border: "1px solid #d7ccff",
+                        background: "#ede7ff",
+                        color: "#3f3292",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        padding: "4px 10px",
+                      }}
+                    >
+                      Ir para card
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
     <div
       style={{
         height: "70px",
@@ -210,218 +396,96 @@ export default function Header() {
         padding: "0 30px",
         borderBottom: "1px solid rgba(255,255,255,0.1)", // Linha inferior
         color: "#fff",
-        position: "relative", // Necessário para posicionar dropdown
+        position: "relative",
         zIndex: 3000,
       }}
     >
       {/* Título */}
-      <h2
-        style={{
-          margin: 0,
-          fontWeight: "500",
-          letterSpacing: "0.5px"
-        }}
-      >
-        🚀 NVX Fibra LTDA
-      </h2>
+      {/* Botão toggle sidebar + Título */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label={isSidebarOpen ? "Ocultar menu lateral" : "Mostrar menu lateral"}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "8px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(255,255,255,0.1)",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+          >
+            ☰
+          </button>
+        )}
+        <h2
+          style={{
+            margin: 0,
+            fontWeight: "500",
+            letterSpacing: "0.5px"
+          }}
+        >
+          🚀 NVX Fibra LTDA
+        </h2>
+      </div>
 
       {/* Área direita contendo notificações e menu do usuário */}
       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
         {/* Ícone de Notificação */}
-        <div ref={notificationsRef} style={{ position: "relative" }}>
-          <div
-            onClick={() => {
-              setShowNotifications((prev) => !prev);
-              setShowMenu(false);
-            }}
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.1)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              transition: "0.2s",
-              position: "relative",
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"} // Hover
-            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"} // Normal
-          >
-            🔔
-            {unreadCount > 0 && (
-              <span
-                style={{
-                  position: "absolute",
-                  top: "-3px",
-                  right: "-3px",
-                  minWidth: "18px",
-                  height: "18px",
-                  borderRadius: "9px",
-                  background: "#ff4d6d",
-                  color: "#fff",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 4px",
-                  border: "1px solid rgba(255,255,255,0.4)",
-                }}
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </div>
-
-          {showNotifications && (
-            <div
+        <div
+          onClick={() => {
+            setShowNotifications((prev) => !prev);
+            setShowMenu(false);
+          }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            background: showNotifications ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "0.2s",
+            position: "relative",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+          onMouseLeave={(e) => e.currentTarget.style.background = showNotifications ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.1)"}
+        >
+          🔔
+          {unreadCount > 0 && (
+            <span
               style={{
                 position: "absolute",
-                top: "50px",
-                right: "0",
-                background: "#fff",
-                borderRadius: "10px",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                minWidth: "520px",
-                maxWidth: "680px",
-                zIndex: 2200,
-                overflow: "hidden",
+                top: "-3px",
+                right: "-3px",
+                minWidth: "18px",
+                height: "18px",
+                borderRadius: "9px",
+                background: "#ff4d6d",
+                color: "#fff",
+                fontSize: "10px",
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 4px",
+                border: "1px solid rgba(255,255,255,0.4)",
               }}
             >
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderBottom: "1px solid #efe8ff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                <span style={{ fontSize: "13px", color: "#4e3ca4", fontWeight: 700 }}>
-                  Notificações ({notifications.length})
-                </span>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={markAllAsRead}
-                    style={{
-                      border: "1px solid #ddd2ff",
-                      background: "#f8f5ff",
-                      color: "#4d3ba2",
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                    }}
-                  >
-                    Marcar lidas
-                  </button>
-                  <button
-                    type="button"
-                    onClick={clearReadNotifications}
-                    style={{
-                      border: "1px solid #ffd8d8",
-                      background: "#fff6f6",
-                      color: "#b42318",
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      padding: "4px 8px",
-                    }}
-                  >
-                    Limpar lidas
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ maxHeight: "620px", overflowY: "auto" }}>
-                {notificationsLoading ? (
-                  <div style={{ padding: "14px", color: "#7b6cae", fontSize: "13px" }}>
-                    Carregando notificações...
-                  </div>
-                ) : notificationsError ? (
-                  <div style={{ padding: "14px", color: "#b42318", fontSize: "13px" }}>
-                    {notificationsError}
-                  </div>
-                ) : notifications.length === 0 ? (
-                  <div style={{ padding: "14px", color: "#7b6cae", fontSize: "13px" }}>
-                    Sem notificações no momento.
-                  </div>
-                ) : (
-                  notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        border: "none",
-                        background: item.readAt ? "#fff" : "#f6f1ff",
-                        borderBottom: "1px solid #f3edff",
-                        padding: "10px 12px",
-                        opacity: item.readAt ? 0.82 : 1,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                        <strong style={{ color: "#3f3292", fontSize: "12px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title}</strong>
-                        <span style={{ fontSize: "10px", color: item.priority === "high" ? "#d32f2f" : "#7b54e8", fontWeight: 700 }}>
-                          {item.kind === "mention" ? "MENÇÃO" : item.priority === "high" ? "ALTO" : "MÉDIO"}
-                        </span>
-                      </div>
-                      <div style={{ color: "#685d95", fontSize: "12px", marginTop: 4 }}>{item.message}</div>
-                      <div style={{ color: "#8d83b3", fontSize: "11px", marginTop: 4, display: "flex", justifyContent: "space-between" }}>
-                        <span>{item.when.toLocaleDateString("pt-BR")}</span>
-                        <span>{item.readAt ? "Lida" : "Não lida"}</span>
-                      </div>
-
-                      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                        {!item.readAt && (
-                          <button
-                            type="button"
-                            onClick={() => markOneAsRead(item.id)}
-                            style={{
-                              border: "1px solid #ddd2ff",
-                              background: "#f8f5ff",
-                              color: "#4d3ba2",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              padding: "4px 8px",
-                            }}
-                          >
-                            Marcar lida
-                          </button>
-                        )}
-
-                        {item.cardId !== undefined && item.cardId !== null && (
-                          <button
-                            type="button"
-                            onClick={() => openNotificationCard(item)}
-                            style={{
-                              border: "1px solid #d7ccff",
-                              background: "#ede7ff",
-                              color: "#3f3292",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                              padding: "4px 8px",
-                            }}
-                          >
-                            Ir para card
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           )}
         </div>
 
@@ -570,5 +634,6 @@ export default function Header() {
 
       </div>
     </div>
+    </>
   );
 }
