@@ -6,22 +6,30 @@ import api from "../services/api"; // Instância de API para comunicação com b
 export default function Login() {
   const [email, setEmail] = useState(""); // Estado para armazenar o email digitado
   const [senha, setSenha] = useState(""); // Estado para armazenar a senha digitada
-  const [perfil, setPerfil] = useState("comercial"); // Estado para armazenar o perfil selecionado
   const [loading, setLoading] = useState(false); // Estado que indica se a requisição está em andamento
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate(); // Hook para redirecionar usuário após login
+
+  const getApiErrorMessage = (error, fallback) => {
+    const data = error?.response?.data;
+    if (typeof data === "string") return data;
+    if (data?.message) return data.message;
+    if (data?.error) return data.error;
+    return fallback;
+  };
 
   // Função que realiza login via API
   const login = async () => {
     try {
       setLoading(true); // Ativa loading
-      const res = await api.post("/users/login", { email, senha, perfil }); // Chamada POST para login
+      setErrorMessage("");
+      const res = await api.post("/users/login", { email, senha }); // Chamada POST para login
       localStorage.setItem("token", res.data.token); // Salva token no localStorage
       localStorage.setItem("user", JSON.stringify(res.data.user)); // Salva dados do usuário no localStorage
-      alert("Logado com sucesso!"); // Alerta de sucesso
       navigate("/dashboard"); // Redireciona para dashboard
     } catch (error) {
       // Caso ocorra erro, exibe mensagem apropriada
-      alert("Falha no login: " + (error.response?.data?.message || "Erro ao conectar"));
+      setErrorMessage("Falha no login: " + getApiErrorMessage(error, "Erro ao conectar"));
     } finally {
       setLoading(false); // Desativa loading independente do resultado
     }
@@ -41,10 +49,10 @@ export default function Login() {
       alignItems: "center",
       justifyContent: "center",
       height: "100vh", // Ocupa toda a altura da tela
-      background: "linear-gradient(135deg, #240046, #3c096c)" // Gradiente de fundo
+      background: "linear-gradient(135deg, #2a0a4a, #4b1f8a)" // Gradiente de fundo
     }}>
       <div style={{
-        background: "rgba(255,255,255,0.05)", // Fundo semi-transparente
+        background: "rgba(255,255,255,0.07)", // Fundo semi-transparente
         padding: "50px", // Espaçamento interno
         borderRadius: "20px", // Bordas arredondadas
         border: "1px solid rgba(255,255,255,0.1)", // Borda sutil
@@ -57,6 +65,21 @@ export default function Login() {
         {/* Título do sistema */}
         <h1 style={{ marginBottom: "30px", fontSize: "32px" }}>🚀 Delivery</h1>
         <p style={{ marginBottom: "30px", opacity: 0.8 }}>Sistema de Gerenciamento</p>
+
+        {errorMessage && (
+          <div style={{
+            padding: "10px 12px",
+            marginBottom: "16px",
+            borderRadius: "8px",
+            background: "rgba(239, 68, 68, 0.18)",
+            border: "1px solid rgba(239, 68, 68, 0.5)",
+            color: "#ffd1d8",
+            fontSize: "13px",
+            textAlign: "left"
+          }}>
+            {errorMessage}
+          </div>
+        )}
         
         {/* Campo de email */}
         <input
@@ -98,32 +121,6 @@ export default function Login() {
           }}
         />
 
-        {/* Select de perfil */}
-        <select
-          value={perfil} // Valor vinculado ao estado perfil
-          onChange={e => setPerfil(e.target.value)} // Atualiza estado ao selecionar
-          style={{
-            width: "100%",
-            padding: "12px 15px",
-            marginBottom: "20px",
-            borderRadius: "8px",
-            border: "1px solid rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.1)",
-            color: "#fff",
-            fontSize: "14px",
-            boxSizing: "border-box",
-            cursor: "pointer"
-          }}
-        >
-          {/* Opções de perfil */}
-          <option value="comercial">👔 Comercial</option>
-          <option value="operacional">📋 Operacional</option>
-          <option value="tecnico">🔧 Técnico</option>
-          <option value="gestor">👨‍💼 Gestor</option>
-          <option value="delivery">🚚 Delivery</option>
-          <option value="admin">🔐 Admin</option>
-        </select>
-        
         {/* Botão de login */}
         <button
           onClick={login} // Chama função de login ao clicar
@@ -133,7 +130,7 @@ export default function Login() {
             padding: "12px 15px",
             borderRadius: "8px",
             border: "none",
-            background: "linear-gradient(135deg, #9d4edd, #c77dff)",
+            background: "linear-gradient(135deg, #7a4dff, #5a30ff)",
             color: "#fff",
             fontSize: "16px",
             fontWeight: "bold",
@@ -156,7 +153,7 @@ export default function Login() {
         }}>
           Não tem conta? 
           <Link to="/register" style={{
-            color: "#c77dff",
+            color: "#d8c6ff",
             textDecoration: "none",
             fontWeight: "bold",
             marginLeft: "5px",

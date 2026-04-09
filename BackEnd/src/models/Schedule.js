@@ -1,44 +1,60 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Schema de agendamento de instalações
-const ScheduleSchema = new mongoose.Schema({
+// 🔹 Model de agendamentos de instalações
+const Schedule = sequelize.define("Schedule", {
+
+  // Título resumido da atividade (usado na Agenda)
+  titulo: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  // Notas livres da atividade
+  notas: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
 
   // Referência ao card (demanda) vinculada ao agendamento
-  card: {
-    type: mongoose.Schema.Types.ObjectId, // ID do documento
-    ref: "Card" // Relaciona com a coleção "Card"
+  // Equivalente ao: card: { type: ObjectId, ref: "Card" } do Mongoose
+  card_id: {
+    type: DataTypes.INTEGER,
+    references: { model: "cards", key: "id" },
+    onDelete: "CASCADE",
+    allowNull: true
   },
 
   // Referência ao técnico responsável pela execução
-  tecnico: {
-    type: mongoose.Schema.Types.ObjectId, // ID do técnico
-    ref: "Technician" // Relaciona com a coleção "Technician"
+  // Equivalente ao: tecnico: { type: ObjectId, ref: "Technician" } do Mongoose
+  tecnico_id: {
+    type: DataTypes.INTEGER,
+    references: { model: "technicians", key: "id" },
+    onDelete: "SET NULL",
+    allowNull: true
   },
 
   // Data da instalação
-  data: Date,
+  data: DataTypes.DATE,
 
   // Horário específico (ex: "08:00")
-  horario: String,
+  horario: DataTypes.STRING,
 
   // Janela de atendimento (ex: "08h–12h")
-  janela: String,
+  janela: DataTypes.STRING,
 
-  // Status do agendamento
+  // Status do agendamento com valores controlados
   status: {
-    type: String,
-    // Define valores permitidos (evita inconsistência)
-    enum: ["pendente", "confirmado", "reagendado", "em_execucao", "finalizado"]
+    type: DataTypes.ENUM("pendente", "confirmado", "reagendado", "em_execucao", "finalizado"),
+    defaultValue: "pendente"
   },
 
   // Motivo do reagendamento (usado quando status = reagendado)
-  motivoReagendamento: String
+  motivoReagendamento: DataTypes.TEXT
 
-}, { 
-  timestamps: true // Adiciona automaticamente:
-  // createdAt -> data de criação
-  // updatedAt -> última atualização
+}, {
+  tableName: "schedules",
+  timestamps: true // createdAt e updatedAt automáticos
 });
 
-// Exporta o model
-module.exports = mongoose.model("Schedule", ScheduleSchema);
+module.exports = Schedule;

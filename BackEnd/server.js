@@ -1,24 +1,84 @@
-const app = require("./src/app"); // Importa a aplicação Express
-const http = require("http");     // Core do Node para criar servidor HTTP
-const { Server } = require("socket.io"); // Importa Socket.IO para tempo real
+require("dotenv").config();
 
-// 🔹 Cria servidor HTTP usando Express
+const app = require("./src/app");
+const http = require("http");
+const { Server } = require("socket.io");
+const { sequelize } = require("./src/models");
+
+function normalizeOrigin(origin) {
+  return String(origin || "").trim().replace(/\/$/, "").toLowerCase();
+}
+
+function getAllowedOrigins() {
+  const raw = process.env.CORS_ALLOWED_ORIGINS || process.env.FRONTEND_URL || "http://localhost:5173";
+  return [...new Set(
+    raw
+      .split(",")
+      .map((value) => normalizeOrigin(value))
+      .filter(Boolean)
+  )];
+}
+
+const allowedOrigins = getAllowedOrigins();
+
+// Cria servidor HTTP usando Express
 const server = http.createServer(app);
 
-// 🔹 Inicializa Socket.IO
+// 🔒 Configuração segura de Socket.IO
 const io = new Server(server, {
-  cors: { origin: "*" } // Permite qualquer front-end acessar o WebSocket
+  cors: {
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedRequestOrigin = normalizeOrigin(origin);
+      if (allowedOrigins.includes(normalizedRequestOrigin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ["websocket", "polling"]
 });
 
-// 🔹 Evento de conexão do cliente
+// Middleware de autenticação para Socket.IO
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    return next(new Error("Autenticação necessária"));
+  }
+  next();
+});
+
+// Evento de conexão do cliente
 io.on("connection", (socket) => {
-  console.log("Cliente conectado");
+  console.log("Cliente conectado:", socket.id);
 
-  // Aqui você pode adicionar eventos:
-  // ex: socket.on("novoCard", data => { ... })
+  socket.on("disconnect", () => {
+    console.log("Cliente desconectado:", socket.id);
+  });
 });
 
-// 🔹 Inicia o servidor na porta 3000
-server.listen(3000, () => {
-  console.log("Servidor rodando na porta 3000");
-});
+// Inicia o servidor apenas se o banco estiver conectado
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "localhost";
+
+async function startServer() {
+  try {
+    await sequelize.authenticate();
+    console.log("Banco de dados conectado com sucesso.");
+
+    server.listen(PORT, HOST, () => {
+      console.log(`Servidor rodando em http://${HOST}:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Falha ao conectar no banco de dados:", error.message);
+    process.exit(1);
+  }
+}
+
+startServer();

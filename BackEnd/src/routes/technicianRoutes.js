@@ -1,14 +1,28 @@
+// Roteador de técnicos
 const router = require("express").Router();
 const Technician = require("../models/Technician");
+const auth = require("../controllers/middleware/auth");
 
-router.post("/", async (req, res) => {
-  const tech = await Technician.create(req.body);
-  res.json(tech);
+// POST /technicians — cadastra um novo técnico
+router.post("/", auth, async (req, res) => {
+  try {
+    // Cria o técnico com os dados enviados no body
+    const tech = await Technician.create(req.body);
+    res.json(tech);
+  } catch (error) {
+    res.status(500).json({ message: "Erro ao criar técnico", error: error.message });
+  }
 });
 
-router.get("/", async (req, res) => {
-  const techs = await Technician.find();
-  res.json(techs);
+// GET /technicians — retorna todos os técnicos cadastrados
+router.get("/", auth, async (req, res) => {
+  try {
+    // Busca todos os registros da tabela de técnicos
+    const techs = await Technician.findAll();
+    res.json(techs);
+  } catch (error) {
+    res.status(500).json({ message: "Erro ao buscar técnicos", error: error.message });
+  }
 });
 
 module.exports = router;

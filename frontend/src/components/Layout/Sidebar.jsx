@@ -3,28 +3,38 @@ import { useNavigate, useLocation } from "react-router-dom";
 // useLocation: fornece informação da rota atual
 
 // Componente da barra lateral com menu de navegação
-export default function Sidebar() {
+export default function Sidebar({ isOpen = true }) {
   const navigate = useNavigate(); // Hook para redirecionamento de rotas
   const location = useLocation(); // Hook para detectar a rota atual
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
 
   // Itens do menu com nome, ícone e caminho
   const menuItems = [
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
     { name: "Agenda", icon: "📅", path: "/agenda" },
+    ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
   ];
 
   return (
     <div
       style={{
         width: "250px", // largura fixa da sidebar
+        minWidth: "250px",
+        flexShrink: 0,
         height: "100vh", // altura completa da tela
-        background: "linear-gradient(180deg, #240046, #3c096c)", // gradiente roxo
+        boxSizing: "border-box",
+        background: "linear-gradient(180deg, #2c0b52, #4f238f)", // gradiente roxo
         color: "#fff",
         display: "flex",
         flexDirection: "column",
         padding: "25px 15px",
-        borderRight: "1px solid rgba(255,255,255,0.05)" // linha separando do conteúdo
+        borderRight: "1px solid rgba(255,255,255,0.05)", // linha separando do conteúdo
+        transform: isOpen ? "translateX(0)" : "translateX(-100%)",
+        opacity: isOpen ? 1 : 0,
+        transition: "transform 320ms ease, opacity 240ms ease",
+        pointerEvents: isOpen ? "auto" : "none",
       }}
     >
       
@@ -73,7 +83,7 @@ export default function Sidebar() {
                 borderRadius: "12px",
                 cursor: "pointer",
                 background: isActive
-                  ? "linear-gradient(90deg, #7a2cbf8f, #9d4edd6c)" // ativo
+                  ? "linear-gradient(90deg, #6f3dde, #8a5dff)" // ativo
                   : "transparent", // inativo
                 transition: "0.2s",
                 fontSize: "14px"

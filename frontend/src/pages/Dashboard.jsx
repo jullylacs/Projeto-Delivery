@@ -14,6 +14,54 @@ export default function Dashboard() {
   // Estado para armazenar mensagens de erro
   const [error, setError] = useState("");
 
+  const loadingStyles = {
+    container: {
+      padding: "24px",
+      background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
+      minHeight: "90vh",
+    },
+    card: {
+      background: "#fff",
+      border: "1px solid rgba(108,59,255,0.12)",
+      borderRadius: "14px",
+      padding: "18px",
+      boxShadow: "0 8px 18px rgba(62,44,158,0.08)",
+      marginBottom: "16px",
+    },
+    line: {
+      height: "14px",
+      borderRadius: "8px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "10px",
+    },
+    title: {
+      height: "28px",
+      width: "260px",
+      borderRadius: "10px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "10px",
+    },
+    subtitle: {
+      height: "14px",
+      width: "420px",
+      maxWidth: "100%",
+      borderRadius: "8px",
+      background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)",
+      backgroundSize: "200% 100%",
+      animation: "dashPulse 1.4s ease-in-out infinite",
+      marginBottom: "18px",
+    },
+    grid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+      gap: "16px",
+    },
+  };
+
   // useEffect que executa na montagem do componente para buscar os cards via API
   useEffect(() => {
     api.get("/cards") // Requisição GET para endpoint "/cards"
@@ -92,16 +140,37 @@ export default function Dashboard() {
   // Renderiza loading enquanto dados são carregados
   if (loading) {
     return (
-      <div style={{ padding: "22px" }}>
-        <h2>Dashboard</h2>
-        <p>Carregando dados...</p>
+      <div style={loadingStyles.container}>
+        <style>
+          {`@keyframes dashPulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}
+        </style>
+        <div style={loadingStyles.title} />
+        <div style={loadingStyles.subtitle} />
+
+        <div style={loadingStyles.grid}>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "45%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "30%" }} />
+            <div style={{ ...loadingStyles.line, width: "65%" }} />
+          </div>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "52%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "28%" }} />
+            <div style={{ ...loadingStyles.line, width: "75%" }} />
+          </div>
+          <div style={loadingStyles.card}>
+            <div style={{ ...loadingStyles.line, width: "48%" }} />
+            <div style={{ ...loadingStyles.line, height: "34px", width: "24%" }} />
+            <div style={{ ...loadingStyles.line, width: "58%" }} />
+          </div>
+        </div>
       </div>
     );
   }
 
   // Estilos inline do dashboard
   const styles = {
-    container: { padding: "24px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "90vh" },
+    container: { padding: "24px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "90vh", color: "#1f2b46" },
     header: { marginBottom: "24px" },
     title: { margin: 0, color: "#3c2f9f", fontSize: "24px", fontWeight: "800" },
     subtitle: { color: "#5f5a88", fontSize: "14px", marginTop: "4px" },
@@ -111,7 +180,7 @@ export default function Dashboard() {
     cardValue: { fontSize: "32px", fontWeight: "800", color: "#3c2f9f", marginBottom: "8px" },
     alertBox: { padding: "12px", borderRadius: "8px", marginBottom: "8px", fontSize: "13px", fontWeight: "500" },
     alertRed: { backgroundColor: "#ffebee", borderLeft: "4px solid #d32f2f", color: "#c62828", paddingLeft: "12px" },
-    alertOrange: { backgroundColor: "#fff3e0", borderLeft: "4px solid #f57c00", color: "#e65100", paddingLeft: "12px" },
+    alertOrange: { backgroundColor: "#f3edff", borderLeft: "4px solid #7b54e8", color: "#5f3fb8", paddingLeft: "12px" },
     chartRow: { display: "flex", alignItems: "flex-end", gap: "8px", padding: "16px 0", height: "200px" },
     chartBar: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" },
     barFill: { width: "100%", borderRadius: "12px 12px 0 0", transition: "height 0.3s ease", minHeight: "4px" },
@@ -140,7 +209,7 @@ export default function Dashboard() {
                 <div style={{ ...styles.card, borderLeft: "4px solid #d32f2f" }}>
                   <div style={styles.cardTitle}>🔴 Violações de SLA</div>
                   <div style={styles.cardValue}>{stats.slaViolations}</div>
-                  <div style={styles.alertBox + { ...styles.alertRed }}>
+                  <div style={{ ...styles.alertBox, ...styles.alertRed }}>
                     {stats.slaViolations} card(s) vencido(s) e não concluído(s)
                   </div>
                 </div>
@@ -149,7 +218,7 @@ export default function Dashboard() {
                 <div style={{ ...styles.card, borderLeft: "4px solid #f57c00" }}>
                   <div style={styles.cardTitle}>🟠 Avisos de SLA</div>
                   <div style={styles.cardValue}>{stats.slaWarnings}</div>
-                  <div style={styles.alertBox + { ...styles.alertOrange }}>
+                  <div style={{ ...styles.alertBox, ...styles.alertOrange }}>
                     {stats.slaWarnings} card(s) vence(m) nos próximos 3 dias
                   </div>
                 </div>
@@ -181,7 +250,7 @@ export default function Dashboard() {
             <div style={styles.card}>
               <div style={styles.cardTitle}>🎯 Concluído</div>
               <div style={styles.cardValue}>{stats.concluido}</div>
-              <div style={{ fontSize: "12px", color: "#4caf50", fontWeight: "600" }}>
+              <div style={{ fontSize: "12px", color: "#5a3fd0", fontWeight: "600" }}>
                 de {stats.total} cards
               </div>
             </div>
@@ -190,7 +259,7 @@ export default function Dashboard() {
             <div style={styles.card}>
               <div style={styles.cardTitle}>⏳ Em Andamento</div>
               <div style={styles.cardValue}>{stats.restante}</div>
-              <div style={{ fontSize: "12px", color: "#ff9800", fontWeight: "600" }}>
+              <div style={{ fontSize: "12px", color: "#7b54e8", fontWeight: "600" }}>
                 {stats.total > 0 ? ((stats.restante / stats.total) * 100).toFixed(1) : "0"}% do total
               </div>
             </div>
@@ -213,11 +282,11 @@ export default function Dashboard() {
                   };
                   const colors = {
                     novo: "#9e9e9e",
-                    analise: "#2196f3",
-                    agendamento: "#ff9800",
+                    analise: "#8b64ff",
+                    agendamento: "#7b54e8",
                     agendado: "#673ab7",
-                    execucao: "#f44336",
-                    concluido: "#4caf50",
+                    execucao: "#6a43d8",
+                    concluido: "#5a30ff",
                     inativo: "#bdbdbd",
                   };
                   const maxHeight = 180;

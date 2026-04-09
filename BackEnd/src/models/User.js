@@ -1,29 +1,57 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Define o schema de usuários do sistema
-const UserSchema = new mongoose.Schema({
+// 🔹 Model de usuários do sistema
+const User = sequelize.define("User", {
 
   // Nome completo do usuário
-  nome: String,
+  nome: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
 
-  // Email do usuário (usado para login e contato)
-  email: String,
+  // Email único (usado para login)
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
 
-  // Senha do usuário (ATUALMENTE em texto puro — muito perigoso!)
-  senha: String,
+  // Senha (hash recomendado — manter bcrypt em implementação futura)
+  senha: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
 
-  // Perfil/role do usuário (define permissões)
+  // Perfil/role do usuário
   perfil: {
-    type: String,
-    // Valores permitidos
-    enum: ["comercial", "operacional", "tecnico", "gestor", "admin"]
-  }
+    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"),
+    defaultValue: "convidado"
+  },
 
-}, { 
-  timestamps: true // Adiciona automaticamente:
-  // createdAt -> data de criação
-  // updatedAt -> última atualização
+  // Controle de aprovação de novos cadastros
+  aprovado: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  aprovado_por: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+  aprovado_em: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+
+  // Campos adicionais usados no updateUserProfile
+  telefone: DataTypes.STRING,
+  departamento: DataTypes.STRING,
+  avatar: DataTypes.TEXT
+
+}, {
+  tableName: "users",
+  timestamps: true // createdAt e updatedAt automáticos
 });
 
-// Exporta o model para uso no sistema
-module.exports = mongoose.model("User", UserSchema);
+module.exports = User;

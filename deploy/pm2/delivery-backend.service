@@ -1,0 +1,21 @@
+[Unit]
+Description=Delivery Backend (PM2)
+After=network.target
+
+[Service]
+Type=forking
+User=www-data
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=PM2_HOME=/var/www/.pm2
+PIDFile=/var/www/.pm2/pm2.pid
+Restart=on-failure
+
+ExecStart=/usr/local/bin/pm2 resurrect
+ExecReload=/usr/local/bin/pm2 reload all
+ExecStop=/usr/local/bin/pm2 kill
+
+[Install]
+WantedBy=multi-user.target

@@ -1,22 +1,35 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do banco MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Define o schema da coluna do Kanban
-const ColumnSchema = new mongoose.Schema({
-  
+// 🔹 Model de colunas do Kanban
+const Column = sequelize.define("Column", {
+
   // Nome da coluna (ex: Novo, Em análise, Concluído)
-  nome: String,
+  nome: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true,
+    validate: {
+      notEmpty: true,
+      len: [1, 120],
+    }
+  },
 
-  // Ordem de exibição da coluna no Kanban (define a posição visual)
-  ordem: Number,
+  // Posição de exibição no Kanban
+  ordem: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
 
-  // Limite de cards permitidos na coluna (WIP - Work In Progress)
-  limiteWip: Number
+  // Limite WIP (Work In Progress) — null = sem limite
+  limiteWip: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  }
 
-}, { 
-  timestamps: true // Adiciona automaticamente:
-  // createdAt -> data de criação
-  // updatedAt -> última atualização
+}, {
+  tableName: "columns",
+  timestamps: true
 });
 
-// Exporta o model para uso no sistema
-module.exports = mongoose.model("Column", ColumnSchema);
+module.exports = Column;

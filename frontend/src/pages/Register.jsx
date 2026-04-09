@@ -10,12 +10,20 @@ export default function Register() {
     nome: "",
     email: "",
     senha: "",
-    confirmarSenha: "",
-    perfil: "comercial" // perfil padrão ao registrar
+    confirmarSenha: ""
   });
   const [loading, setLoading] = useState(false); // Indica carregamento do submit
   const [error, setError] = useState(""); // Mensagem de erro do formulário
+  const [success, setSuccess] = useState("");
   const navigate = useNavigate(); // Hook para navegação programática
+
+  const getApiErrorMessage = (error, fallback) => {
+    const data = error?.response?.data;
+    if (typeof data === "string") return data;
+    if (data?.message) return data.message;
+    if (data?.error) return data.error;
+    return fallback;
+  };
 
   // Atualiza o estado do formulário quando o usuário digita
   const handleChange = (e) => {
@@ -49,8 +57,8 @@ export default function Register() {
       setError("Senha é obrigatória");
       return false;
     }
-    if (formData.senha.length < 6) {
-      setError("Senha deve ter no mínimo 6 caracteres");
+    if (formData.senha.length < 8) {
+      setError("Senha deve ter no minimo 8 caracteres");
       return false;
     }
     if (formData.senha !== formData.confirmarSenha) {
@@ -68,28 +76,27 @@ export default function Register() {
 
     setLoading(true); // ativa indicador de carregamento
     setError(""); // limpa erros
+    setSuccess("");
 
     try {
       // Log para depuração
       console.log("Tentando registrar com:", {
         nome: formData.nome,
-        email: formData.email,
-        perfil: formData.perfil
+        email: formData.email
       });
 
       // Requisição POST para criar usuário
       const response = await api.post("/users/register", {
         nome: formData.nome.trim(),
         email: formData.email.trim().toLowerCase(),
-        senha: formData.senha,
-        perfil: formData.perfil
+        senha: formData.senha
       });
 
       console.log("Resposta do servidor:", response.data);
 
       // Sucesso
-      alert("Conta criada com sucesso! Faça login agora.");
-      navigate("/login"); // redireciona para login
+      setSuccess(response?.data?.message || "Cadastro enviado para aprovação. Redirecionando para login...");
+      setTimeout(() => navigate("/login"), 1200);
     } catch (error) {
       console.error("Erro detalhado no registro:", error);
 
@@ -99,13 +106,13 @@ export default function Register() {
         console.log("Status do erro:", error.response.status);
 
         if (error.response.status === 400) {
-          setError(error.response.data.message || "Dados inválidos. Verifique os campos.");
+          setError(getApiErrorMessage(error, "Dados invalidos. Verifique os campos."));
         } else if (error.response.status === 409) {
-          setError("Email já cadastrado. Use outro email ou faça login.");
+          setError(getApiErrorMessage(error, "Email ja cadastrado. Use outro email ou faca login."));
         } else if (error.response.status === 500) {
-          setError("Erro no servidor. Tente novamente mais tarde.");
+          setError(getApiErrorMessage(error, "Erro no servidor. Tente novamente mais tarde."));
         } else {
-          setError(error.response.data?.message || "Erro ao registrar. Tente novamente.");
+          setError(getApiErrorMessage(error, "Erro ao registrar. Tente novamente."));
         }
       } else if (error.request) {
         console.log("Sem resposta do servidor:", error.request);
@@ -163,6 +170,21 @@ export default function Register() {
             ❌ {error}
           </div>
         )}
+
+        {success && (
+          <div style={{
+            padding: "12px 15px",
+            marginBottom: "20px",
+            borderRadius: "8px",
+            background: "rgba(52, 211, 153, 0.16)",
+            border: "1px solid rgba(52, 211, 153, 0.5)",
+            color: "#b8ffe4",
+            fontSize: "14px",
+            textAlign: "center"
+          }}>
+            ✅ {success}
+          </div>
+        )}
         
         {/* Formulário */}
         <form onSubmit={register}>
@@ -218,40 +240,12 @@ export default function Register() {
             />
           </div>
 
-          {/* Select Perfil */}
-          <div style={{ marginBottom: "15px" }}>
-            <select
-              name="perfil"
-              value={formData.perfil}
-              onChange={handleChange}
-              style={{
-                width: "100%",
-                padding: "12px 15px",
-                borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.2)",
-                background: "rgba(255,255,255,0.1)",
-                color: "#fff",
-                fontSize: "14px",
-                boxSizing: "border-box",
-                cursor: "pointer",
-                outline: "none"
-              }}
-            >
-              <option value="comercial" style={{ background: "#240046" }}>👔 Comercial</option>
-              <option value="operacional" style={{ background: "#240046" }}>📋 Operacional</option>
-              <option value="tecnico" style={{ background: "#240046" }}>🔧 Técnico</option>
-              <option value="gestor" style={{ background: "#240046" }}>👨‍💼 Gestor</option>
-              <option value="delivery" style={{ background: "#240046" }}>🚚 Delivery</option>
-              <option value="admin" style={{ background: "#240046" }}>🔐 Admin</option>
-            </select>
-          </div>
-
           {/* Campo Senha */}
           <div style={{ marginBottom: "15px" }}>
             <input
               type="password"
               name="senha"
-              placeholder="Senha * (mínimo 6 caracteres)"
+              placeholder="Senha * (minimo 8 caracteres)"
               value={formData.senha}
               onChange={handleChange}
               onKeyPress={handleKeyPress}

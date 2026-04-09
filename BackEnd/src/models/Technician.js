@@ -1,18 +1,27 @@
-const mongoose = require("mongoose"); // Importa o Mongoose para modelagem do MongoDB
+const { DataTypes } = require("sequelize");
+const sequelize = require("../config/db");
 
-// 🔹 Define o schema de técnicos
-const TechnicianSchema = new mongoose.Schema({
+// 🔹 Model de técnicos
+const Technician = sequelize.define("Technician", {
 
   // Nome completo do técnico
-  nome: String,
+  nome: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
 
   // Telefone de contato
-  telefone: String,
+  telefone: DataTypes.STRING,
 
-  // Status de ativo/inativo (para alocação de agendamentos)
-  ativo: Boolean
+  // Se está disponível para alocação
+  ativo: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
 
+}, {
+  tableName: "technicians",
+  timestamps: false // Técnico não precisa de controle de data de criação
 });
 
-// Exporta o model para uso no sistema
-module.exports = mongoose.model("Technician", TechnicianSchema);
+module.exports = Technician;

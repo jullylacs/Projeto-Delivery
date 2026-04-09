@@ -1,113 +1,237 @@
-import { useEffect, useState } from "react"; // Hooks do React
-import { useNavigate } from "react-router-dom"; // Hook para navegação programática
-import api from "../services/api"; // Instância de API configurada para comunicação com backend
+﻿import { useEffect, useState } from "react"; // Hooks do React
+import { useNavigate } from "react-router-dom"; // Hook para navegaÃ§Ã£o programÃ¡tica
+import api from "../services/api"; // InstÃ¢ncia de API configurada para comunicaÃ§Ã£o com backend
+
+const MAX_AVATAR_UPLOAD_MB = 10;
+const TARGET_AVATAR_BASE64_BYTES = 900 * 1024;
+const MAX_AVATAR_DIMENSION = 1024;
+
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Falha ao ler imagem"));
+    reader.readAsDataURL(file);
+  });
+
+const loadImageElement = (src) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Falha ao processar imagem"));
+    image.src = src;
+  });
+
+const compressAvatarImage = async (file) => {
+  const initialDataUrl = await fileToDataUrl(file);
+  const image = await loadImageElement(initialDataUrl);
+
+  const maxSide = Math.max(image.width, image.height);
+  const scale = maxSide > MAX_AVATAR_DIMENSION ? MAX_AVATAR_DIMENSION / maxSide : 1;
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Falha ao preparar compressao de imagem");
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  // Reduz qualidade progressivamente para manter payload leve e evitar 413.
+  let quality = 0.86;
+  let compressed = canvas.toDataURL("image/jpeg", quality);
+
+  while (compressed.length > TARGET_AVATAR_BASE64_BYTES && quality > 0.4) {
+    quality -= 0.08;
+    compressed = canvas.toDataURL("image/jpeg", quality);
+  }
+
+  return compressed;
+};
+
+const readStoredUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+};
 
 export default function Profile() {
   // Estados do componente
-  const [user, setUser] = useState(null); // Armazena dados do usuário
-  const [loading, setLoading] = useState(true); // Indica se o perfil está sendo carregado
-  const [isEditing, setIsEditing] = useState(false); // Define se o usuário está no modo de edição
-  const [formData, setFormData] = useState({}); // Armazena dados do formulário enquanto edita
+  const [user, setUser] = useState(null); // Armazena dados do usuÃ¡rio
+  const [loading, setLoading] = useState(true); // Indica se o perfil estÃ¡ sendo carregado
+  const [isEditing, setIsEditing] = useState(false); // Define se o usuÃ¡rio estÃ¡ no modo de ediÃ§Ã£o
+  const [formData, setFormData] = useState({}); // Armazena dados do formulÃ¡rio enquanto edita
   const [avatarPreview, setAvatarPreview] = useState(null); // Armazena preview do avatar
   const [error, setError] = useState(""); // Mensagem de erro
-  const navigate = useNavigate(); // Hook para navegação programática
+  const [successMessage, setSuccessMessage] = useState("");
+  const navigate = useNavigate(); // Hook para navegaÃ§Ã£o programÃ¡tica
 
-  // Carrega perfil do usuário ao montar o componente
+  const normalizeAvatar = (value) => {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+
+    const decoder = document.createElement("textarea");
+    decoder.innerHTML = trimmed;
+    return decoder.value.trim();
+  };
+
+  // Carrega perfil do usuÃ¡rio ao montar o componente
   useEffect(() => {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}"); // Busca dados do usuário no localStorage
+    const userData = readStoredUser(); // Busca dados do usuÃ¡rio no localStorage
+    const userId = userData?._id || userData?.id;
 
-    if (!userData._id) {
-      navigate("/login"); // Se não tiver usuário, redireciona para login
+    if (!userId) {
+      navigate("/login"); // Se nÃ£o tiver usuÃ¡rio, redireciona para login
       return;
     }
 
-    fetchUserProfile(userData._id); // Busca perfil do usuário no backend
+    fetchUserProfile(userId); // Busca perfil do usuÃ¡rio no backend
   }, [navigate]);
 
-  // Função para buscar perfil do usuário pelo ID
+  // FunÃ§Ã£o para buscar perfil do usuÃ¡rio pelo ID
   const fetchUserProfile = async (userId) => {
     try {
       const response = await api.get(`/users/${userId}`); // Requisição GET para backend
-      setUser(response.data); // Salva dados do usuário
-      setFormData(response.data); // Preenche formulário com os dados atuais
-      setAvatarPreview(response.data.avatar); // Define avatar
+      const normalizedUser = { ...response.data, avatar: normalizeAvatar(response.data?.avatar) };
+      setUser(normalizedUser); // Salva dados do usuário
+      setFormData(normalizedUser); // Preenche formulário com os dados atuais
+      setAvatarPreview(normalizedUser.avatar); // Define avatar
+      // Sincroniza localStorage para que o Header reflita o avatar atual
+      localStorage.setItem("user", JSON.stringify(normalizedUser));
+      window.dispatchEvent(new Event("user-updated"));
       setLoading(false); // Desativa loading
     } catch (err) {
       console.error("Erro ao buscar perfil:", err); // Loga erro
-      setError("Erro ao carregar perfil"); // Mostra mensagem de erro
+
+      if (err?.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        navigate("/login");
+        return;
+      }
+
+      const localUser = readStoredUser();
+      if (localUser) {
+        setUser(localUser);
+        setFormData(localUser);
+        setAvatarPreview(localUser.avatar || null);
+        setError("Não foi possível sincronizar com o servidor. Exibindo dados locais.");
+      } else {
+        setError("Erro ao carregar perfil"); // Mostra mensagem de erro
+      }
+
       setLoading(false); // Desativa loading
     }
   };
 
-  // Atualiza valores do formulário conforme usuário digita
+  // Atualiza valores do formulÃ¡rio conforme usuÃ¡rio digita
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value // Atualiza o campo específico do formulário
+      [name]: value // Atualiza o campo especÃ­fico do formulÃ¡rio
     }));
     setError(""); // Limpa erro ao digitar
+    setSuccessMessage("");
   };
 
-  // Função para alterar avatar com preview
-  const handleAvatarChange = (e) => {
+  // FunÃ§Ã£o para alterar avatar com preview
+  const handleAvatarChange = async (e) => {
     const file = e.target.files[0]; // Pega arquivo selecionado
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result); // Atualiza preview
-        setFormData(prev => ({
-          ...prev,
-          avatar: reader.result // Salva avatar em base64 no formulário
-        }));
-      };
-      reader.readAsDataURL(file); // Converte arquivo para base64
+    if (!file) return;
+
+    try {
+      const maxBytes = MAX_AVATAR_UPLOAD_MB * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setError(`Imagem muito grande. Envie um arquivo de ate ${MAX_AVATAR_UPLOAD_MB}MB.`);
+        setSuccessMessage("");
+        return;
+      }
+
+      const compressedDataUrl = await compressAvatarImage(file);
+
+      setAvatarPreview(compressedDataUrl); // Atualiza preview
+      setFormData(prev => ({
+        ...prev,
+        avatar: compressedDataUrl // Salva avatar comprimido em base64 no formulÃ¡rio
+      }));
+      setError("");
+    } catch (error) {
+      setSuccessMessage("");
+      setError(error.message || "Nao foi possivel processar a imagem");
     }
   };
 
-  // Salva alterações do perfil no backend
+  // Salva alteraÃ§Ãµes do perfil no backend
   const handleSaveProfile = async () => {
     try {
-      const response = await api.put(`/users/${user._id}`, formData); // Requisição PUT para atualizar perfil
-      setUser(response.data); // Atualiza estado do usuário
-      localStorage.setItem("user", JSON.stringify(response.data)); // Atualiza localStorage
-      setIsEditing(false); // Sai do modo edição
+      const userId = user?._id || user?.id;
+      if (!userId) {
+        setError("Identificador de usuÃ¡rio invÃ¡lido");
+        return;
+      }
+
+      const payload = {
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        departamento: formData.departamento,
+        avatar: formData.avatar,
+      };
+
+      const response = await api.put(`/users/${userId}`, payload); // RequisiÃ§Ã£o PUT para atualizar perfil
+      const normalizedUser = { ...response.data, avatar: normalizeAvatar(response.data?.avatar) };
+      setUser(normalizedUser); // Atualiza estado do usuÃ¡rio
+      localStorage.setItem("user", JSON.stringify(normalizedUser)); // Atualiza localStorage
+      window.dispatchEvent(new Event("user-updated"));
+      setIsEditing(false); // Sai do modo ediÃ§Ã£o
       setError(""); // Limpa erro
-      alert("Perfil atualizado com sucesso!"); // Alerta de sucesso
+      setSuccessMessage("Perfil atualizado com sucesso!");
     } catch (err) {
+      setSuccessMessage("");
       setError("Erro ao atualizar perfil: " + (err.response?.data?.message || err.message)); // Mostra erro detalhado
     }
   };
 
-  // Objetos de perfis com label e cor para visualização
+  // Objetos de perfis com label e cor para visualizaÃ§Ã£o
   const perfis = {
-    comercial: { label: "👔 Comercial", color: "#1e40af" },
-    operacional: { label: "📋 Operacional", color: "#059669" },
-    tecnico: { label: "🔧 Técnico", color: "#d97706" },
-    gestor: { label: "👨‍💼 Gestor", color: "#7c3aed" },
-    delivery: { label: "🚚 Delivery", color: "#0ea5e9" },
-    admin: { label: "🔐 Admin", color: "#dc2626" }
+    comercial: { label: "Comercial", color: "#1e40af" },
+    operacional: { label: "Operacional", color: "#059669" },
+    tecnico: { label: "Tecnico", color: "#d97706" },
+    delivery: { label: "Delivery", color: "#9b1b5a" },
+    gestor: { label: "Gestor", color: "#7c3aed" },
+    admin: { label: "Admin", color: "#dc2626" }
   };
 
   // Renderiza loading enquanto busca dados
   if (loading) {
     return (
-      <div style={{ padding: "24px", textAlign: "center", color: "#666" }}>
+      <div style={{ padding: "24px", textAlign: "center", color: "#5f5a88" }}>
         Carregando perfil...
       </div>
     );
   }
 
-  // Caso não tenha usuário carregado, mostra erro
+  // Caso nÃ£o tenha usuÃ¡rio carregado, mostra erro
   if (!user) {
     return (
-      <div style={{ padding: "24px", textAlign: "center", color: "#d32f2f" }}>
+      <div style={{ padding: "24px", textAlign: "center", color: "#c62828" }}>
         Erro ao carregar perfil
       </div>
     );
   }
 
-  // Renderização principal do componente
+  // RenderizaÃ§Ã£o principal do componente
   return (
     <div style={{
       padding: "24px",
@@ -120,9 +244,9 @@ export default function Profile() {
       }}>
         {/* Header */}
         <div style={{ marginBottom: "24px" }}>
-          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>👤 Meu Perfil</h1>
+          <h1 style={{ margin: 0, color: "#3c2f9f", fontSize: "28px" }}>Meu Perfil</h1>
           <p style={{ color: "#5f5a88", fontSize: "14px", marginTop: "4px" }}>
-            Visualize e edite suas informações
+            Visualize e edite suas informacoes
           </p>
         </div>
 
@@ -141,10 +265,24 @@ export default function Profile() {
           </div>
         )}
 
+        {successMessage && (
+          <div style={{
+            padding: "12px 16px",
+            backgroundColor: "#ecfdf3",
+            border: "1px solid #35c986",
+            borderRadius: "8px",
+            color: "#146c43",
+            marginBottom: "16px",
+            fontSize: "14px"
+          }}>
+            {successMessage}
+          </div>
+        )}
+
         {/* Card de perfil */}
         <div style={{
           backgroundColor: "#fff",
-          border: "1px solid rgba(108,59,255,0.12)",
+          border: "1px solid #d6d0ff",
           borderRadius: "14px",
           padding: "32px",
           boxShadow: "0 8px 18px rgba(62,44,158,0.08)"
@@ -162,7 +300,7 @@ export default function Profile() {
               width: "120px",
               height: "120px",
               borderRadius: "50%",
-              backgroundColor: avatarPreview ? "transparent" : "#8b64ff", // Cor padrão se não tiver avatar
+              backgroundColor: avatarPreview ? "transparent" : "#8b64ff", // Cor padrÃ£o se nÃ£o tiver avatar
               backgroundImage: avatarPreview ? `url(${avatarPreview})` : "none", // Imagem do avatar
               backgroundSize: "cover",
               backgroundPosition: "center",
@@ -174,10 +312,10 @@ export default function Profile() {
               border: "4px solid #e0e0e0",
               boxShadow: "0 4px 12px rgba(62,44,158,0.15)"
             }}>
-              {!avatarPreview && "👤"} {/* Emoji padrão */}
+              {!avatarPreview && "U"}
             </div>
 
-            {/* Botão para alterar avatar */}
+            {/* BotÃ£o para alterar avatar */}
             {isEditing && (
               <label style={{
                 padding: "8px 16px",
@@ -189,7 +327,7 @@ export default function Profile() {
                 fontWeight: "600",
                 marginBottom: "12px"
               }}>
-                📸 Mudar Foto
+                Mudar foto
                 <input
                   type="file"
                   accept="image/*"
@@ -216,7 +354,7 @@ export default function Profile() {
             </span>
           </div>
 
-          {/* Informações */}
+          {/* InformaÃ§Ãµes */}
           <div style={{ display: "grid", gap: "16px" }}>
             {/* Nome */}
             <div>
@@ -243,7 +381,7 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
@@ -280,7 +418,7 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
@@ -305,35 +443,9 @@ export default function Profile() {
               }}>
                 Cargo
               </label>
-              {isEditing ? (
-                <select
-                  name="perfil"
-                  value={formData.perfil || "comercial"}
-                  onChange={handleChange}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #d6d0ff",
-                    borderRadius: "8px",
-                    backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
-                    fontSize: "14px",
-                    boxSizing: "border-box",
-                    cursor: "pointer"
-                  }}
-                >
-                  <option value="comercial">👔 Comercial</option>
-                  <option value="operacional">📋 Operacional</option>
-                  <option value="tecnico">🔧 Técnico</option>
-                  <option value="gestor">👨‍💼 Gestor</option>
-                  <option value="delivery">🚚 Delivery</option>
-                  <option value="admin">🔐 Admin</option>
-                </select>
-              ) : (
-                <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {perfis[user.perfil]?.label || user.perfil}
-                </p>
-              )}
+              <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
+                {perfis[user.perfil]?.label || user.perfil}
+              </p>
             </div>
 
             {/* Telefone */}
@@ -362,14 +474,14 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.telefone || "Não informado"}
+                  {user.telefone || "Nao informado"}
                 </p>
               )}
             </div>
@@ -400,20 +512,20 @@ export default function Profile() {
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
                     backgroundColor: "#faf9ff",
-                    color: "#1e1a61",
+                    color: "#1f2b46",
                     fontSize: "14px",
                     boxSizing: "border-box"
                   }}
                 />
               ) : (
                 <p style={{ margin: 0, fontSize: "14px", color: "#3c2f9f" }}>
-                  {user.departamento || "Não informado"}
+                  {user.departamento || "Nao informado"}
                 </p>
               )}
             </div>
 
-            {/* Data de criação */}
-            <div style={{ paddingTop: "12px", borderTop: "1px solid #e0e0e0" }}>
+            {/* Data de criaÃ§Ã£o */}
+            <div style={{ paddingTop: "12px", borderTop: "1px solid #d6d0ff" }}>
               <label style={{
                 display: "block",
                 fontSize: "12px",
@@ -435,20 +547,20 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Botões de ação */}
+          {/* BotÃµes de aÃ§Ã£o */}
           <div style={{
             display: "flex",
             gap: "12px",
             marginTop: "28px",
             paddingTop: "20px",
-            borderTop: "1px solid #e0e0e0"
+            borderTop: "1px solid #d6d0ff"
           }}>
             {isEditing ? (
               <>
-                {/* Cancelar edição */}
+                {/* Cancelar ediÃ§Ã£o */}
                 <button
                   onClick={() => {
-                    setIsEditing(false); // Sai do modo edição
+                    setIsEditing(false); // Sai do modo ediÃ§Ã£o
                     setFormData(user); // Restaura dados originais
                     setAvatarPreview(user.avatar); // Restaura avatar
                     setError(""); // Limpa erros
@@ -458,8 +570,8 @@ export default function Profile() {
                     padding: "10px 16px",
                     border: "1px solid #d6d0ff",
                     borderRadius: "8px",
-                    backgroundColor: "#f8f7ff",
-                    color: "#5b4eaa",
+                    backgroundColor: "#faf9ff",
+                    color: "#5f5a88",
                     cursor: "pointer",
                     fontWeight: "600",
                     fontSize: "14px"
@@ -468,7 +580,7 @@ export default function Profile() {
                   Cancelar
                 </button>
 
-                {/* Salvar alterações */}
+                {/* Salvar alteraÃ§Ãµes */}
                 <button
                   onClick={handleSaveProfile}
                   style={{
@@ -483,11 +595,11 @@ export default function Profile() {
                     fontSize: "14px"
                   }}
                 >
-                  💾 Salvar Alterações
+                  Salvar alteracoes
                 </button>
               </>
             ) : (
-              /* Botão para ativar modo edição */
+              /* BotÃ£o para ativar modo ediÃ§Ã£o */
               <button
                 onClick={() => setIsEditing(true)}
                 style={{
@@ -502,7 +614,7 @@ export default function Profile() {
                   fontSize: "14px"
                 }}
               >
-                ✏️ Editar Perfil
+                Editar perfil
               </button>
             )}
           </div>

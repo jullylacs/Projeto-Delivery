@@ -5,100 +5,146 @@ const styles = {
   container: {
     display: "flex",
     flexDirection: "column",
-    gap: "20px", // Espaço entre seções
-    minHeight: "520px", // Altura mínima maior para detalhamento
-    padding: "32px 28px", // Mais espaço interno
-    justifyContent: "flex-start"
+    gap: "14px",
+    minHeight: "560px",
+    padding: "8px 2px 2px",
+    justifyContent: "flex-start",
+  },
+  sectionCard: {
+    background: "#f7f5ff",
+    border: "1px solid #ddd4ff",
+    borderRadius: "14px",
+    padding: "14px",
+    boxShadow: "0 3px 12px rgba(73, 42, 173, 0.08)",
+  },
+  sectionHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "10px",
+  },
+  sectionTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#3e2b9d",
+    margin: 0,
+    letterSpacing: "0.2px",
+  },
+  sectionCaption: {
+    fontSize: "11px",
+    fontWeight: "700",
+    color: "#6e5fb0",
+    background: "#ebe5ff",
+    borderRadius: "999px",
+    padding: "3px 8px",
+    border: "1px solid #d7cbff",
   },
   formGroup: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px", // Espaço entre label e input
+    gap: "6px",
   },
   label: {
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: "600",
-    color: "#5d3fdd",
-    letterSpacing: "0.3px",
+    color: "#5f4ca8",
+    letterSpacing: "0.4px",
+    textTransform: "uppercase",
   },
   input: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
-    color: "#1e1a61",
-    fontSize: "14px",
+    border: "1px solid #d9d0f9",
+    borderRadius: "10px",
+    padding: "11px 12px",
+    background: "#ffffff",
+    color: "#201b5f",
+    fontSize: "13px",
     outline: "none",
     transition: "all 0.2s ease",
     fontFamily: "inherit",
+    boxSizing: "border-box",
   },
   textarea: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
-    color: "#1e1a61",
-    fontSize: "14px",
-    minHeight: "80px",
+    border: "1px solid #d9d0f9",
+    borderRadius: "10px",
+    padding: "11px 12px",
+    background: "#ffffff",
+    color: "#201b5f",
+    fontSize: "13px",
+    minHeight: "92px",
     outline: "none",
     fontFamily: "inherit",
-    resize: "vertical", // Usuário pode redimensionar verticalmente
-  },
-  select: {
-    width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
-    color: "#1e1a61",
-    fontSize: "14px",
-    outline: "none",
-    cursor: "pointer",
+    resize: "vertical",
+    boxSizing: "border-box",
   },
   row: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr", // Duas colunas iguais
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+  },
+  stack: {
+    display: "grid",
     gap: "12px",
   },
   actionButtons: {
     display: "flex",
     justifyContent: "flex-end",
     gap: "12px",
-    marginTop: "8px",
+    marginTop: "4px",
+    paddingTop: "10px",
+    borderTop: "1px solid #e6ddff",
   },
   cancelBtn: {
-    border: "1px solid #e2e0f0",
+    border: "1px solid #d9d0f9",
     background: "#ffffff",
-    color: "#5b4eaa",
-    padding: "10px 20px",
-    borderRadius: "12px",
+    color: "#4f4199",
+    padding: "10px 16px",
+    borderRadius: "10px",
     cursor: "pointer",
-    fontWeight: "500",
+    fontWeight: "600",
     transition: "all 0.2s ease",
   },
   saveBtn: {
     border: "none",
-    background: "linear-gradient(135deg, #7c5bff, #5a30ff)",
+    background: "linear-gradient(135deg, #7f5af0, #5a30ff)",
     color: "#fff",
-    padding: "10px 24px",
-    borderRadius: "12px",
+    padding: "10px 18px",
+    borderRadius: "10px",
     cursor: "pointer",
     fontWeight: "600",
     transition: "all 0.2s ease",
   },
-  sectionTitle: {
-    fontSize: "16px",
+  errorText: {
+    color: "#c62828",
+    fontSize: "11px",
     fontWeight: "600",
-    color: "#3e2c9e",
-    margin: "8px 0 4px",
-    paddingBottom: "8px",
-    borderBottom: "2px solid rgba(108,59,255,0.2)", // Linha de destaque abaixo do título
   },
 };
 
-export default function CardModal({ card, onSave, onClose }) {
+const profileBadgePalette = {
+  comercial: { bg: "#e9f1ff", text: "#1d4ed8", border: "#bfd3ff" },
+  operacional: { bg: "#e8fbf1", text: "#047857", border: "#bae6d1" },
+  tecnico: { bg: "#fff3e8", text: "#b45309", border: "#fed7aa" },
+  gestor: { bg: "#f1ecff", text: "#6d28d9", border: "#ddd6fe" },
+  admin: { bg: "#ffecec", text: "#b91c1c", border: "#fecaca" },
+  default: { bg: "#efe8ff", text: "#5135b0", border: "#d6c8ff" },
+};
+
+const normalizeProfileKey = (value) => String(value || "").trim().toLowerCase();
+
+const getProfileBadgeStyle = (perfil) => {
+  const key = normalizeProfileKey(perfil);
+  const palette = profileBadgePalette[key] || profileBadgePalette.default;
+  return {
+    background: palette.bg,
+    color: palette.text,
+    border: `1px solid ${palette.border}`,
+  };
+};
+
+export default function CardModal({ card, onSave, onClose, vendorOptions = [] }) {
+  const [vendorSearch, setVendorSearch] = useState("");
   // Estado para armazenar dados do formulário, inicializado com valores do card (ou vazio)
   const [formData, setFormData] = useState({
     titulo: card.titulo || "",
@@ -110,6 +156,7 @@ export default function CardModal({ card, onSave, onClose }) {
     sla: card.sla || 0,
     prazo: card.prazo ? card.prazo.split("T")[0] : "", // Converte ISO para YYYY-MM-DD
     observacoes: card.observacoes || "",
+    vendedorId: String(card?.vendedor?.id || card?.vendedor_id || card?.vendedorId || ""),
     coordenadas: {
       lat: card.coordenadas?.lat || "",
       lng: card.coordenadas?.lng || "",
@@ -118,6 +165,14 @@ export default function CardModal({ card, onSave, onClose }) {
 
   // Estado para armazenar mensagens de erro de validação
   const [errors, setErrors] = useState({});
+
+  const filteredVendorOptions = vendorOptions.filter((option) =>
+    option.label.toLowerCase().includes(vendorSearch.trim().toLowerCase())
+  );
+
+  const selectedVendor = vendorOptions.find(
+    (option) => option.id === String(formData.vendedorId || "")
+  );
 
   // Função para atualizar campos do formulário
   const handleChange = (field, value) => {
@@ -167,13 +222,27 @@ export default function CardModal({ card, onSave, onClose }) {
     await onSave(updatedCard); // Chama função externa de salvamento
   };
 
+  const handleFieldFocus = (event) => {
+    event.currentTarget.style.borderColor = "#8d76ff";
+    event.currentTarget.style.boxShadow = "0 0 0 3px rgba(124, 91, 255, 0.16)";
+  };
+
+  const handleFieldBlur = (event) => {
+    const hasError = event.currentTarget.dataset.error === "true";
+    event.currentTarget.style.borderColor = hasError ? "#ff4444" : "#d9d0f9";
+    event.currentTarget.style.boxShadow = "none";
+  };
+
   // Renderização do modal do card
   return (
     <div style={styles.container}>
       {/* Seção de informações básicas */}
-      <div>
-        <h3 style={styles.sectionTitle}>📋 Informações Básicas</h3>
-        <div style={{ display: "grid", gap: "12px", marginTop: "12px" }}>
+      <div style={styles.sectionCard}>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.sectionTitle}>Informações básicas</h3>
+          <span style={styles.sectionCaption}>Principal</span>
+        </div>
+        <div style={styles.stack}>
           {/* Título do card */}
           <div style={styles.formGroup}>
             <label style={styles.label}>Título do Card</label>
@@ -181,6 +250,9 @@ export default function CardModal({ card, onSave, onClose }) {
               style={styles.input}
               value={formData.titulo}
               onChange={(e) => handleChange("titulo", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
               placeholder="Ex: Instalação de Ar Condicionado"
             />
           </div>
@@ -193,9 +265,12 @@ export default function CardModal({ card, onSave, onClose }) {
                 style={{ ...styles.input, borderColor: errors.cliente ? "#ff4444" : "#e2e0f0" }}
                 value={formData.cliente}
                 onChange={(e) => handleChange("cliente", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error={errors.cliente ? "true" : "false"}
                 placeholder="Nome do cliente"
               />
-              {errors.cliente && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.cliente}</span>}
+              {errors.cliente && <span style={styles.errorText}>{errors.cliente}</span>}
             </div>
 
             <div style={styles.formGroup}>
@@ -204,9 +279,12 @@ export default function CardModal({ card, onSave, onClose }) {
                 style={{ ...styles.input, borderColor: errors.telefone ? "#ff4444" : "#e2e0f0" }}
                 value={formData.telefone}
                 onChange={(e) => handleChange("telefone", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error={errors.telefone ? "true" : "false"}
                 placeholder="(11) 99999-9999"
               />
-              {errors.telefone && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.telefone}</span>}
+              {errors.telefone && <span style={styles.errorText}>{errors.telefone}</span>}
             </div>
           </div>
 
@@ -217,9 +295,12 @@ export default function CardModal({ card, onSave, onClose }) {
               style={{ ...styles.input, borderColor: errors.endereco ? "#ff4444" : "#e2e0f0" }}
               value={formData.endereco}
               onChange={(e) => handleChange("endereco", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error={errors.endereco ? "true" : "false"}
               placeholder="Rua, número, bairro, cidade"
             />
-            {errors.endereco && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.endereco}</span>}
+            {errors.endereco && <span style={styles.errorText}>{errors.endereco}</span>}
           </div>
 
           {/* Linha com Tipo de Serviço e Preço */}
@@ -230,9 +311,12 @@ export default function CardModal({ card, onSave, onClose }) {
                 style={{ ...styles.input, borderColor: errors.tipoServico ? "#ff4444" : "#e2e0f0" }}
                 value={formData.tipoServico}
                 onChange={(e) => handleChange("tipoServico", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error={errors.tipoServico ? "true" : "false"}
                 placeholder="Ex: Instalação, Manutenção, Consultoria"
               />
-              {errors.tipoServico && <span style={{ color: "#ff4444", fontSize: "11px" }}>{errors.tipoServico}</span>}
+              {errors.tipoServico && <span style={styles.errorText}>{errors.tipoServico}</span>}
             </div>
 
             <div style={styles.formGroup}>
@@ -243,16 +327,57 @@ export default function CardModal({ card, onSave, onClose }) {
                 step="0.01"
                 value={formData.preco}
                 onChange={(e) => handleChange("preco", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error="false"
                 placeholder="0,00"
               />
             </div>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Vendedor Responsável</label>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#4f4199" }}>Selecionado:</span>
+              <span style={{ ...getProfileBadgeStyle(selectedVendor?.perfil), borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                {selectedVendor?.perfil ? `${selectedVendor.perfil} - ` : ""}
+                {selectedVendor?.label || "Manter vendedor atual"}
+              </span>
+            </div>
+            <input
+              style={{ ...styles.input, marginBottom: 8 }}
+              value={vendorSearch}
+              onChange={(e) => setVendorSearch(e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
+              placeholder="Buscar vendedor..."
+            />
+            <select
+              style={styles.input}
+              value={formData.vendedorId || ""}
+              onChange={(e) => handleChange("vendedorId", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
+            >
+              <option value="">Manter vendedor atual</option>
+              {filteredVendorOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}{option.perfil ? ` - ${option.perfil}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
 
       {/* Seção de Localização */}
-      <div>
-        <h3 style={styles.sectionTitle}>📍 Localização</h3>
+      <div style={styles.sectionCard}>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.sectionTitle}>Localização</h3>
+          <span style={styles.sectionCaption}>Geo</span>
+        </div>
         <div style={styles.row}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Latitude</label>
@@ -260,6 +385,9 @@ export default function CardModal({ card, onSave, onClose }) {
               style={styles.input}
               value={formData.coordenadas.lat}
               onChange={(e) => handleChange("lat", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
               placeholder="-23.5505"
             />
           </div>
@@ -270,6 +398,9 @@ export default function CardModal({ card, onSave, onClose }) {
               style={styles.input}
               value={formData.coordenadas.lng}
               onChange={(e) => handleChange("lng", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
               placeholder="-46.6333"
             />
           </div>
@@ -277,8 +408,11 @@ export default function CardModal({ card, onSave, onClose }) {
       </div>
 
       {/* Seção de Prazo e SLA */}
-      <div>
-        <h3 style={styles.sectionTitle}>⏱️ Prazos e SLAs</h3>
+      <div style={styles.sectionCard}>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.sectionTitle}>Prazos e SLA</h3>
+          <span style={styles.sectionCaption}>Controle</span>
+        </div>
         <div style={styles.row}>
           <div style={styles.formGroup}>
             <label style={styles.label}>Prazo</label>
@@ -287,6 +421,9 @@ export default function CardModal({ card, onSave, onClose }) {
               type="date"
               value={formData.prazo}
               onChange={(e) => handleChange("prazo", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
             />
           </div>
 
@@ -297,6 +434,9 @@ export default function CardModal({ card, onSave, onClose }) {
               type="number"
               value={formData.sla}
               onChange={(e) => handleChange("sla", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
               placeholder="0"
             />
           </div>
@@ -304,13 +444,19 @@ export default function CardModal({ card, onSave, onClose }) {
       </div>
 
       {/* Seção de Observações */}
-      <div>
-        <h3 style={styles.sectionTitle}>📝 Observações</h3>
+      <div style={styles.sectionCard}>
+        <div style={styles.sectionHeader}>
+          <h3 style={styles.sectionTitle}>Observações</h3>
+          <span style={styles.sectionCaption}>Notas</span>
+        </div>
         <div style={styles.formGroup}>
           <textarea
             style={styles.textarea}
             value={formData.observacoes}
             onChange={(e) => handleChange("observacoes", e.target.value)}
+            onFocus={handleFieldFocus}
+            onBlur={handleFieldBlur}
+            data-error="false"
             placeholder="Informações adicionais sobre o serviço..."
             rows={4}
           />
