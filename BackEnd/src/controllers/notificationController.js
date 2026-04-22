@@ -279,7 +279,7 @@ const buildTodayScheduleNotifications = (schedules) => {
       return {
         kind: "agenda",
         source_key: `agenda-today-${todayKey}-${scheduleId}`,
-        card_id: Number.isFinite(cardId) ? cardId : null,
+        card_id: Number.isFinite(cardId) && cardId > 0 ? cardId : null,
         title,
         message: `Você tem um agendamento para hoje. ${parts.join(" | ")}`,
         when_at: safeWhen,
