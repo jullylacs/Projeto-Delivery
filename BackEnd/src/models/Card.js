@@ -3,6 +3,14 @@ const sequelize = require("../config/db");
 
 // 🔹 Model de cards do Kanban
 const Card = sequelize.define("Card", {
+  // Mensalidade do serviço
+  mensalidade: DataTypes.DECIMAL(10, 2),
+
+  // Valor da instalação
+  instalacao: DataTypes.DECIMAL(10, 2),
+
+  // Tempo contratual em meses
+  tempoContratual: DataTypes.INTEGER,
 
   // Nome do cliente
   cliente: DataTypes.STRING,

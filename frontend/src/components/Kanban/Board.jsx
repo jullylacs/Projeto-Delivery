@@ -2492,6 +2492,7 @@ export default function Board() {
         tipoServico: newCard.tipoServico.trim(),
         mensalidade: newCard.mensalidade ? Number(newCard.mensalidade) : 0,
         instalacao: newCard.instalacao ? Number(newCard.instalacao) : 0,
+        tempoContratual: newCard.tempoContratual ? Number(newCard.tempoContratual) : 0,
         sla: newCard.sla ? Number(newCard.sla) : 0,
         prazo: newCard.prazo || null,
         observacoes: newCard.observacoes?.trim() || "",
