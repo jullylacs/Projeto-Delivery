@@ -152,9 +152,11 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
     telefone: card.telefone || "",
     endereco: card.endereco || "",
     tipoServico: card.tipoServico || "",
-    preco: card.preco || "",
+    mensalidade: card.mensalidade || "",
+    instalacao: card.instalacao || "",
     sla: card.sla || 0,
     prazo: card.prazo ? card.prazo.split("T")[0] : "", // Converte ISO para YYYY-MM-DD
+    tempoContratual: card.tempoContratual || "",
     observacoes: card.observacoes || "",
     vendedorId: String(card?.vendedor?.id || card?.vendedor_id || card?.vendedorId || ""),
     coordenadas: {
@@ -215,7 +217,8 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
     const updatedCard = {
       ...card, // Mantém propriedades existentes do card
       ...formData, // Sobrescreve com os valores do formulário
-      preco: formData.preco ? Number(formData.preco) : undefined, // Converte preço para número
+      mensalidade: formData.mensalidade ? Number(formData.mensalidade) : undefined,
+      instalacao: formData.instalacao ? Number(formData.instalacao) : undefined,
       sla: formData.sla ? Number(formData.sla) : 0, // Converte SLA para número
     };
 
@@ -320,13 +323,27 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
             </div>
 
             <div style={styles.formGroup}>
-              <label style={styles.label}>Preço (R$)</label>
+              <label style={styles.label}>Mensalidade (R$)</label>
               <input
                 style={styles.input}
                 type="number"
                 step="0.01"
-                value={formData.preco}
-                onChange={(e) => handleChange("preco", e.target.value)}
+                value={formData.mensalidade}
+                onChange={(e) => handleChange("mensalidade", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error="false"
+                placeholder="0,00"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Instalação (R$)</label>
+              <input
+                style={styles.input}
+                type="number"
+                step="0.01"
+                value={formData.instalacao}
+                onChange={(e) => handleChange("instalacao", e.target.value)}
                 onFocus={handleFieldFocus}
                 onBlur={handleFieldBlur}
                 data-error="false"
@@ -407,10 +424,10 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
         </div>
       </div>
 
-      {/* Seção de Prazo e SLA */}
+      {/* Seção de Prazo, SLA e Tempo Contratual */}
       <div style={styles.sectionCard}>
         <div style={styles.sectionHeader}>
-          <h3 style={styles.sectionTitle}>Prazos e SLA</h3>
+          <h3 style={styles.sectionTitle}>Prazos, SLA e Contrato</h3>
           <span style={styles.sectionCaption}>Controle</span>
         </div>
         <div style={styles.row}>
@@ -428,7 +445,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
           </div>
 
           <div style={styles.formGroup}>
-            <label style={styles.label}>SLA (dias)</label>
+            <label style={styles.label}>SLA (horas)</label>
             <input
               style={styles.input}
               type="number"
@@ -438,6 +455,20 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
               onBlur={handleFieldBlur}
               data-error="false"
               placeholder="0"
+            />
+            <span style={{ fontSize: '11px', color: '#6e5fb0', marginTop: '2px' }}>
+              {formData.sla ? `${formData.sla} horas` : 'Informe o SLA em horas'}
+            </span>
+          </div>
+
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Tempo Contratual</label>
+            <input
+              style={styles.input}
+              type="text"
+              value={formData.tempoContratual}
+              onChange={e => handleChange('tempoContratual', e.target.value)}
+              placeholder="Ex: 12 meses, 24 meses, etc."
             />
           </div>
         </div>

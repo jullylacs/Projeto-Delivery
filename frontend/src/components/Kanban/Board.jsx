@@ -1404,7 +1404,7 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
           {/* Tag de SLA (Service Level Agreement) */}
           {card.sla > 0 && (
             <span style={{ ...styles.deadlineTag, background: "#e3f2fd", color: "#1565c0" }}>
-              ⏱️ SLA: {card.sla}d
+              ⏱️ SLA: {card.sla} horas
             </span>
           )}
         </div>
@@ -1465,9 +1465,11 @@ export default function Board() {
     endereco: "",
     coordenadas: { lat: "", lng: "" },
     tipoServico: "",
-    preco: "",
+    mensalidade: "",
+    instalacao: "",
     sla: 0,
     prazo: "",
+    tempoContratual: "",
     observacoes: "",
     vendedorId: "",
   });
@@ -2481,7 +2483,8 @@ export default function Board() {
         telefone: newCard.telefone.trim(),
         endereco: newCard.endereco.trim(),
         tipoServico: newCard.tipoServico.trim(),
-        preco: newCard.preco ? Number(newCard.preco) : 0,
+        mensalidade: newCard.mensalidade ? Number(newCard.mensalidade) : 0,
+        instalacao: newCard.instalacao ? Number(newCard.instalacao) : 0,
         sla: newCard.sla ? Number(newCard.sla) : 0,
         prazo: newCard.prazo || null,
         observacoes: newCard.observacoes?.trim() || "",
@@ -2512,7 +2515,8 @@ export default function Board() {
           endereco: "",
           coordenadas: { lat: "", lng: "" },
           tipoServico: "",
-          preco: "",
+          mensalidade: "",
+          instalacao: "",
           sla: 0,
           prazo: "",
           observacoes: "",
@@ -3358,13 +3362,26 @@ export default function Board() {
                       />
                     </div>
                     <div style={styles.createField}>
-                      <label style={styles.createLabel}><DollarSign size={13} /> Preço</label>
+                      <label style={styles.createLabel}><DollarSign size={13} /> Mensalidade (R$)</label>
                       <input
                         style={styles.createInput}
                         type="number"
                         step="0.01"
-                        value={newCard.preco}
-                        onChange={(e) => handleInputChange("preco", e.target.value)}
+                        value={newCard.mensalidade}
+                        onChange={(e) => handleInputChange("mensalidade", e.target.value)}
+                        onFocus={handleCreateFieldFocus}
+                        onBlur={handleCreateFieldBlur}
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><DollarSign size={13} /> Instalação (R$)</label>
+                      <input
+                        style={styles.createInput}
+                        type="number"
+                        step="0.01"
+                        value={newCard.instalacao}
+                        onChange={(e) => handleInputChange("instalacao", e.target.value)}
                         onFocus={handleCreateFieldFocus}
                         onBlur={handleCreateFieldBlur}
                         placeholder="0,00"
@@ -3374,7 +3391,7 @@ export default function Board() {
 
                   <div style={styles.createRow}>
                     <div style={styles.createField}>
-                      <label style={styles.createLabel}><Zap size={13} /> SLA (dias)</label>
+                      <label style={styles.createLabel}><Zap size={13} /> SLA (horas)</label>
                       <input
                         style={styles.createInput}
                         type="number"
@@ -3394,6 +3411,16 @@ export default function Board() {
                         onChange={(e) => handleInputChange("prazo", e.target.value)}
                         onFocus={handleCreateFieldFocus}
                         onBlur={handleCreateFieldBlur}
+                      />
+                    </div>
+                    <div style={styles.createField}>
+                      <label style={styles.createLabel}><FileText size={13} /> Tempo Contratual</label>
+                      <input
+                        style={styles.createInput}
+                        type="text"
+                        value={newCard.tempoContratual}
+                        onChange={e => handleInputChange('tempoContratual', e.target.value)}
+                        placeholder="Ex: 12 meses, 24 meses, etc."
                       />
                     </div>
                   </div>
@@ -3649,14 +3676,26 @@ export default function Board() {
                 <span style={styles.detailsValue}>{selectedCard.tipoServico}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><DollarSign size={14} /> Preço:</span> 
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Mensalidade:</span> 
                 <span style={styles.detailsValue}>
-                  {selectedCard.preco ? Number(selectedCard.preco).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
+                  {selectedCard.mensalidade ? Number(selectedCard.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
+                </span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Instalação:</span> 
+                <span style={styles.detailsValue}>
+                  {selectedCard.instalacao ? Number(selectedCard.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
                 </span>
               </div>
               <div style={styles.detailsRow}>
                 <span style={styles.detailsLabel}>⏱️ SLA:</span> 
-                <span style={styles.detailsValue}>{selectedCard.sla || "--"} dias</span>
+                <span style={styles.detailsValue}>{selectedCard.sla || "--"} horas</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><FileText size={14} /> Tempo Contratual:</span>
+                <span style={styles.detailsValue}>
+                  {selectedCard.tempoContratual ? `${selectedCard.tempoContratual} meses` : "--"}
+                </span>
               </div>
               <div style={styles.detailsRow}>
                 <span style={styles.detailsLabel}><CalendarDays size={14} /> Prazo:</span> 
