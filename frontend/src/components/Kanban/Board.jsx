@@ -1475,6 +1475,7 @@ export default function Board() {
     tempoContratual: "",
     observacoes: "",
     vendedorId: "",
+    colunaId: undefined,
   });
   const [error, setError] = useState("");                  // Mensagem de erro
   const [activeId, setActiveId] = useState(null);          // ID do card sendo arrastado
@@ -2447,8 +2448,7 @@ export default function Board() {
 
   // Cria novo card com validação de campos obrigatórios
   const handleCreateCard = async () => {
-    const { cliente, telefone, endereco, tipoServico } = newCard;
-    
+    const { cliente, telefone, endereco, tipoServico, colunaId } = newCard;
     // Validação detalhada de campos obrigatórios
     if (!cliente || !cliente.trim()) {
       setError("Cliente é obrigatório");
@@ -2464,6 +2464,10 @@ export default function Board() {
     }
     if (!tipoServico || !tipoServico.trim()) {
       setError("Tipo de serviço é obrigatório");
+      return;
+    }
+    if (!colunaId || !Number.isFinite(Number(colunaId))) {
+      setError("Selecione a etapa inicial do card");
       return;
     }
 
@@ -2495,7 +2499,7 @@ export default function Board() {
           lat: newCard.coordenadas.lat?.trim() || "",
           lng: newCard.coordenadas.lng?.trim() || "",
         },
-        colunaId: columnDefs.find((item) => item.nome === defaultColumnName)?.id,
+        colunaId: Number(colunaId),
         vendedorId: newCard.vendedorId || sellerId,
         ip: "",
         comments: []
@@ -3398,8 +3402,27 @@ export default function Board() {
                   <p style={styles.createMetaValue}>{selectedVendorOption?.label || seller}</p>
                 </div>
                 <div style={styles.createMetaCard}>
-                  <p style={styles.createMetaLabel}>Status inicial</p>
-                  <p style={styles.createMetaValue}>{defaultColumnName}</p>
+                  <p style={styles.createMetaLabel}>Etapa inicial</p>
+                  <select
+                    style={{
+                      ...styles.createInput,
+                      fontWeight: 700,
+                      color: '#5a30ff',
+                      background: '#f7f5ff',
+                      border: '1px solid #d6d0ff',
+                      cursor: 'pointer',
+                      marginTop: 2,
+                      minWidth: 120,
+                    }}
+                    value={newCard.colunaId || orderedColumnDefs[0]?.id || ''}
+                    onChange={e => {
+                      setNewCard((prev) => ({ ...prev, colunaId: Number(e.target.value) }));
+                    }}
+                  >
+                    {orderedColumnDefs.map(col => (
+                      <option key={col.id} value={col.id}>{col.nome}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
