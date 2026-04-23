@@ -725,20 +725,23 @@ const styles = {
   },
   tableContainer: {
     width: "100%",
-    maxWidth: "100%",
+    maxWidth: "100vw",
     overflowX: "auto",
     overflowY: "hidden",
     borderRadius: "16px",
     background: "#faf9ff",
     border: "1px solid #d6d0ff",
-    padding: "12px",
+    padding: "12px 0",
     boxSizing: "border-box",
+    position: "relative",
+    scrollBehavior: "smooth",
+    minHeight: 0,
   },
   table: {
     width: "max-content",
+    minWidth: "100%",
     borderCollapse: "separate",
     borderSpacing: "10px 0",
-    minWidth: "100%",
     tableLayout: "auto",
   },
   th: {
@@ -3095,10 +3098,83 @@ export default function Board() {
 
       {/* Contexto de Drag and Drop - envolve todo o Kanban */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div style={styles.tableContainer}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
+        <div style={{ position: 'relative', width: '100%' }}>
+          {/* Botão scroll esquerda */}
+          <button
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 20,
+              background: '#fff',
+              border: '1px solid #d6d0ff',
+              borderRadius: '50%',
+              width: 38,
+              height: 38,
+              boxShadow: '0 2px 8px rgba(60,40,120,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              opacity: 0.85,
+            }}
+            onClick={() => {
+              const el = document.getElementById('kanban-horizontal-scroll');
+              if (el) el.scrollBy({ left: -400, behavior: 'smooth' });
+            }}
+            aria-label="Rolar para esquerda"
+          >
+            ←
+          </button>
+          {/* Botão scroll direita */}
+          <button
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 20,
+              background: '#fff',
+              border: '1px solid #d6d0ff',
+              borderRadius: '50%',
+              width: 38,
+              height: 38,
+              boxShadow: '0 2px 8px rgba(60,40,120,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              opacity: 0.85,
+            }}
+            onClick={() => {
+              const el = document.getElementById('kanban-horizontal-scroll');
+              if (el) el.scrollBy({ left: 400, behavior: 'smooth' });
+            }}
+            aria-label="Rolar para direita"
+          >
+            →
+          </button>
+          <div
+            id="kanban-horizontal-scroll"
+            style={{
+              ...styles.tableContainer,
+              position: 'sticky',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 15,
+              marginBottom: 0,
+              maxHeight: '70vh',
+              minHeight: 0,
+              boxShadow: '0 -2px 12px 0 rgba(60,47,140,0.04)',
+              background: 'inherit',
+              overflowY: 'auto',
+            }}
+          >
+            <table style={styles.table}>
+              <thead>
+                <tr>
                 {/* Renderiza cabeçalho com cada coluna e controles de edição */}
                 {orderedColumnDefs.map((column, idx) => {
                   const col = column.nome;
@@ -3214,36 +3290,79 @@ export default function Board() {
                 {orderedColumnDefs.map((column) => {
                   const col = column.nome;
                   const columnCards = cardsByColumn[String(column.id)] || [];
-
-                  return (
-                    <td key={column.id || col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
-                      {/* Área droppable para receber cards arrastados */}
-                      <DroppableColumn id={`column-${column.id}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
-                        {/* Mapeia e renderiza cada card da coluna */}
-                        {columnCards.map((card) => (
-                          <DraggableCard
-                            key={getCardKey(card)}
-                            card={card}
-                            onOpen={handleOpenCard}
-                            densityCfg={densityCfg}
-                            isPromoted={promotedCardId === getCardKey(card)}
-                            isTargeted={targetedCardId === String(getCardKey(card))}
-                            domId={getCardDomId(getCardKey(card))}
-                          />
-                        ))}
-                        {/* Mensagem quando não há cards na coluna */}
-                        {columnCards.length === 0 && (
-                          <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
-                            Nenhum card
-                          </div>
-                        )}
-                      </DroppableColumn>
-                    </td>
-                  );
+                  // Componente interno para manter estado de expansão por coluna
+                  function ColumnWithShowMore() {
+                    const [expanded, setExpanded] = useState(false);
+                    const visible = expanded ? columnCards : columnCards.slice(0, 5);
+                    return (
+                      <td key={column.id || col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
+                        <DroppableColumn id={`column-${column.id}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
+                          {visible.map((card) => (
+                            <DraggableCard
+                              key={getCardKey(card)}
+                              card={card}
+                              onOpen={handleOpenCard}
+                              densityCfg={densityCfg}
+                              isPromoted={promotedCardId === getCardKey(card)}
+                              isTargeted={targetedCardId === String(getCardKey(card))}
+                              domId={getCardDomId(getCardKey(card))}
+                            />
+                          ))}
+                          {columnCards.length > 5 && !expanded && (
+                            <button
+                              style={{
+                                margin: '12px auto 0',
+                                display: 'block',
+                                background: '#ede6ff',
+                                border: 'none',
+                                color: '#5b3ad1',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                borderRadius: 8,
+                                padding: '8px 18px',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(90,48,255,0.08)',
+                              }}
+                              onClick={() => setExpanded(true)}
+                            >
+                              Ver mais
+                            </button>
+                          )}
+                          {columnCards.length > 5 && expanded && (
+                            <button
+                              style={{
+                                margin: '12px auto 0',
+                                display: 'block',
+                                background: '#f7f4ff',
+                                border: 'none',
+                                color: '#7c5cff',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                borderRadius: 8,
+                                padding: '8px 18px',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(90,48,255,0.08)',
+                              }}
+                              onClick={() => setExpanded(false)}
+                            >
+                              Mostrar menos
+                            </button>
+                          )}
+                          {columnCards.length === 0 && (
+                            <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
+                              Nenhum card
+                            </div>
+                          )}
+                        </DroppableColumn>
+                      </td>
+                    );
+                  }
+                  return <ColumnWithShowMore key={column.id || col} />;
                 })}
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
         <DragOverlay dropAnimation={null}>
           {activeCard ? (
