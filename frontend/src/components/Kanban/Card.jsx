@@ -29,9 +29,13 @@ export default function Card({ card, usuarioLogado }) {
           {card.nome && <p style={styles.nome}>{card.nome}</p>}
         </div>
 
-        {/* Badge de preço, se existir */}
-        {card.preco && (
-          <div style={styles.precoBadge}>{formatarMoeda(card.preco)}</div>
+        {/* Badge de mensalidade, se existir */}
+        {card.mensalidade && (
+          <div style={styles.precoBadge}>Mensalidade: {formatarMoeda(card.mensalidade)}</div>
+        )}
+        {/* Badge de instalação, se existir */}
+        {card.instalacao && (
+          <div style={styles.precoBadge}>Instalação: {formatarMoeda(card.instalacao)}</div>
         )}
       </div>
 
@@ -43,8 +47,11 @@ export default function Card({ card, usuarioLogado }) {
         {/* Componente Info para exibir label + valor */}
         <Info label="📞 Telefone" value={card.telefone} />
         <Info label="🛠 Serviço" value={card.tipoServico} />
+        <Info label="💸 Mensalidade" value={card.mensalidade ? formatarMoeda(card.mensalidade) : undefined} iconColor="#6c3bff" />
+        <Info label="💰 Instalação" value={card.instalacao ? formatarMoeda(card.instalacao) : undefined} iconColor="#6c3bff" />
         <Info label="🌐 IP" value={card.ip} iconColor="#6c3bff" />
-        <Info label="⏱ SLA" value={card.sla} iconColor="#6c3bff" />
+        <Info label="⏱ SLA" value={card.sla ? `${String(card.sla).replace(/[^\d]/g, '')} horas` : undefined} iconColor="#6c3bff" />
+        <Info label="📄 Tempo Contratual" value={card.tempoContratual ? `${card.tempoContratual} meses` : undefined} iconColor="#6c3bff" />
         <Info label="📅 Prazo" value={card.prazo} iconColor="#6c3bff" />
         <Info label="👤 Vendedor" value={card.vendedor || usuarioLogado} />
         {/* O vendedor será o do card ou, se não houver, o usuário logado */}

@@ -1,5 +1,5 @@
 // Importa hooks do React
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 // Importa serviço de API customizado
 import api from "../services/api";
 // Componente visual que indica SLA (tempo limite de cards)
@@ -9,10 +9,14 @@ import SLAIndicator from "../components/UI/SLAIndicator";
 export default function Dashboard() {
   // Estado para armazenar os cards do Kanban
   const [cards, setCards] = useState([]);
+  // Estado para armazenar as colunas reais do Kanban
+  const [columns, setColumns] = useState([]);
   // Estado de carregamento inicial
   const [loading, setLoading] = useState(true);
   // Estado para armazenar mensagens de erro
   const [error, setError] = useState("");
+  // Timer para atualização periódica
+  const intervalRef = useRef(null);
 
   const loadingStyles = {
     container: {
@@ -62,54 +66,73 @@ export default function Dashboard() {
     },
   };
 
-  // useEffect que executa na montagem do componente para buscar os cards via API
+  // Função para buscar cards e colunas
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [cardsRes, columnsRes] = await Promise.all([
+        api.get("/cards"),
+        api.get("/columns"),
+      ]);
+      setCards(cardsRes.data || []);
+      // Ordena colunas por ordem (igual Kanban)
+      const normalizedColumns = Array.isArray(columnsRes.data)
+        ? [...columnsRes.data].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+        : [];
+      setColumns(normalizedColumns);
+      setLoading(false);
+    } catch (err) {
+      setError("Não foi possível carregar os dados");
+      setLoading(false);
+      console.error(err);
+    }
+  };
+
+  // useEffect para buscar dados na montagem e atualizar periodicamente
   useEffect(() => {
-    api.get("/cards") // Requisição GET para endpoint "/cards"
-      .then((res) => {
-        setCards(res.data); // Armazena os dados retornados em "cards"
-        setLoading(false);  // Marca que terminou o carregamento
-      })
-      .catch((err) => {
-        setError("Não foi possível carregar os dados"); // Seta mensagem de erro
-        setLoading(false); // Finaliza loading mesmo com erro
-        console.error(err); // Log do erro no console
-      });
-  }, []); // Dependências vazias: executa apenas na montagem
-
-  // Calcula estatísticas dos cards de forma memoizada para performance
-  const stats = useMemo(() => {
-    const total = cards.length; // Total de cards
-    const concluido = cards.filter((c) => c.status === "Concluído").length; // Cards concluídos
-    const restante = total - concluido; // Cards ainda em andamento
-    const ratio = total > 0 ? (concluido / total) * 100 : 0; // % de conclusão
-
-    // Quebra por status
-    const statusBreakdown = {
-      novo: cards.filter((c) => c.status === "Novo").length,
-      analise: cards.filter((c) => c.status === "Em análise").length,
-      agendamento: cards.filter((c) => c.status === "Agendamento").length,
-      agendado: cards.filter((c) => c.status === "Agendado").length,
-      execucao: cards.filter((c) => c.status === "Em execução").length,
-      concluido: concluido,
-      inativo: cards.filter((c) => c.status === "Inativo").length,
+    fetchData();
+    // Atualização automática a cada 10s
+    intervalRef.current = setInterval(fetchData, 60000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
+  }, []);
+
+  // Calcula estatísticas dos cards e colunas de forma memoizada para performance
+  const stats = useMemo(() => {
+    const total = cards.length;
+    const concluido = cards.filter((c) => c.status === "Concluído").length;
+    const restante = total - concluido;
+    const ratio = total > 0 ? (concluido / total) * 100 : 0;
+
+    // Quebra por coluna real (sincronizado com Kanban, sem colunas fantasmas)
+    const columnBreakdown = {};
+    columns.forEach((col) => {
+      // Cards que pertencem a esta coluna (prioriza coluna_id, depois coluna.nome, depois status)
+      columnBreakdown[col.nome] = cards.filter((c) => {
+        // Preferência: coluna_id === col.id (número), depois coluna === col.nome (string), depois status === col.nome
+        if (c.coluna_id && col.id && Number(c.coluna_id) === Number(col.id)) return true;
+        if (c.coluna && String(c.coluna).trim() === String(col.nome).trim()) return true;
+        if (!c.coluna_id && !c.coluna && c.status && String(c.status).trim() === String(col.nome).trim()) return true;
+        return false;
+      }).length;
+    });
 
     // SLA: alerta de prazos vencidos ou próximos
     const now = new Date();
     const slaViolations = cards.filter((c) => {
       if (!c.prazo || c.status === "Concluído" || c.status === "Inativo") return false;
       const deadline = new Date(c.prazo);
-      return deadline < now; // Card vencido
+      return deadline < now;
     });
-
     const slaWarnings = cards.filter((c) => {
       if (!c.prazo || c.status === "Concluído" || c.status === "Inativo") return false;
       const deadline = new Date(c.prazo);
-      const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24)); // Dias restantes
-      return daysUntil >= 0 && daysUntil <= 3; // Aviso para próximos 3 dias
+      const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+      return daysUntil >= 0 && daysUntil <= 3;
     });
 
-    // Performance por vendedor
+    // Performance por vendedor (mantém igual)
     const vendors = [...new Set(cards.map((c) => c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor"))];
     const vendorStats = vendors.map((vendor) => {
       const vendorCards = cards.filter((c) => {
@@ -130,12 +153,12 @@ export default function Dashboard() {
       concluido,
       restante,
       ratio,
-      statusBreakdown,
+      columnBreakdown,
       slaViolations: slaViolations.length,
       slaWarnings: slaWarnings.length,
       vendorStats,
     };
-  }, [cards]); // Recalcula apenas quando "cards" muda
+  }, [cards, columns]); // Recalcula quando cards ou columns mudam
 
   // Renderiza loading enquanto dados são carregados
   if (loading) {
@@ -181,8 +204,28 @@ export default function Dashboard() {
     alertBox: { padding: "12px", borderRadius: "8px", marginBottom: "8px", fontSize: "13px", fontWeight: "500" },
     alertRed: { backgroundColor: "#ffebee", borderLeft: "4px solid #d32f2f", color: "#c62828", paddingLeft: "12px" },
     alertOrange: { backgroundColor: "#f3edff", borderLeft: "4px solid #7b54e8", color: "#5f3fb8", paddingLeft: "12px" },
-    chartRow: { display: "flex", alignItems: "flex-end", gap: "8px", padding: "16px 0", height: "200px" },
-    chartBar: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" },
+    chartRow: {
+      display: "flex",
+      flexWrap: "nowrap",
+      alignItems: "flex-end",
+      gap: "8px",
+      padding: "16px 0",
+      height: "220px",
+      justifyContent: "space-between",
+      overflowX: "hidden",
+      width: "100%",
+      maxWidth: "100%",
+    },
+    chartBar: {
+      flex: "1 1 0%",
+      minWidth: 0,
+      maxWidth: "100%",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      background: "none",
+    },
     barFill: { width: "100%", borderRadius: "12px 12px 0 0", transition: "height 0.3s ease", minHeight: "4px" },
     barLabel: { marginTop: "8px", fontSize: "11px", color: "#6c65a7", textAlign: "center", fontWeight: "500" },
     progressBar: { width: "100%", height: "8px", background: "#ebeaff", borderRadius: "4px", overflow: "hidden", marginTop: "8px" },
@@ -265,45 +308,26 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Distribuição por status */}
+          {/* Distribuição por etapa (colunas reais do Kanban) */}
           <div style={styles.grid}>
             <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
-              <div style={styles.cardTitle}>📊 Distribuição por Status</div>
+              <div style={styles.cardTitle}>📊 Distribuição por Etapa (Kanban)</div>
               <div style={styles.chartRow}>
-                {Object.entries(stats.statusBreakdown).map(([status, count]) => {
-                  const labels = {
-                    novo: "Novo",
-                    analise: "Análise",
-                    agendamento: "Agendamento",
-                    agendado: "Agendado",
-                    execucao: "Execução",
-                    concluido: "Concluído",
-                    inativo: "Inativo",
-                  };
-                  const colors = {
-                    novo: "#9e9e9e",
-                    analise: "#8b64ff",
-                    agendamento: "#7b54e8",
-                    agendado: "#673ab7",
-                    execucao: "#6a43d8",
-                    concluido: "#5a30ff",
-                    inativo: "#bdbdbd",
-                  };
+                {columns.map((col) => {
+                  const count = stats.columnBreakdown[col.nome] || 0;
                   const maxHeight = 180;
                   const height = stats.total > 0 ? (count / stats.total) * maxHeight : 0;
-
+                  // Cores dinâmicas (padrão, mas pode customizar por coluna)
+                  const colorList = ["#8b64ff", "#7b54e8", "#673ab7", "#6a43d8", "#5a30ff", "#bdbdbd", "#9e9e9e", "#00b894", "#fdcb6e", "#e17055"];
+                  const color = colorList[col.ordem % colorList.length] || "#8b64ff";
                   return (
-                    <div key={status} style={styles.chartBar}>
+                    <div key={col.id || col.nome} style={styles.chartBar}>
                       <div
-                        style={{
-                          ...styles.barFill,
-                          height: `${Math.max(height, 4)}px`,
-                          backgroundColor: colors[status],
-                        }}
+                        style={{ ...styles.barFill, height: `${Math.max(height, 4)}px`, backgroundColor: color }}
                       />
                       <div style={styles.barLabel}>
                         <div style={{ fontWeight: "700", fontSize: "12px" }}>{count}</div>
-                        <div style={{ fontSize: "10px" }}>{labels[status]}</div>
+                        <div style={{ fontSize: "10px" }}>{col.nome}</div>
                       </div>
                     </div>
                   );

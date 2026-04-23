@@ -15,7 +15,7 @@ const apiBaseUrl = explicitBaseUrl
 // Cria uma instância do Axios com configuração padrão
 const api = axios.create({
   baseURL: apiBaseUrl, // URL base para todas as requisições
-  timeout: 10000,                   // Tempo máximo de espera de 10 segundos
+  timeout: 200000,                   // Tempo máximo de espera de 200 segundos
   headers: {
     "Content-Type": "application/json" // Define que o conteúdo será JSON
   }

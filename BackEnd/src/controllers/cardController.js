@@ -63,6 +63,11 @@ const resolveColumn = async (payload) => {
 
 const buildCardPayload = async (input) => {
   const payload = { ...input };
+  // Garante que tempoContratual seja inteiro ou null
+  if (payload.tempoContratual !== undefined && payload.tempoContratual !== null && payload.tempoContratual !== "") {
+    const parsedTempo = parseInt(payload.tempoContratual, 10);
+    payload.tempoContratual = Number.isFinite(parsedTempo) ? parsedTempo : null;
+  }
   const resolvedColumn = await resolveColumn(payload);
 
   if (!resolvedColumn) {
