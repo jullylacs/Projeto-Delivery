@@ -332,7 +332,16 @@ export default function CommentInput({
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5f3dc6", fontSize: 13, fontWeight: 600 }}>
                 <Paperclip size={14} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pendingAttachment.name || "Arquivo anexado"}</span>
+                <span style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  display: "inline-block",
+                  maxWidth: 140,
+                  verticalAlign: "middle"
+                }} title={pendingAttachment.name || "Arquivo anexado"}>
+                  {pendingAttachment.name || "Arquivo anexado"}
+                </span>
               </div>
             )}
 

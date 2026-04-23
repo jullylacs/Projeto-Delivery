@@ -154,6 +154,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
     tipoServico: card.tipoServico || "",
     mensalidade: card.mensalidade || "",
     instalacao: card.instalacao || "",
+    tipo_card: card.tipo_card || "",
     sla: card.sla || 0,
     prazo: card.prazo ? card.prazo.split("T")[0] : "", // Converte ISO para YYYY-MM-DD
     tempoContratual: card.tempoContratual || "",
@@ -306,8 +307,8 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
             {errors.endereco && <span style={styles.errorText}>{errors.endereco}</span>}
           </div>
 
-          {/* Linha com Tipo de Serviço e Preço */}
-          <div style={styles.row}>
+          {/* Linha com Tipo de Serviço, Mensalidade, Instalação e Tipo do Card */}
+          <div style={{ ...styles.row, gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
             <div style={styles.formGroup}>
               <label style={styles.label}>Tipo de Serviço *</label>
               <input
@@ -321,7 +322,6 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
               />
               {errors.tipoServico && <span style={styles.errorText}>{errors.tipoServico}</span>}
             </div>
-
             <div style={styles.formGroup}>
               <label style={styles.label}>Mensalidade (R$)</label>
               <input
@@ -349,6 +349,23 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
                 data-error="false"
                 placeholder="0,00"
               />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Tipo do Card *</label>
+              <select
+                style={styles.input}
+                value={formData.tipo_card}
+                onChange={(e) => handleChange("tipo_card", e.target.value)}
+                onFocus={handleFieldFocus}
+                onBlur={handleFieldBlur}
+                data-error="false"
+                required
+              >
+                <option value="">Selecione...</option>
+                <option value="Venda">Venda</option>
+                <option value="Cotação">Cotação</option>
+                <option value="POC">POC</option>
+              </select>
             </div>
           </div>
 

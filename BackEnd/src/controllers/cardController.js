@@ -5,6 +5,11 @@ const normalizeCard = (card) => {
   const raw = card?.toJSON ? card.toJSON() : { ...card };
   if (!raw) return raw;
 
+  // Garante que tipo_card sempre exista (mesmo se vier null do banco)
+  if (!raw.tipo_card) {
+    raw.tipo_card = "Venda"; // Valor padrão se não vier do banco
+  }
+
   const resolvedColumnId = Number(raw?.coluna_id ?? raw?.colunaId ?? raw?.column?.id);
   if (Number.isFinite(resolvedColumnId)) {
     raw.coluna_id = resolvedColumnId;
