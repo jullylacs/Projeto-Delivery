@@ -32,6 +32,14 @@ const Card = sequelize.define("Card", {
   // Título/resumo da demanda
   titulo: DataTypes.STRING,
 
+
+  // Tipo do card (Venda, Cotação, POC)
+  tipo_card: {
+    type: DataTypes.ENUM("Venda", "Cotação", "POC"),
+    allowNull: false,
+    defaultValue: "Venda"
+  },
+
   // Tipo de serviço (DIA, BIA, L2L, etc.)
   tipoServico: DataTypes.STRING,
 

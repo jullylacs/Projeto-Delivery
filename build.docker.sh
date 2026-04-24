@@ -5,7 +5,6 @@ DEFAULT_REGISTRY="ghcr.io/jullylacs"
 DEFAULT_BACKEND_IMAGE="delivery-backend"
 DEFAULT_FRONTEND_IMAGE="delivery-frontend"
 DEFAULT_VERSION="0.0.0"
-DEFAULT_LATEST="latest"
 
 echo "=== DELIVERY BUILD ==="
 echo
@@ -28,11 +27,6 @@ VERSION=${VERSION:-$DEFAULT_VERSION}
 # LATEST?
 read -p "Also tag as 'latest'? (y/n) [y]: " USE_LATEST
 USE_LATEST=${USE_LATEST:-y}
-LATEST_TAG=""
-if [[ "$USE_LATEST" =~ ^[Yy]$ ]]; then
-    read -p "Tag name for 'latest' [${DEFAULT_LATEST}]: " LATEST_TAG
-    LATEST_TAG=${LATEST_TAG:-$DEFAULT_LATEST}
-fi
 
 # PUSH?
 read -p "Push after build? (y/n) [n]: " DO_PUSH
@@ -44,7 +38,7 @@ echo "Registry : $REGISTRY"
 echo "Backend  : ${REGISTRY}/${BACKEND_IMAGE}:${VERSION}"
 echo "Frontend : ${REGISTRY}/${FRONTEND_IMAGE}:${VERSION}"
 if [[ "$USE_LATEST" =~ ^[Yy]$ ]]; then
-    echo "Latest   : $LATEST_TAG"
+    echo "Latest   : yes (retag via docker tag, sem rebuild)"
 else
     echo "Latest   : no"
 fi
@@ -57,19 +51,18 @@ read -p "Confirm build? (y/n): " CONFIRM
 echo
 echo "=== BUILDING ==="
 
+# Builda uma única vez com a versão; o Makefile cuida do retag para latest
+LATEST_ARG=""
+if [[ "$USE_LATEST" =~ ^[Yy]$ ]]; then
+    LATEST_ARG="TAG_LATEST=true"
+fi
+
 make -f docker/Makefile build \
     REGISTRY="$REGISTRY" \
     BACKEND_IMAGE="$BACKEND_IMAGE" \
     FRONTEND_IMAGE="$FRONTEND_IMAGE" \
-    TAG="$VERSION"
-
-if [[ "$USE_LATEST" =~ ^[Yy]$ ]]; then
-    make -f docker/Makefile build \
-        REGISTRY="$REGISTRY" \
-        BACKEND_IMAGE="$BACKEND_IMAGE" \
-        FRONTEND_IMAGE="$FRONTEND_IMAGE" \
-        TAG="$LATEST_TAG"
-fi
+    TAG="$VERSION" \
+    $LATEST_ARG
 
 if [[ "$DO_PUSH" =~ ^[Yy]$ ]]; then
     echo
@@ -78,15 +71,8 @@ if [[ "$DO_PUSH" =~ ^[Yy]$ ]]; then
         REGISTRY="$REGISTRY" \
         BACKEND_IMAGE="$BACKEND_IMAGE" \
         FRONTEND_IMAGE="$FRONTEND_IMAGE" \
-        TAG="$VERSION"
-
-    if [[ "$USE_LATEST" =~ ^[Yy]$ ]]; then
-        make -f docker/Makefile push \
-            REGISTRY="$REGISTRY" \
-            BACKEND_IMAGE="$BACKEND_IMAGE" \
-            FRONTEND_IMAGE="$FRONTEND_IMAGE" \
-            TAG="$LATEST_TAG"
-    fi
+        TAG="$VERSION" \
+        $LATEST_ARG
 fi
 
 echo

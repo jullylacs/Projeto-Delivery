@@ -6,19 +6,36 @@ export default function Card({ card, usuarioLogado }) {
 
   return (
     <div
-      style={styles.card} // Aplica estilo principal do card
+      style={styles.card}
       onMouseEnter={(e) => {
-        // Ao passar o mouse, eleva o card visualmente
         e.currentTarget.style.transform = "translateY(-5px)";
         e.currentTarget.style.boxShadow =
           "0 12px 24px rgba(108,59,255,0.3), 0 0 15px rgba(108,59,255,0.2)";
       }}
       onMouseLeave={(e) => {
-        // Ao sair o mouse, volta à posição normal
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.08)";
       }}
     >
+      {/* Identificação do Card (Venda, Cotação, POC) */}
+      {card.tipo_card && (
+        <div style={{
+          background: '#e7e3ff',
+          color: '#5a30ff',
+          fontWeight: 700,
+          fontSize: 13,
+          borderRadius: 10,
+          padding: '4px 16px',
+          marginBottom: 8,
+          display: 'inline-block',
+          letterSpacing: 0.5,
+          textTransform: 'uppercase',
+          border: '1px solid #cfc2ff',
+          alignSelf: 'flex-start',
+        }}>
+          {card.tipo_card}
+        </div>
+      )}
       {/* Header */}
       <div style={styles.header}>
         <div>

@@ -1274,6 +1274,50 @@ function DroppableColumn({ id, children, minHeight, padding }) {
 // Componente de card que pode ser arrastado
 // Representa um item individual no kanban
 function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargeted = false, domId }) {
+    // Função para copiar o link do card
+    const handleCopyLink = (e) => {
+      e.stopPropagation();
+      const cardId = card?._id || card?.id;
+      if (!cardId) return;
+      const url = `${window.location.origin}${window.location.pathname}#card-${cardId}`;
+      // Tenta copiar usando Clipboard API, se falhar usa fallback
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url).then(() => showCopyMsg(), showFallback);
+      } else {
+        showFallback();
+      }
+
+      function showFallback() {
+        // Fallback: cria input temporário
+        const tempInput = document.createElement('input');
+        tempInput.value = url;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        try {
+          document.execCommand('copy');
+        } catch {}
+        tempInput.remove();
+        showCopyMsg();
+      }
+
+      function showCopyMsg() {
+        const msg = document.createElement('div');
+        msg.textContent = 'Copiado com sucesso';
+        msg.style.position = 'fixed';
+        msg.style.top = '24px';
+        msg.style.right = '24px';
+        msg.style.background = '#5a30ff';
+        msg.style.color = '#fff';
+        msg.style.padding = '10px 22px';
+        msg.style.borderRadius = '10px';
+        msg.style.fontWeight = '700';
+        msg.style.fontSize = '15px';
+        msg.style.boxShadow = '0 2px 12px rgba(90,48,255,0.13)';
+        msg.style.zIndex = 9999;
+        document.body.appendChild(msg);
+        setTimeout(() => { msg.remove(); }, 1400);
+      }
+    };
   // useDraggable do dnd-kit para tornar o card arrastável
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: getCardKey(card) });
   const [isHovered, setIsHovered] = useState(false);
@@ -1343,6 +1387,47 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
       onMouseLeave={() => setIsHovered(false)} // Desativa hover
       {...attributes} // Propriedades de acessibilidade para drag and drop
     >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: card.tipo_card ? 8 : 0 }}>
+        {/* Badge do tipo_card no topo */}
+        {card.tipo_card && (
+          <div style={{
+            background: '#e7e3ff',
+            color: '#5a30ff',
+            fontWeight: 700,
+            fontSize: 13,
+            borderRadius: 10,
+            padding: '4px 16px',
+            display: 'inline-block',
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            border: '1px solid #cfc2ff',
+            alignSelf: 'flex-start',
+          }}>
+            {card.tipo_card}
+          </div>
+        )}
+        {/* Botão de copiar link do card (ícone) */}
+        {(card._id || card.id) && (
+          <button
+            onClick={handleCopyLink}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              marginLeft: 0,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Copiar link do card"
+          >
+            <svg width="19" height="19" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="6" width="10" height="10" rx="3" stroke="#5a30ff" strokeWidth="2" fill="#f3f0ff"/>
+              <rect x="3" y="3" width="10" height="10" rx="3" stroke="#b7aaff" strokeWidth="2" fill="#fff"/>
+            </svg>
+          </button>
+        )}
+      </div>
       <div style={styles.cardHeader}>
         {/* Alça para arrastar o card */}
         <div
@@ -1470,6 +1555,7 @@ export default function Board() {
     tipoServico: "",
     mensalidade: "",
     instalacao: "",
+    tipo_card: "",
     sla: 0,
     prazo: "",
     tempoContratual: "",
@@ -1839,13 +1925,22 @@ export default function Board() {
     return true;
   }, [cards]);
 
+  // Deep link: abre o card automaticamente se o hash da URL for #card-ID
   useEffect(() => {
-    const pendingCardId = localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
+    let pendingCardId = localStorage.getItem(KANBAN_FOCUS_CARD_KEY);
+    // Se não houver no localStorage, tenta pelo hash da URL
+    if (!pendingCardId && window.location.hash.startsWith('#card-')) {
+      pendingCardId = window.location.hash.replace('#card-', '').trim();
+    }
     if (!pendingCardId) return;
 
     const focused = focusCardById(pendingCardId);
     if (focused) {
       localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+      // Limpa o hash da URL após abrir o card
+      if (window.location.hash.startsWith('#card-')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
     }
   }, [cards, focusCardById]);
 
@@ -2490,6 +2585,7 @@ export default function Board() {
         telefone: newCard.telefone.trim(),
         endereco: newCard.endereco.trim(),
         tipoServico: newCard.tipoServico.trim(),
+        tipo_card: newCard.tipo_card || "",
         mensalidade: newCard.mensalidade ? Number(newCard.mensalidade) : 0,
         instalacao: newCard.instalacao ? Number(newCard.instalacao) : 0,
         tempoContratual: newCard.tempoContratual ? Number(newCard.tempoContratual) : 0,
@@ -3487,50 +3583,66 @@ export default function Board() {
               </div>
 
               <div style={styles.createSection}>
-                <div style={styles.createSectionHeader}>
-                  <h3 style={styles.createSectionTitle}><Wrench size={16} /> Escopo e valores</h3>
-                  <span style={styles.createSectionChip}>Operação</span>
-                </div>
-                <div style={styles.createSectionGrid}>
-                  <div style={styles.createRow}>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><Wrench size={13} /> Tipo de serviço <span style={styles.createRequired}>*</span></label>
-                      <input
-                        style={styles.createInput}
-                        value={newCard.tipoServico}
-                        onChange={(e) => handleInputChange("tipoServico", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                        placeholder="Instalação, manutenção, visita técnica"
-                      />
-                    </div>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><DollarSign size={13} /> Mensalidade (R$)</label>
-                      <input
-                        style={styles.createInput}
-                        type="number"
-                        step="0.01"
-                        value={newCard.mensalidade}
-                        onChange={(e) => handleInputChange("mensalidade", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                        placeholder="0,00"
-                      />
-                    </div>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><DollarSign size={13} /> Instalação (R$)</label>
-                      <input
-                        style={styles.createInput}
-                        type="number"
-                        step="0.01"
-                        value={newCard.instalacao}
-                        onChange={(e) => handleInputChange("instalacao", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                        placeholder="0,00"
-                      />
-                    </div>
+                  <div style={styles.createSectionHeader}>
+                    <h3 style={styles.createSectionTitle}><Wrench size={16} /> Escopo e valores</h3>
+                    <span style={styles.createSectionChip}>Operação</span>
                   </div>
+                  <div style={styles.createSectionGrid}>
+                    <div style={styles.createRow}>
+                      <div style={styles.createField}>
+                        <label style={styles.createLabel}><Wrench size={13} /> Tipo de serviço <span style={styles.createRequired}>*</span></label>
+                        <input
+                          style={styles.createInput}
+                          value={newCard.tipoServico}
+                          onChange={(e) => handleInputChange("tipoServico", e.target.value)}
+                          onFocus={handleCreateFieldFocus}
+                          onBlur={handleCreateFieldBlur}
+                          placeholder="Instalação, manutenção, visita técnica"
+                        />
+                      </div>
+                      <div style={styles.createField}>
+                        <label style={styles.createLabel}>Tipo do Card <span style={styles.createRequired}>*</span></label>
+                        <select
+                          style={styles.createInput}
+                          value={newCard.tipo_card}
+                          onChange={(e) => handleInputChange("tipo_card", e.target.value)}
+                          onFocus={handleCreateFieldFocus}
+                          onBlur={handleCreateFieldBlur}
+                          required
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Venda">Venda</option>
+                          <option value="Cotação">Cotação</option>
+                          <option value="POC">POC</option>
+                        </select>
+                      </div>
+                      <div style={styles.createField}>
+                        <label style={styles.createLabel}><DollarSign size={13} /> Mensalidade (R$)</label>
+                        <input
+                          style={styles.createInput}
+                          type="number"
+                          step="0.01"
+                          value={newCard.mensalidade}
+                          onChange={(e) => handleInputChange("mensalidade", e.target.value)}
+                          onFocus={handleCreateFieldFocus}
+                          onBlur={handleCreateFieldBlur}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div style={styles.createField}>
+                        <label style={styles.createLabel}><DollarSign size={13} /> Instalação (R$)</label>
+                        <input
+                          style={styles.createInput}
+                          type="number"
+                          step="0.01"
+                          value={newCard.instalacao}
+                          onChange={(e) => handleInputChange("instalacao", e.target.value)}
+                          onFocus={handleCreateFieldFocus}
+                          onBlur={handleCreateFieldBlur}
+                          placeholder="0,00"
+                        />
+                      </div>
+                    </div>
 
                   <div style={styles.createRow}>
                     <div style={styles.createField}>
@@ -3806,6 +3918,26 @@ export default function Board() {
                 <span style={styles.detailsLabel}><User size={14} /> Cliente:</span> 
                 <span style={styles.detailsValue}>{selectedCard.cliente}</span>
               </div>
+              {/* Exibe o tipo do card (Venda, Cotação, POC) */}
+              {selectedCard.tipo_card && (
+                <div style={styles.detailsRow}>
+                  <span style={styles.detailsLabel}>Tipo do Card:</span>
+                  <span style={{
+                    ...styles.detailsValue,
+                    background: '#e7e3ff',
+                    color: '#5a30ff',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    borderRadius: 10,
+                    padding: '2px 14px',
+                    marginLeft: 8,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    border: '1px solid #cfc2ff',
+                    display: 'inline-block',
+                  }}>{selectedCard.tipo_card}</span>
+                </div>
+              )}
               <div style={styles.detailsRow}>
                 <span style={styles.detailsLabel}>Telefone:</span> 
                 <span style={styles.detailsValue}>{selectedCard.telefone}</span>
@@ -3945,7 +4077,7 @@ export default function Board() {
                     Nenhum comentário ainda.
                   </p>
                 ) : (
-                  (selectedCard.comments || []).map((comment, idx) => (
+                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => (
                     <div key={comment.id} style={styles.detailsCommentItem}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4284,8 +4416,11 @@ export default function Board() {
                               </button>
                             </div>
                           ) : (
-                            <a href={comment.attachment.data} download={comment.attachment.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13 }}>
-                              <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} /> {comment.attachment.name}
+                            <a href={comment.attachment.data} download={comment.attachment.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, maxWidth: 180, display: 'inline-flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                              <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 120 }}>
+                                {comment.attachment.name}
+                              </span>
                             </a>
                           )}
                         </div>

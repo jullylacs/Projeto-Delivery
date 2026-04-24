@@ -5,6 +5,11 @@ const normalizeCard = (card) => {
   const raw = card?.toJSON ? card.toJSON() : { ...card };
   if (!raw) return raw;
 
+  // Garante que tipo_card sempre exista (mesmo se vier null do banco)
+  if (!raw.tipo_card) {
+    raw.tipo_card = "Venda"; // Valor padrão se não vier do banco
+  }
+
   const resolvedColumnId = Number(raw?.coluna_id ?? raw?.colunaId ?? raw?.column?.id);
   if (Number.isFinite(resolvedColumnId)) {
     raw.coluna_id = resolvedColumnId;
@@ -63,13 +68,24 @@ const resolveColumn = async (payload) => {
 
 const buildCardPayload = async (input) => {
   const payload = { ...input };
-  // Garante que tempoContratual seja inteiro ou null
-  if (payload.tempoContratual !== undefined && payload.tempoContratual !== null && payload.tempoContratual !== "") {
-    const parsedTempo = parseInt(payload.tempoContratual, 10);
-    payload.tempoContratual = Number.isFinite(parsedTempo) ? parsedTempo : null;
-  }
-  const resolvedColumn = await resolveColumn(payload);
 
+  // Lista de campos inteiros
+  const intFields = ["tempoContratual", "sla", "coluna_id", "vendedor_id"];
+  intFields.forEach((field) => {
+    if (payload[field] === "") payload[field] = null;
+    if (payload[field] !== undefined && payload[field] !== null && payload[field] !== "") {
+      const parsed = parseInt(payload[field], 10);
+      payload[field] = Number.isFinite(parsed) ? parsed : null;
+    }
+  });
+
+  // Campos do tipo data
+  const dateFields = ["prazo", "createdAt", "updatedAt"];
+  dateFields.forEach((field) => {
+    if (payload[field] === "") payload[field] = null;
+  });
+
+  const resolvedColumn = await resolveColumn(payload);
   if (!resolvedColumn) {
     return { error: "Coluna inválida. Crie a coluna antes de vincular cards." };
   }
@@ -180,6 +196,14 @@ exports.updateCard = async (req, res) => {
     // Retorna o card atualizado
     res.json(normalizeCard(card));
   } catch (err) {
+    // Log detalhado para depuração
+    console.error("[updateCard] Erro ao atualizar card:", {
+      message: err?.message,
+      name: err?.name,
+      stack: err?.stack,
+      body: req.body,
+      params: req.params,
+    });
     // Em caso de erro (ex: falha no banco), retorna status 500
     res.status(500).json({ error: err?.message || err?.name || "Erro ao atualizar card" });
   }
