@@ -68,6 +68,7 @@ const cardRoutes = require("./routes/cardRoutes");
 const columnRoutes = require("./routes/columnRoutes");
 const userRoutes = require("./routes/userRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
 const auth = require("./controllers/middleware/auth");
@@ -94,6 +95,7 @@ app.use(`${apiBasePath}/cards`, cardRoutes);
 app.use(`${apiBasePath}/columns`, auth, columnRoutes);
 app.use(`${apiBasePath}/users`, userRoutes);
 app.use(`${apiBasePath}/notifications`, notificationRoutes);
+app.use(`${apiBasePath}/roles`, roleRoutes);
 app.use(`${apiBasePath}/schedules`, scheduleRoutes);
 app.use(`${apiBasePath}/technicians`, technicianRoutes);
 

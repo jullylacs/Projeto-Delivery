@@ -160,10 +160,11 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
     tempoContratual: card.tempoContratual || "",
     observacoes: card.observacoes || "",
     vendedorId: String(card?.vendedor?.id || card?.vendedor_id || card?.vendedorId || ""),
-    coordenadas: {
-      lat: card.coordenadas?.lat || "",
-      lng: card.coordenadas?.lng || "",
-    },
+    coordenadas: card.coordenadas && card.coordenadas.lat && card.coordenadas.lng
+      ? `${card.coordenadas.lat},${card.coordenadas.lng}`
+      : typeof card.coordenadas === "string"
+        ? card.coordenadas
+        : "",
   });
 
   // Estado para armazenar mensagens de erro de validação
@@ -204,7 +205,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
     const newErrors = {};
     if (!formData.cliente.trim()) newErrors.cliente = "Cliente é obrigatório";
     if (!formData.telefone.trim()) newErrors.telefone = "Telefone é obrigatório";
-    if (!formData.endereco.trim()) newErrors.endereco = "Endereço é obrigatório";
+    // Endereço e coordenadas agora são opcionais
     if (!formData.tipoServico.trim()) newErrors.tipoServico = "Tipo de serviço é obrigatório";
 
     setErrors(newErrors); // Atualiza estado de erros
@@ -292,9 +293,9 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
             </div>
           </div>
 
-          {/* Endereço */}
+          {/* Endereço e Coordenadas juntos/opcionais */}
           <div style={styles.formGroup}>
-            <label style={styles.label}>Endereço *</label>
+            <label style={styles.label}>Endereço ou Coordenadas</label>
             <input
               style={{ ...styles.input, borderColor: errors.endereco ? "#ff4444" : "#e2e0f0" }}
               value={formData.endereco}
@@ -302,9 +303,25 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
               onFocus={handleFieldFocus}
               onBlur={handleFieldBlur}
               data-error={errors.endereco ? "true" : "false"}
-              placeholder="Rua, número, bairro, cidade"
+              placeholder="Rua, número, bairro, cidade OU latitude,longitude"
             />
-            {errors.endereco && <span style={styles.errorText}>{errors.endereco}</span>}
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input
+                style={{ ...styles.input, flex: 1 }}
+                value={formData.coordenadas.lat}
+                onChange={e => handleChange("lat", e.target.value)}
+                placeholder="Latitude (opcional)"
+              />
+              <input
+                style={{ ...styles.input, flex: 1 }}
+                value={formData.coordenadas.lng}
+                onChange={e => handleChange("lng", e.target.value)}
+                placeholder="Longitude (opcional)"
+              />
+            </div>
+            <span style={{ color: "#7a73a1", fontSize: 12 }}>
+              Preencha endereço, coordenadas ou ambos. Nenhum campo é obrigatório.
+            </span>
           </div>
 
           {/* Linha com Tipo de Serviço, Mensalidade, Instalação e Tipo do Card */}
