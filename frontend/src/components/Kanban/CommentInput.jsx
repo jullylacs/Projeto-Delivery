@@ -1,3 +1,14 @@
+// Função utilitária para contexto de menção
+const mentionContextFromText = (text, caretPosition) => {
+  const beforeCaret = text.slice(0, caretPosition);
+  const atIndex = beforeCaret.lastIndexOf("@");
+  if (atIndex === -1) return null;
+  const hasSpaceBefore = atIndex > 0 && !/\s/.test(beforeCaret[atIndex - 1]);
+  if (hasSpaceBefore) return null;
+  const query = beforeCaret.slice(atIndex + 1);
+  if (/\s/.test(query)) return null;
+  return { start: atIndex, end: caretPosition, query };
+};
 import React, { useMemo, useRef, useState } from "react";
 import { AtSign, Bold, Code, Italic, List, ListOrdered, Paperclip, Quote, SendHorizontal } from "lucide-react";
 
@@ -15,33 +26,14 @@ const normalizeMentionUsers = (users = []) => {
       };
     })
     .filter((user) => user.name)
+
     .reduce((acc, user) => {
       if (acc.some((item) => item.name.toLowerCase() === user.name.toLowerCase())) {
         return acc;
       }
-
       acc.push(user);
       return acc;
     }, []);
-};
-
-const mentionContextFromText = (text, caretPosition) => {
-  const beforeCaret = text.slice(0, caretPosition);
-  const atIndex = beforeCaret.lastIndexOf("@");
-
-  if (atIndex === -1) return null;
-
-  const hasSpaceBefore = atIndex > 0 && !/\s/.test(beforeCaret[atIndex - 1]);
-  if (hasSpaceBefore) return null;
-
-  const query = beforeCaret.slice(atIndex + 1);
-  if (/\s/.test(query)) return null;
-
-  return {
-    start: atIndex,
-    end: caretPosition,
-    query,
-  };
 };
 
 export default function CommentInput({

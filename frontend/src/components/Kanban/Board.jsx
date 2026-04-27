@@ -2173,9 +2173,9 @@ export default function Board() {
     setStatusEdit(String(getCardColumnId(card) || ""));
     setVendorEdit(String(card?.vendedor?.id || card?.vendedor_id || ""));
     setVendorSearchDetails("");
-    setCommentText("");
+    // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
-    setPendingAttachment(null);
+    setPendingAttachments([]); // Corrige: limpa anexos pendentes
   };
 
   // Fecha modal de detalhes
@@ -2184,13 +2184,13 @@ export default function Board() {
     setSelectedCard(null);
     setVendorEdit("");
     setVendorSearchDetails("");
-    setCommentText("");
+    // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
     setReplyDraftByCommentId({});
     setActiveReplyCommentId(null);
     setEditingReplyKey(null);
     setEditingReplyText("");
-    setPendingAttachment(null);
+    setPendingAttachments([]); // Corrige: limpa anexos pendentes
     setPreviewImage(null);
     setPreviewZoom(1);
   };
@@ -2387,6 +2387,10 @@ export default function Board() {
     }
   };
 
+  // Estado local do texto do comentário
+  const [commentText, setCommentText] = useState("");
+  const [isCommentLoading, setIsCommentLoading] = useState(false);
+
   // Recebe array de arquivos, lê todos e adiciona ao pendingAttachments
   const handleAttachmentSelect = (files) => {
     if (!files || files.length === 0) return;
@@ -2409,6 +2413,9 @@ export default function Board() {
     });
   };
 
+  // Limpa anexos pendentes
+  const handleClearAttachment = () => setPendingAttachments([]);
+
   const getAvatarInitials = (name) => {
     const safeName = String(name || "Usuário").trim();
     if (!safeName) return "U";
@@ -2421,11 +2428,21 @@ export default function Board() {
   };
 
   // Adiciona comentário ao card
+  // Adiciona comentário ao card
   const handleAddComment = async () => {
-    if (!selectedCard) return;
+
+
+    console.log('[DEBUG] handleAddComment chamado', { selectedCard, commentText, pendingAttachments });
+    if (!selectedCard) {
+      console.warn('[DEBUG] selectedCard indefinido');
+      return;
+    }
 
     const normalizedText = commentText.trim();
-    if (!normalizedText && pendingAttachments.length === 0) return;
+    if (!normalizedText && pendingAttachments.length === 0) {
+      console.warn('[DEBUG] Comentário vazio e sem anexos');
+      return;
+    }
 
     // Recupera dados do usuário para identificar autor
     const userData = JSON.parse(localStorage.getItem("user") || "null");
@@ -2450,14 +2467,16 @@ export default function Board() {
     const commentTimeout = setTimeout(() => setIsCommentLoading(false), 120000);
     try {
       // Envia para API
-      await persistCommentsOnSelectedCard(updatedComments);
-      setCommentText(""); // Limpa campo de comentário
+      const result = await persistCommentsOnSelectedCard(updatedComments);
+      console.log("[DEBUG] Comentário enviado com sucesso", result);
+      setCommentText("");
       setIsCommentComposerOpen(false);
       setPendingAttachments([]);
       setIsCommentLoading(false);
       clearTimeout(commentTimeout);
     } catch (err) {
       console.error("erro ao adicionar comentário", err);
+      alert("Erro ao adicionar comentário: " + (err?.message || err));
       setError("Erro ao adicionar comentário. Tente novamente ou verifique sua conexão.");
       setIsCommentLoading(false);
       clearTimeout(commentTimeout);
@@ -4306,7 +4325,7 @@ export default function Board() {
                           }}><Trash2 size={15} /></button>
                           <button style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }} title="Editar comentário" onClick={() => {
                             setIsCommentComposerOpen(true);
-                            setCommentText(comment.text);
+                            // setCommentText removido (não existe mais)
                             const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
                             const cardUpdate = { ...selectedCard, comments: updatedComments };
                             api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate).then((response) => {
@@ -4694,9 +4713,10 @@ export default function Board() {
                 ) : (
                   <>
                     <CommentInput
-                      // O estado do texto do comentário é local ao CommentInput
-                      onSend={handleSendComment}
-                      onFile={handleFileAttachment}
+                      value={commentText}
+                      onChange={setCommentText}
+                      onSend={handleAddComment}
+                      onFile={handleAttachmentSelect}
                       placeholder="Escreva um comentário..."
                       mentionUsers={mentionUsers}
                       pendingAttachments={pendingAttachments}
@@ -4707,8 +4727,10 @@ export default function Board() {
                         type="button"
                         onClick={() => {
                           setIsCommentComposerOpen(false);
-                          setCommentText("");
-                          setPendingAttachment(null);
+                          // setCommentText removido (não existe mais)
+                          setPendingAttachments([]); // Corrige: limpa anexos pendentes
+                        // Função para limpar anexos pendentes
+                        const handleClearAttachment = () => setPendingAttachments([]);
                         }}
                         style={{
                           border: "none",
