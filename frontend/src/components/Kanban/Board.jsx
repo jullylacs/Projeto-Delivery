@@ -1599,6 +1599,14 @@ export default function Board() {
   const defaultColumnName = columns[0] || "Novo";
 
   const densityPresets = {
+    mini: {
+      columnWidth: "210px",
+      cardMinWidth: "185px",
+      cardPadding: "6px 5px",
+      columnMinHeight: "340px",
+      columnPadding: "4px",
+      metaFontSize: "9px",
+    },
     compacto: {
       columnWidth: "320px",
       cardMinWidth: "294px",
@@ -3138,6 +3146,7 @@ export default function Board() {
         <div style={{ display: "flex", gap: 10 }}>
           <div style={styles.densityGroup}>
             {[
+              { key: "mini", label: "Mini" },
               { key: "compacto", label: "Compacto" },
               { key: "medio", label: "Médio" },
               { key: "confortavel", label: "Confortável" },
