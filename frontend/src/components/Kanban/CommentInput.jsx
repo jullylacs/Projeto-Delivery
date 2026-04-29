@@ -37,15 +37,19 @@ const normalizeMentionUsers = (users = []) => {
 };
 
 export default function CommentInput({
-  value,
-  onChange,
   onSend,
   onFile,
   placeholder,
   mentionUsers = [],
   pendingAttachments = [],
   onClearAttachment,
+  initialValue = "",
 }) {
+  const [value, setValue] = useState(initialValue);
+    // Atualiza o valor se initialValue mudar (ex: ao trocar de comentário para editar)
+    React.useEffect(() => {
+      setValue(initialValue);
+    }, [initialValue]);
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({
     isOpen: false,
@@ -55,11 +59,11 @@ export default function CommentInput({
     activeIndex: 0,
   });
 
-  // Otimização: só calcula usuários de menção se realmente houver @ no texto
+  // Otimização: só calcula usuários de menção quando a lista de menção está aberta
   const users = useMemo(() => {
-    if (!value.includes("@")) return [];
+    if (!mentionState.isOpen) return [];
     return normalizeMentionUsers(mentionUsers);
-  }, [mentionUsers, value]);
+  }, [mentionUsers, mentionState.isOpen]);
 
   const applyInlineFormat = (prefix, suffix = prefix) => {
     const node = textAreaRef.current;
@@ -71,7 +75,7 @@ export default function CommentInput({
     const formatted = `${prefix}${selected}${suffix}`;
     const nextValue = `${value.slice(0, start)}${formatted}${value.slice(end)}`;
 
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -96,7 +100,7 @@ export default function CommentInput({
       .join("\n");
 
     const nextValue = `${value.slice(0, start)}${prefixed}${value.slice(end)}`;
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -117,7 +121,7 @@ export default function CommentInput({
     const node = textAreaRef.current;
     const mention = "@";
     if (!node) {
-      onChange(`${value}${mention}`);
+      setValue(`${value}${mention}`);
       return;
     }
 
@@ -125,7 +129,7 @@ export default function CommentInput({
     const end = node.selectionEnd ?? value.length;
     const nextValue = `${value.slice(0, start)}${mention}${value.slice(end)}`;
 
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -150,7 +154,7 @@ export default function CommentInput({
     const nextValue = `${prefix}${mentionText}${suffix}`;
     const nextCaret = prefix.length + mentionText.length;
 
-    onChange(nextValue);
+    setValue(nextValue);
     closeMentionList();
 
     requestAnimationFrame(() => {
@@ -160,7 +164,7 @@ export default function CommentInput({
   };
 
   const handleTextChange = (nextValue, caretPosition) => {
-    onChange(nextValue);
+    setValue(nextValue);
 
     const context = mentionContextFromText(nextValue, caretPosition);
     if (!context) {
@@ -491,7 +495,12 @@ export default function CommentInput({
       </label>
       <button
         type="button"
-        onClick={onSend}
+        onClick={() => {
+          if (value.trim()) {
+            onSend && onSend(value);
+            setValue("");
+          }
+        }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "translateY(-1px)";
           e.currentTarget.style.boxShadow = "0 6px 14px rgba(78,46,187,0.45)";

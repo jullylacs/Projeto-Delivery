@@ -2435,10 +2435,11 @@ export default function Board() {
 
   // Adiciona comentário ao card
   // Adiciona comentário ao card
-  const handleAddComment = async () => {
+
+  const handleAddComment = async (commentTextArg) => {
     if (!selectedCard) return;
 
-    const normalizedText = commentText.trim();
+    const normalizedText = (commentTextArg || "").trim();
     if (!normalizedText && pendingAttachments.length === 0) return;
 
     const userData = JSON.parse(localStorage.getItem("user") || "null");
@@ -4706,14 +4707,13 @@ export default function Board() {
                 ) : (
                   <>
                     <CommentInput
-                      value={commentText}
-                      onChange={setCommentText}
                       onSend={handleAddComment}
                       onFile={handleAttachmentSelect}
                       placeholder="Escreva um comentário..."
                       mentionUsers={mentionUsers}
                       pendingAttachments={pendingAttachments}
                       onClearAttachment={handleClearAttachment}
+                      initialValue={editingCommentIdx !== null && selectedCard && selectedCard.comments && selectedCard.comments[editingCommentIdx] ? selectedCard.comments[editingCommentIdx].text : ""}
                     />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <button
@@ -4722,7 +4722,7 @@ export default function Board() {
                           setIsCommentComposerOpen(false);
                           setPendingAttachments([]);
                           setEditingCommentIdx(null);
-                          setCommentText("");
+                          // Não precisa mais limpar commentText
                         }}
                         style={{
                           border: "none",
