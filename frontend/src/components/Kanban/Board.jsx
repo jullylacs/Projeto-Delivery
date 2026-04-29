@@ -4273,7 +4273,9 @@ export default function Board() {
                     Nenhum comentário ainda.
                   </p>
                 ) : (
-                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => (
+                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => {
+                    const originalIdx = (selectedCard.comments || []).length - 1 - idx;
+                    return (
                     <div key={comment.id} style={styles.detailsCommentItem}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4314,7 +4316,7 @@ export default function Board() {
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }} title="Excluir comentário" onClick={async () => {
-                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
+                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== originalIdx);
                             try {
                               await persistCommentsOnSelectedCard(updatedComments);
                             } catch (err) {
@@ -4322,7 +4324,7 @@ export default function Board() {
                             }
                           }}><Trash2 size={15} /></button>
                           <button style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }} title="Editar comentário" onClick={() => {
-                            setEditingCommentIdx(idx);
+                            setEditingCommentIdx(originalIdx);
                             setCommentText(comment.text || "");
                             setIsCommentComposerOpen(true);
                           }}><Pencil size={15} /></button>
@@ -4676,7 +4678,8 @@ export default function Board() {
                         {new Date(comment.createdAt).toLocaleString('pt-BR')}
                       </small>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
 
@@ -4719,12 +4722,9 @@ export default function Board() {
                         type="button"
                         onClick={() => {
                           setIsCommentComposerOpen(false);
-                          // setCommentText removido (não existe mais)
-                          setPendingAttachments([]); // Corrige: limpa anexos pendentes
+                          setPendingAttachments([]);
                           setEditingCommentIdx(null);
                           setCommentText("");
-                        // Função para limpar anexos pendentes
-                        const handleClearAttachment = () => setPendingAttachments([]);
                         }}
                         style={{
                           border: "none",
@@ -4948,4 +4948,3 @@ export default function Board() {
     </div>
   );
 }
-
