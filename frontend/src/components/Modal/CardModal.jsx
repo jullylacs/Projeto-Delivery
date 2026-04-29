@@ -204,7 +204,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
   const validate = () => {
     const newErrors = {};
     if (!formData.cliente.trim()) newErrors.cliente = "Cliente é obrigatório";
-    if (!formData.telefone.trim()) newErrors.telefone = "Telefone é obrigatório";
+    // Telefone não é mais obrigatório
     // Endereço e coordenadas agora são opcionais
     if (!formData.tipoServico.trim()) newErrors.tipoServico = "Tipo de serviço é obrigatório";
 
@@ -279,7 +279,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
             </div>
 
             <div style={styles.formGroup}>
-              <label style={styles.label}>Telefone *</label>
+              <label style={styles.label}>Telefone</label>
               <input
                 style={{ ...styles.input, borderColor: errors.telefone ? "#ff4444" : "#e2e0f0" }}
                 value={formData.telefone}
@@ -458,26 +458,13 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
         </div>
       </div>
 
-      {/* Seção de Prazo, SLA e Tempo Contratual */}
+      {/* Seção de SLA e Tempo Contratual (Prazo removido) */}
       <div style={styles.sectionCard}>
         <div style={styles.sectionHeader}>
-          <h3 style={styles.sectionTitle}>Prazos, SLA e Contrato</h3>
+          <h3 style={styles.sectionTitle}>SLA e Contrato</h3>
           <span style={styles.sectionCaption}>Controle</span>
         </div>
         <div style={styles.row}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Prazo</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={formData.prazo}
-              onChange={(e) => handleChange("prazo", e.target.value)}
-              onFocus={handleFieldFocus}
-              onBlur={handleFieldBlur}
-              data-error="false"
-            />
-          </div>
-
           <div style={styles.formGroup}>
             <label style={styles.label}>SLA (horas)</label>
             <input

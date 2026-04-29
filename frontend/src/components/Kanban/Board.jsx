@@ -67,7 +67,7 @@ const mapImportedCard = ({ card, status, seller, sellerId }) => {
   const description = String(card?.observacoes || card?.description || card?.desc || "").trim();
   const labels = Array.isArray(card?.labels) ? card.labels : [];
   const firstLabel = labels.find((label) => label?.name)?.name || "";
-  const dueDateRaw = card?.prazo || card?.due || null;
+  // const dueDateRaw = card?.prazo || card?.due || null;
   const dueDate = dueDateRaw && !Number.isNaN(new Date(dueDateRaw).getTime())
     ? new Date(dueDateRaw).toISOString().slice(0, 10)
     : "";
@@ -84,7 +84,7 @@ const mapImportedCard = ({ card, status, seller, sellerId }) => {
     tipoServico: String(card?.tipoServico || firstLabel || "Importado"),
     preco: Number(card?.preco || 0),
     sla: Number(card?.sla || 0),
-    prazo: dueDate || null,
+    // prazo removido
     observacoes: description || "Importado de fonte externa",
     status,
     coluna: status,
@@ -141,7 +141,7 @@ const EXPORT_FIELDS = [
   { key: "tipoServico", label: "tipo_servico" },
   { key: "preco", label: "preco" },
   { key: "sla", label: "sla" },
-  { key: "prazo", label: "prazo" },
+  // { key: "prazo", label: "prazo" },
   { key: "status", label: "status" },
   { key: "coluna", label: "coluna" },
   { key: "vendedor", label: "vendedor" },
@@ -158,9 +158,9 @@ const normalizeExportValue = (card, fieldKey) => {
     return Array.isArray(card?.comments) ? card.comments.length : 0;
   }
 
-  if (fieldKey === "prazo") {
-    return card?.prazo ? new Date(card.prazo).toLocaleDateString("pt-BR") : "";
-  }
+  // if (fieldKey === "prazo") {
+  //   return card?.prazo ? new Date(card.prazo).toLocaleDateString("pt-BR") : "";
+  // }
 
   const value = card?.[fieldKey];
   return value ?? "";
@@ -1473,22 +1473,19 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
 
         {/* Tags de preço, prazo e SLA */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-          {/* Tag de preço */}
-          {card.preco && (
+          {/* Tag de mensalidade */}
+          {card.mensalidade > 0 && (
             <span style={styles.priceTag}>
-              <DollarSign size={12} /> {formatPrice(card.preco)}
+              <DollarSign size={12} /> Mensalidade: {Number(card.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
-          {/* Tag de prazo com destaque visual para atrasado */}
-          {card.prazo && (
-            <span style={{
-              ...styles.deadlineTag,
-              background: isOverdue(card.prazo) ? "#ffebee" : "#fff3e0", // Vermelho se atrasado
-              color: isOverdue(card.prazo) ? "#c62828" : "#e65100",
-            }}>
-              <CalendarDays size={12} /> {new Date(card.prazo).toLocaleDateString("pt-BR")}
+          {/* Tag de instalação */}
+          {card.instalacao > 0 && (
+            <span style={styles.priceTag}>
+              <DollarSign size={12} /> Instalação: {Number(card.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
+          {/* Prazo removido */}
           {/* Tag de SLA (Service Level Agreement) */}
           {card.sla > 0 && (
             <span style={{ ...styles.deadlineTag, background: "#e3f2fd", color: "#1565c0" }}>
@@ -2622,7 +2619,7 @@ export default function Board() {
         instalacao: newCard.instalacao ? Number(newCard.instalacao) : 0,
         tempoContratual: newCard.tempoContratual ? Number(newCard.tempoContratual) : 0,
         sla: newCard.sla ? Number(newCard.sla) : 0,
-        prazo: newCard.prazo || null,
+        // prazo removido
         observacoes: newCard.observacoes?.trim() || "",
         coordenadas,
         colunaId: Number(colunaId),
@@ -2651,7 +2648,7 @@ export default function Board() {
           mensalidade: "",
           instalacao: "",
           sla: 0,
-          prazo: "",
+          // prazo removido
           observacoes: "",
           vendedorId: "",
         });
@@ -2852,7 +2849,7 @@ export default function Board() {
         titulo: card?.name || "",
         desc: extraNotes,
         observacoes: extraNotes,
-        prazo: card?.due || null,
+        // prazo removido
         comments: commentsByCard.get(card?.id) || [],
         vendedor: mainMember?.fullName || mainMember?.username || "",
       };
@@ -3880,17 +3877,7 @@ export default function Board() {
                         placeholder="0"
                       />
                     </div>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><CalendarDays size={13} /> Prazo</label>
-                      <input
-                        style={styles.createInput}
-                        type="date"
-                        value={newCard.prazo}
-                        onChange={(e) => handleInputChange("prazo", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                      />
-                    </div>
+                    {/* Campo Prazo removido */}
                     <div style={styles.createField}>
                       <label style={styles.createLabel}><FileText size={13} /> Tempo Contratual</label>
                       <input
@@ -4110,68 +4097,70 @@ export default function Board() {
                 <div style={styles.detailsMainBody}>
                 {/* Seção de informações principais do card */}
                 <div style={styles.detailsSection}>
+              {/* Informações básicas - igual ao formulário de criação */}
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><User size={14} /> Cliente:</span> 
-                <span style={styles.detailsValue}>{selectedCard.cliente}</span>
-              </div>
-              {/* Exibe o tipo do card (Venda, Cotação, POC) */}
-              {selectedCard.tipo_card && (
-                <div style={styles.detailsRow}>
-                  <span style={styles.detailsLabel}>Tipo do Card:</span>
-                  <span style={{
-                    ...styles.detailsValue,
-                    background: '#e7e3ff',
-                    color: '#5a30ff',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    borderRadius: 10,
-                    padding: '2px 14px',
-                    marginLeft: 8,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    border: '1px solid #cfc2ff',
-                    display: 'inline-block',
-                  }}>{selectedCard.tipo_card}</span>
-                </div>
-              )}
-              <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}>Telefone:</span> 
-                <span style={styles.detailsValue}>{selectedCard.telefone}</span>
+                <span style={styles.detailsLabel}>Título do Card:</span>
+                <span style={styles.detailsValue}>{selectedCard.titulo || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><MapPin size={14} /> Endereço:</span> 
-                <span style={styles.detailsValue}>{selectedCard.endereco}</span>
+                <span style={styles.detailsLabel}>Cliente:</span>
+                <span style={styles.detailsValue}>{selectedCard.cliente || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><Wrench size={14} /> Serviço:</span> 
-                <span style={styles.detailsValue}>{selectedCard.tipoServico}</span>
+                <span style={styles.detailsLabel}>Telefone:</span>
+                <span style={styles.detailsValue}>{selectedCard.telefone || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><DollarSign size={14} /> Mensalidade:</span> 
+                <span style={styles.detailsLabel}><MapPin size={14} /> Endereço:</span>
+                <span style={styles.detailsValue}>{selectedCard.endereco || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><MapPin size={14} /> Coordenadas:</span>
+                <span style={styles.detailsValue}>
+                  {(() => {
+                    let lat = '--', lng = '--';
+                    if (selectedCard?.coordenadas) {
+                      if (typeof selectedCard.coordenadas === 'string' && selectedCard.coordenadas.includes(',')) {
+                        const [latStr, lngStr] = selectedCard.coordenadas.split(',').map(s => s.trim());
+                        lat = latStr || '--';
+                        lng = lngStr || '--';
+                      } else if (typeof selectedCard.coordenadas === 'object' && selectedCard.coordenadas !== null) {
+                        lat = selectedCard.coordenadas.lat || selectedCard.coordenadas[0] || '--';
+                        lng = selectedCard.coordenadas.lng || selectedCard.coordenadas[1] || '--';
+                      }
+                    }
+                    return `${lat}, ${lng}`;
+                  })()}
+                </span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><Wrench size={14} /> Tipo de Serviço:</span>
+                <span style={styles.detailsValue}>{selectedCard.tipoServico || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Mensalidade:</span>
                 <span style={styles.detailsValue}>
                   {selectedCard.mensalidade ? Number(selectedCard.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
                 </span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><DollarSign size={14} /> Instalação:</span> 
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Instalação:</span>
                 <span style={styles.detailsValue}>
                   {selectedCard.instalacao ? Number(selectedCard.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
                 </span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}>⏱️ SLA:</span> 
-                <span style={styles.detailsValue}>{selectedCard.sla || "--"} horas</span>
+                <span style={styles.detailsLabel}>Tipo do Card:</span>
+                <span style={styles.detailsValue}>{selectedCard.tipo_card || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}>⏱️ SLA:</span>
+                <span style={styles.detailsValue}>{selectedCard.sla || '--'} horas</span>
               </div>
               <div style={styles.detailsRow}>
                 <span style={styles.detailsLabel}><FileText size={14} /> Tempo Contratual:</span>
                 <span style={styles.detailsValue}>
-                  {selectedCard.tempoContratual ? `${selectedCard.tempoContratual} meses` : "--"}
-                </span>
-              </div>
-              <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><CalendarDays size={14} /> Prazo:</span> 
-                <span style={styles.detailsValue}>
-                  {selectedCard.prazo ? new Date(selectedCard.prazo).toLocaleDateString("pt-BR") : "--"}
+                  {selectedCard.tempoContratual ? `${selectedCard.tempoContratual} meses` : '--'}
                 </span>
               </div>
               
