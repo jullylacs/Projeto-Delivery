@@ -73,6 +73,10 @@ export default function Profile() {
   const [avatarPreview, setAvatarPreview] = useState(null); // Armazena preview do avatar
   const [error, setError] = useState(""); // Mensagem de erro
   const [successMessage, setSuccessMessage] = useState("");
+  // Estados para alteração de senha
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const navigate = useNavigate(); // Hook para navegaÃ§Ã£o programÃ¡tica
 
   const normalizeAvatar = (value) => {
@@ -262,6 +266,80 @@ export default function Profile() {
             fontSize: "14px"
           }}>
             {error}
+          </div>
+        )}
+
+        {/* Formulário de edição de perfil */}
+        {isEditing && (
+          <div style={{ margin: "32px 0", padding: "24px", background: "#fff", borderRadius: "14px", boxShadow: "0 2px 12px rgba(60,47,159,0.07)" }}>
+            <h2 style={{ color: "#3c2f9f", fontSize: "20px", marginBottom: "18px" }}>Editar Dados Cadastrais</h2>
+            <div style={{ display: "grid", gap: "16px" }}>
+              <input
+                type="text"
+                name="nome"
+                value={formData.nome || ""}
+                onChange={handleChange}
+                placeholder="Nome"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+              />
+              <input
+                type="email"
+                name="email"
+                value={formData.email || ""}
+                onChange={handleChange}
+                placeholder="E-mail"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+              />
+              <input
+                type="text"
+                name="telefone"
+                value={formData.telefone || ""}
+                onChange={handleChange}
+                placeholder="Telefone"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+              />
+              <input
+                type="text"
+                name="departamento"
+                value={formData.departamento || ""}
+                onChange={handleChange}
+                placeholder="Departamento"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+              />
+              {/* Avatar upload omitido para foco na senha */}
+            </div>
+            <h3 style={{ color: "#5f5a88", fontSize: "16px", margin: "28px 0 10px" }}>Alterar senha</h3>
+            <div style={{ display: "grid", gap: "12px", marginBottom: "18px" }}>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                placeholder="Senha atual"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+                autoComplete="current-password"
+              />
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Nova senha"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+                autoComplete="new-password"
+              />
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={e => setConfirmNewPassword(e.target.value)}
+                placeholder="Confirme a nova senha"
+                style={{ padding: "12px", borderRadius: "8px", border: "1px solid #e0e0e0" }}
+                autoComplete="new-password"
+              />
+            </div>
+            {/* Botões de ação */}
+            <div style={{ display: "flex", gap: "16px", marginTop: "18px" }}>
+              <button onClick={() => setIsEditing(false)} style={{ padding: "10px 22px", borderRadius: "8px", border: "1px solid #e0e0e0", background: "#f7f7fa", color: "#5f5a88", fontWeight: 600 }}>Cancelar</button>
+              <button onClick={handleSaveProfile} style={{ padding: "10px 22px", borderRadius: "8px", border: "none", background: "linear-gradient(135deg, #7a4dff, #5a30ff)", color: "#fff", fontWeight: 700 }}>Salvar alterações</button>
+            </div>
           </div>
         )}
 

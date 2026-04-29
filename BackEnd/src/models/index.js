@@ -9,6 +9,7 @@ const Schedule   = require("./Schedule");
 const Technician = require("./Technician");
 const Notification = require("./Notification");
 const RefreshToken = require("./RefreshToken");
+const Role = require("./Role");
 
 // ─────────────────────────────────────────────
 // 🔗 Associações (equivalente aos ref: do Mongoose)
@@ -52,4 +53,4 @@ User.hasMany(RefreshToken,   { foreignKey: "usuario_id", as: "refreshTokens" });
 // ─────────────────────────────────────────────
 // 📤 Exporta tudo
 // ─────────────────────────────────────────────
-module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken };
+module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken, Role };

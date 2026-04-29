@@ -221,6 +221,98 @@ const styles = {
 };
 
 export default function AdminUsers() {
+    // Estado para novo cargo
+    const [newRole, setNewRole] = useState("");
+    const [roles, setRoles] = useState(PERFIS);
+    const [editingRoleId, setEditingRoleId] = useState(null);
+    const [editingRoleName, setEditingRoleName] = useState("");
+    const [editingRoleDesc, setEditingRoleDesc] = useState("");
+    const [loadingRoles, setLoadingRoles] = useState(false);
+    const [roleError, setRoleError] = useState("");
+
+    // Busca cargos do backend
+    const fetchRoles = async () => {
+      setLoadingRoles(true);
+      setRoleError("");
+      try {
+        const res = await api.get("/roles");
+        // Se vierem objetos, mantém id/nome/descricao
+        const backendRoles = Array.isArray(res.data) ? res.data : [];
+        setRoles([...PERFIS.map(n => ({ nome: n, id: n })), ...backendRoles.filter(r => !PERFIS.includes(r.nome))]);
+      } catch (err) {
+        setRoleError("Erro ao buscar cargos do backend");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchRoles();
+    }, []);
+
+
+    // Adiciona novo cargo no backend
+    const handleAddRole = async () => {
+      const role = newRole.trim().toLowerCase().replace(/[^a-z0-9_\-]/gi, "");
+      if (!role || roles.includes(role)) return;
+      setLoadingRoles(true);
+      setRoleError("");
+      try {
+        await api.post("/roles", { nome: role });
+        setNewRole("");
+        fetchRoles();
+      } catch (err) {
+        setRoleError(err?.response?.data?.message || "Erro ao criar cargo");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    // Inicia edição de cargo
+    const startEditRole = (role) => {
+      setEditingRoleId(role.id);
+      setEditingRoleName(role.nome);
+      setEditingRoleDesc(role.descricao || "");
+    };
+
+    // Cancela edição
+    const cancelEditRole = () => {
+      setEditingRoleId(null);
+      setEditingRoleName("");
+      setEditingRoleDesc("");
+    };
+
+    // Salva edição
+    const saveEditRole = async () => {
+      if (!editingRoleName.trim()) return;
+      setLoadingRoles(true);
+      setRoleError("");
+      try {
+        await api.put(`/roles/${editingRoleId}`, { nome: editingRoleName.trim(), descricao: editingRoleDesc });
+        cancelEditRole();
+        fetchRoles();
+      } catch (err) {
+        setRoleError(err?.response?.data?.message || "Erro ao editar cargo");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    // Exclui cargo
+    const deleteRole = async (role) => {
+      if (!role.id || PERFIS.includes(role.nome)) return;
+      if (!window.confirm(`Excluir cargo "${role.nome}"?`)) return;
+      setLoadingRoles(true);
+      setRoleError("");
+      try {
+        await api.delete(`/roles/${role.id}`);
+        fetchRoles();
+      } catch (err) {
+        setRoleError(err?.response?.data?.message || "Erro ao excluir cargo");
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
   // Estados da tabela de usuários
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -599,6 +691,70 @@ export default function AdminUsers() {
         </div>
       )}
 
+      {/* Seção para criar/editar/excluir cargos */}
+      <div style={{ margin: "18px auto 24px auto", padding: "16px", background: "#f8f5ff", borderRadius: "12px", border: "1px solid #e2d9ff", maxWidth: 500, display: "block" }}>
+        <h3 style={{ margin: 0, color: "#5f2ca0", fontSize: 16 }}>Gerenciar cargos</h3>
+        {/* Lista de cargos */}
+        <div style={{ marginTop: 10, marginBottom: 10 }}>
+          {roles.map((role) => (
+            <div key={role.id || role.nome} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              {editingRoleId === role.id ? (
+                <>
+                  <input
+                    value={editingRoleName}
+                    onChange={e => setEditingRoleName(e.target.value)}
+                    placeholder="Nome do cargo"
+                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
+                    disabled={loadingRoles}
+                  />
+                  <input
+                    value={editingRoleDesc}
+                    onChange={e => setEditingRoleDesc(e.target.value)}
+                    placeholder="Descrição (opcional)"
+                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
+                    disabled={loadingRoles}
+                  />
+                  <button onClick={saveEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#2f8a42", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Salvar</button>
+                  <button onClick={cancelEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#aaa", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <span style={{ minWidth: 90, fontWeight: 600 }}>{role.nome}</span>
+                  {role.descricao && <span style={{ color: "#7a73a1", fontSize: 12 }}>({role.descricao})</span>}
+                  {!PERFIS.includes(role.nome) && (
+                    <>
+                      <button onClick={() => startEditRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#5f2ca0", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Editar</button>
+                      <button onClick={() => deleteRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#a4001d", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Excluir</button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+        {/* Adicionar novo cargo */}
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <input
+            value={newRole}
+            onChange={e => setNewRole(e.target.value)}
+            placeholder="Nome do novo cargo"
+            style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #d9d0f9", fontSize: 13 }}
+            disabled={loadingRoles}
+          />
+          <button
+            onClick={handleAddRole}
+            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "linear-gradient(90deg, #8b64ff, #5a30ff)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }}
+            disabled={loadingRoles}
+          >
+            {loadingRoles ? "Adicionando..." : "Adicionar"}
+          </button>
+        </div>
+        {roleError && <div style={{ color: "#a4001d", marginTop: 8, fontSize: 13 }}>{roleError}</div>}
+        <div style={{ marginTop: 10, color: "#7a73a1", fontSize: 12 }}>
+          Os cargos criados aqui ficam disponíveis para seleção ao editar usuários.
+        </div>
+      </div>
+
       <div style={styles.tableWrap}>
         <table style={styles.table}>
           <thead>
@@ -673,9 +829,9 @@ export default function AdminUsers() {
                         onChange={(e) => setForm((p) => ({ ...p, perfil: e.target.value }))}
                         style={styles.input}
                       >
-                        {PERFIS.map((perfil) => (
-                          <option key={perfil} value={perfil}>
-                            {perfil}
+                        {roles.map((perfil) => (
+                          <option key={perfil.id || perfil.nome} value={perfil.nome}>
+                            {perfil.nome}
                           </option>
                         ))}
                       </select>

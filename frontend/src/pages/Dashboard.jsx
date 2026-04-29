@@ -11,6 +11,8 @@ export default function Dashboard() {
   const [cards, setCards] = useState([]);
   // Estado para armazenar as colunas reais do Kanban
   const [columns, setColumns] = useState([]);
+  // Estado para armazenar todos os usuários
+  const [users, setUsers] = useState([]);
   // Estado de carregamento inicial
   const [loading, setLoading] = useState(true);
   // Estado para armazenar mensagens de erro
@@ -66,13 +68,14 @@ export default function Dashboard() {
     },
   };
 
-  // Função para buscar cards e colunas
+  // Função para buscar cards, colunas e usuários
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [cardsRes, columnsRes] = await Promise.all([
+      const [cardsRes, columnsRes, usersRes] = await Promise.all([
         api.get("/cards"),
         api.get("/columns"),
+        api.get("/users/admin", { params: { limit: 200 } }),
       ]);
       setCards(cardsRes.data || []);
       // Ordena colunas por ordem (igual Kanban)
@@ -80,6 +83,9 @@ export default function Dashboard() {
         ? [...columnsRes.data].sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
         : [];
       setColumns(normalizedColumns);
+      // Suporta resposta paginada ou array direto
+      const userRows = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.data || []);
+      setUsers(userRows);
       setLoading(false);
     } catch (err) {
       setError("Não foi possível carregar os dados");
@@ -108,9 +114,7 @@ export default function Dashboard() {
     // Quebra por coluna real (sincronizado com Kanban, sem colunas fantasmas)
     const columnBreakdown = {};
     columns.forEach((col) => {
-      // Cards que pertencem a esta coluna (prioriza coluna_id, depois coluna.nome, depois status)
       columnBreakdown[col.nome] = cards.filter((c) => {
-        // Preferência: coluna_id === col.id (número), depois coluna === col.nome (string), depois status === col.nome
         if (c.coluna_id && col.id && Number(c.coluna_id) === Number(col.id)) return true;
         if (c.coluna && String(c.coluna).trim() === String(col.nome).trim()) return true;
         if (!c.coluna_id && !c.coluna && c.status && String(c.status).trim() === String(col.nome).trim()) return true;
@@ -132,19 +136,39 @@ export default function Dashboard() {
       return daysUntil >= 0 && daysUntil <= 3;
     });
 
-    // Performance por vendedor (mantém igual)
-    const vendors = [...new Set(cards.map((c) => c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor"))];
-    const vendorStats = vendors.map((vendor) => {
-      const vendorCards = cards.filter((c) => {
-        const vendorName = c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor";
-        return vendorName === vendor;
+    // Performance por cargo (perfil)
+    const usersByRole = {};
+    users.forEach((user) => {
+      const role = user.perfil?.trim() || "Sem cargo";
+      if (!usersByRole[role]) usersByRole[role] = [];
+      usersByRole[role].push(user);
+    });
+
+    // Para cada cargo, calcula stats dos usuários
+    const roleStats = Object.entries(usersByRole).map(([role, roleUsers]) => {
+      // Para cada usuário, calcula cards atribuídos e concluídos
+      const userStats = roleUsers.map((user) => {
+        const userCards = cards.filter((c) => {
+          const vendedorId = c.vendedor?.id || c.vendedor_id || c.vendedorId;
+          return String(vendedorId) === String(user.id);
+        });
+        const completed = userCards.filter((c) => c.status === "Concluído").length;
+        return {
+          user,
+          total: userCards.length,
+          completed,
+          ratio: userCards.length > 0 ? (completed / userCards.length) * 100 : 0,
+        };
       });
-      const vendorCompleted = vendorCards.filter((c) => c.status === "Concluído").length;
+      // Estatísticas do cargo
+      const totalCards = userStats.reduce((sum, u) => sum + u.total, 0);
+      const totalCompleted = userStats.reduce((sum, u) => sum + u.completed, 0);
       return {
-        vendor,
-        total: vendorCards.length,
-        completed: vendorCompleted,
-        ratio: vendorCards.length > 0 ? (vendorCompleted / vendorCards.length) * 100 : 0,
+        role,
+        users: userStats,
+        totalCards,
+        totalCompleted,
+        ratio: totalCards > 0 ? (totalCompleted / totalCards) * 100 : 0,
       };
     });
 
@@ -156,9 +180,9 @@ export default function Dashboard() {
       columnBreakdown,
       slaViolations: slaViolations.length,
       slaWarnings: slaWarnings.length,
-      vendorStats,
+      roleStats,
     };
-  }, [cards, columns]); // Recalcula quando cards ou columns mudam
+  }, [cards, columns, users]);
 
   // Renderiza loading enquanto dados são carregados
   if (loading) {
@@ -336,23 +360,34 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Performance por vendedor */}
-          {stats.vendorStats.length > 0 && (
+          {/* Performance geral por cargo (perfil) */}
+          {stats.roleStats.length > 0 && (
             <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
-              <div style={styles.cardTitle}>👥 Performance por Vendedor</div>
-              <div style={{ display: "grid", gap: "12px" }}>
-                {stats.vendorStats
+              <div style={styles.cardTitle}>👥 Performance por Cargo</div>
+              <div style={{ display: "grid", gap: "18px" }}>
+                {stats.roleStats
                   .sort((a, b) => b.ratio - a.ratio)
-                  .map((vendor) => (
-                    <div key={vendor.vendor} style={{ padding: "12px", backgroundColor: "#fafbff", borderRadius: "8px", borderLeft: "3px solid #8b64ff" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                        <div style={{ fontWeight: "600", color: "#3c2f9f" }}>{vendor.vendor}</div>
+                  .map((role) => (
+                    <div key={role.role} style={{ padding: "14px 12px", backgroundColor: "#fafbff", borderRadius: "10px", borderLeft: "4px solid #8b64ff" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <div style={{ fontWeight: "700", color: "#3c2f9f", fontSize: 15 }}>{role.role}</div>
                         <div style={{ fontSize: "13px", fontWeight: "700", color: "#8b64ff" }}>
-                          {vendor.completed}/{vendor.total} ({vendor.ratio.toFixed(0)}%)
+                          {role.totalCompleted}/{role.totalCards} ({role.ratio.toFixed(0)}%)
                         </div>
                       </div>
                       <div style={styles.progressBar}>
-                        <div style={{ ...styles.progressFill, width: `${vendor.ratio}%` }} />
+                        <div style={{ ...styles.progressFill, width: `${role.ratio}%` }} />
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 13, color: '#5f5a88' }}>
+                        <b>Equipe:</b>
+                        <ul style={{ margin: '6px 0 0 0', padding: 0, listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                          {role.users.map(u => (
+                            <li key={u.user.id} style={{ minWidth: 180 }}>
+                              <span style={{ fontWeight: 600, color: '#3c2f9f' }}>{u.user.nome}</span>
+                              <span style={{ marginLeft: 8, color: '#8b64ff', fontWeight: 600 }}>{u.completed}/{u.total} ({u.ratio.toFixed(0)}%)</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                   ))}

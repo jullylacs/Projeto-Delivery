@@ -139,53 +139,6 @@ const resolveCardTitle = (card) =>
 
 const getCardKey = (card) => card?.id;
 
-const buildSlaNotifications = (cards) => {
-  const now = new Date();
-
-  return cards
-    .filter((card) => {
-      if (!card?.prazo) return false;
-      const status = String(card?.column?.nome || "").toLowerCase();
-      return status !== "concluído" && status !== "concluido" && status !== "inativo";
-    })
-    .map((card) => {
-      const deadline = new Date(card.prazo);
-      if (Number.isNaN(deadline.getTime())) return null;
-
-      const diffDays = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-      const cardId = getCardKey(card);
-      if (!cardId) return null;
-
-      if (deadline < now) {
-        return {
-          kind: "sla",
-          source_key: `sla-late-${cardId}-${deadline.toISOString()}`,
-          card_id: cardId,
-          title: resolveCardTitle(card),
-          message: "Prazo vencido. Requer atenção imediata.",
-          when_at: deadline,
-          priority: "high",
-          metadata: { status: "late" },
-        };
-      }
-
-      if (diffDays >= 0 && diffDays <= 3) {
-        return {
-          kind: "sla",
-          source_key: `sla-due-${cardId}-${deadline.toISOString()}`,
-          card_id: cardId,
-          title: resolveCardTitle(card),
-          message: `Prazo vence em ${diffDays} dia(s).`,
-          when_at: deadline,
-          priority: "medium",
-          metadata: { status: "due", diffDays },
-        };
-      }
-
-      return null;
-    })
-    .filter(Boolean);
-};
 
 const buildMentionNotifications = (cards, currentUserName) => {
   if (!currentUserName) return [];
@@ -331,7 +284,6 @@ exports.syncMine = async (req, res) => {
     const generated = [
       ...buildMentionNotifications(cards, user.nome || user.email),
       ...buildCommentInteractionNotifications(cards, user),
-      ...buildSlaNotifications(cards),
       ...buildTodayScheduleNotifications(schedules),
     ];
 

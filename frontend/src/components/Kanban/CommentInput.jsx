@@ -1,3 +1,14 @@
+// Função utilitária para contexto de menção
+const mentionContextFromText = (text, caretPosition) => {
+  const beforeCaret = text.slice(0, caretPosition);
+  const atIndex = beforeCaret.lastIndexOf("@");
+  if (atIndex === -1) return null;
+  const hasSpaceBefore = atIndex > 0 && !/\s/.test(beforeCaret[atIndex - 1]);
+  if (hasSpaceBefore) return null;
+  const query = beforeCaret.slice(atIndex + 1);
+  if (/\s/.test(query)) return null;
+  return { start: atIndex, end: caretPosition, query };
+};
 import React, { useMemo, useRef, useState } from "react";
 import { AtSign, Bold, Code, Italic, List, ListOrdered, Paperclip, Quote, SendHorizontal } from "lucide-react";
 
@@ -15,45 +26,30 @@ const normalizeMentionUsers = (users = []) => {
       };
     })
     .filter((user) => user.name)
+
     .reduce((acc, user) => {
       if (acc.some((item) => item.name.toLowerCase() === user.name.toLowerCase())) {
         return acc;
       }
-
       acc.push(user);
       return acc;
     }, []);
 };
 
-const mentionContextFromText = (text, caretPosition) => {
-  const beforeCaret = text.slice(0, caretPosition);
-  const atIndex = beforeCaret.lastIndexOf("@");
-
-  if (atIndex === -1) return null;
-
-  const hasSpaceBefore = atIndex > 0 && !/\s/.test(beforeCaret[atIndex - 1]);
-  if (hasSpaceBefore) return null;
-
-  const query = beforeCaret.slice(atIndex + 1);
-  if (/\s/.test(query)) return null;
-
-  return {
-    start: atIndex,
-    end: caretPosition,
-    query,
-  };
-};
-
 export default function CommentInput({
-  value,
-  onChange,
   onSend,
   onFile,
   placeholder,
   mentionUsers = [],
-  pendingAttachment = null,
+  pendingAttachments = [],
   onClearAttachment,
+  initialValue = "",
 }) {
+  const [value, setValue] = useState(initialValue);
+    // Atualiza o valor se initialValue mudar (ex: ao trocar de comentário para editar)
+    React.useEffect(() => {
+      setValue(initialValue);
+    }, [initialValue]);
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({
     isOpen: false,
@@ -63,7 +59,11 @@ export default function CommentInput({
     activeIndex: 0,
   });
 
-  const users = useMemo(() => normalizeMentionUsers(mentionUsers), [mentionUsers]);
+  // Otimização: só calcula usuários de menção quando a lista de menção está aberta
+  const users = useMemo(() => {
+    if (!mentionState.isOpen) return [];
+    return normalizeMentionUsers(mentionUsers);
+  }, [mentionUsers, mentionState.isOpen]);
 
   const applyInlineFormat = (prefix, suffix = prefix) => {
     const node = textAreaRef.current;
@@ -75,7 +75,7 @@ export default function CommentInput({
     const formatted = `${prefix}${selected}${suffix}`;
     const nextValue = `${value.slice(0, start)}${formatted}${value.slice(end)}`;
 
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -100,7 +100,7 @@ export default function CommentInput({
       .join("\n");
 
     const nextValue = `${value.slice(0, start)}${prefixed}${value.slice(end)}`;
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -108,19 +108,20 @@ export default function CommentInput({
     });
   };
 
+  // Otimização: só filtra se lista de usuários estiver aberta
   const filteredUsers = useMemo(() => {
+    if (!mentionState.isOpen || users.length === 0) return [];
     const query = mentionState.query.trim().toLowerCase();
     if (!query) return users;
-
     return users.filter((user) => user.name.toLowerCase().includes(query));
-  }, [mentionState.query, users]);
+  }, [mentionState.isOpen, mentionState.query, users]);
 
   // Insere menção @ ao clicar no botão
   const handleMention = () => {
     const node = textAreaRef.current;
     const mention = "@";
     if (!node) {
-      onChange(`${value}${mention}`);
+      setValue(`${value}${mention}`);
       return;
     }
 
@@ -128,7 +129,7 @@ export default function CommentInput({
     const end = node.selectionEnd ?? value.length;
     const nextValue = `${value.slice(0, start)}${mention}${value.slice(end)}`;
 
-    onChange(nextValue);
+    setValue(nextValue);
 
     requestAnimationFrame(() => {
       node.focus();
@@ -153,7 +154,7 @@ export default function CommentInput({
     const nextValue = `${prefix}${mentionText}${suffix}`;
     const nextCaret = prefix.length + mentionText.length;
 
-    onChange(nextValue);
+    setValue(nextValue);
     closeMentionList();
 
     requestAnimationFrame(() => {
@@ -163,7 +164,7 @@ export default function CommentInput({
   };
 
   const handleTextChange = (nextValue, caretPosition) => {
-    onChange(nextValue);
+    setValue(nextValue);
 
     const context = mentionContextFromText(nextValue, caretPosition);
     if (!context) {
@@ -216,10 +217,11 @@ export default function CommentInput({
     }
   };
 
-  // Dispara upload de arquivo
+  // Dispara upload de múltiplos arquivos
   const handleFile = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      onFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      onFile(files);
       e.target.value = "";
     }
   };
@@ -312,7 +314,7 @@ export default function CommentInput({
           rows={2}
         />
 
-        {pendingAttachment && (
+        {pendingAttachments && pendingAttachments.length > 0 && (
           <div
             style={{
               marginTop: 8,
@@ -321,53 +323,68 @@ export default function CommentInput({
               background: "#f8f5ff",
               padding: 8,
               position: "relative",
+              maxHeight: 180,
+              overflowY: "auto",
+              display: 'flex',
+              gap: 12,
+              flexWrap: 'nowrap',
+              whiteSpace: 'nowrap',
+              overflowX: 'auto',
             }}
           >
-            {pendingAttachment.type?.startsWith("image/") ? (
-              <img
-                src={pendingAttachment.data}
-                alt={pendingAttachment.name || "Imagem anexada"}
-                style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, display: "block", border: "1px solid #ddd0ff" }}
-              />
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5f3dc6", fontSize: 13, fontWeight: 600 }}>
-                <Paperclip size={14} />
-                <span style={{
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  display: "inline-block",
-                  maxWidth: 140,
-                  verticalAlign: "middle"
-                }} title={pendingAttachment.name || "Arquivo anexado"}>
-                  {pendingAttachment.name || "Arquivo anexado"}
-                </span>
+            {pendingAttachments.map((att, idx) => (
+              <div key={idx} style={{ position: 'relative', minWidth: 120, maxWidth: 180 }}>
+                {att.type?.startsWith("image/") ? (
+                  <img
+                    src={att.data}
+                    alt={att.name || "Imagem anexada"}
+                    style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, display: "block", border: "1px solid #ddd0ff" }}
+                  />
+                ) : att.type?.startsWith("video/") ? (
+                  <video controls style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, display: "block", border: "1px solid #ddd0ff" }}>
+                    <source src={att.data} type={att.type} />
+                    Seu navegador não suporta vídeo.
+                  </video>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#5f3dc6", fontSize: 13, fontWeight: 600 }}>
+                    <Paperclip size={14} />
+                    <span style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      display: "inline-block",
+                      maxWidth: 100,
+                      verticalAlign: "middle"
+                    }} title={att.name || "Arquivo anexado"}>
+                      {att.name || "Arquivo anexado"}
+                    </span>
+                  </div>
+                )}
+                {onClearAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => onClearAttachment(idx)}
+                    title="Remover anexo"
+                    style={{
+                      position: "absolute",
+                      top: 6,
+                      right: 6,
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      border: "1px solid #cdbfff",
+                      background: "#ffffff",
+                      color: "#6b54c7",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-            )}
-
-            {onClearAttachment && (
-              <button
-                type="button"
-                onClick={onClearAttachment}
-                title="Remover anexo"
-                style={{
-                  position: "absolute",
-                  top: 6,
-                  right: 6,
-                  width: 22,
-                  height: 22,
-                  borderRadius: "50%",
-                  border: "1px solid #cdbfff",
-                  background: "#ffffff",
-                  color: "#6b54c7",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
-            )}
+            ))}
           </div>
         )}
 
@@ -474,11 +491,16 @@ export default function CommentInput({
         title="Anexar arquivo ou foto"
       >
         <Paperclip size={18} />
-        <input type="file" style={{ display: "none" }} onChange={handleFile} />
+        <input type="file" style={{ display: "none" }} onChange={handleFile} multiple />
       </label>
       <button
         type="button"
-        onClick={onSend}
+        onClick={() => {
+          if (value.trim()) {
+            onSend && onSend(value);
+            setValue("");
+          }
+        }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "translateY(-1px)";
           e.currentTarget.style.boxShadow = "0 6px 14px rgba(78,46,187,0.45)";

@@ -1,0 +1,29 @@
+{
+  "development": {
+    "username": "delivery_sys",
+    "password": "HUVCrPEjGOMJh3",
+    "database": "delivery_sys",
+    "host": "10.0.254.32",
+    "port": 5430,
+    "dialect": "postgres",
+    "ssl": false
+  },
+  "test": {
+    "username": "delivery_sys",
+    "password": "HUVCrPEjGOMJh3",
+    "database": "delivery_sys_test",
+    "host": "10.0.254.32",
+    "port": 5430,
+    "dialect": "postgres",
+    "ssl": false
+  },
+  "production": {
+    "username": "delivery_sys",
+    "password": "HUVCrPEjGOMJh3",
+    "database": "delivery_sys",
+    "host": "10.0.254.32",
+    "port": 5430,
+    "dialect": "postgres",
+    "ssl": false
+  }
+}

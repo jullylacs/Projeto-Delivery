@@ -67,7 +67,7 @@ const mapImportedCard = ({ card, status, seller, sellerId }) => {
   const description = String(card?.observacoes || card?.description || card?.desc || "").trim();
   const labels = Array.isArray(card?.labels) ? card.labels : [];
   const firstLabel = labels.find((label) => label?.name)?.name || "";
-  const dueDateRaw = card?.prazo || card?.due || null;
+  // const dueDateRaw = card?.prazo || card?.due || null;
   const dueDate = dueDateRaw && !Number.isNaN(new Date(dueDateRaw).getTime())
     ? new Date(dueDateRaw).toISOString().slice(0, 10)
     : "";
@@ -84,7 +84,7 @@ const mapImportedCard = ({ card, status, seller, sellerId }) => {
     tipoServico: String(card?.tipoServico || firstLabel || "Importado"),
     preco: Number(card?.preco || 0),
     sla: Number(card?.sla || 0),
-    prazo: dueDate || null,
+    // prazo removido
     observacoes: description || "Importado de fonte externa",
     status,
     coluna: status,
@@ -141,7 +141,7 @@ const EXPORT_FIELDS = [
   { key: "tipoServico", label: "tipo_servico" },
   { key: "preco", label: "preco" },
   { key: "sla", label: "sla" },
-  { key: "prazo", label: "prazo" },
+  // { key: "prazo", label: "prazo" },
   { key: "status", label: "status" },
   { key: "coluna", label: "coluna" },
   { key: "vendedor", label: "vendedor" },
@@ -158,9 +158,9 @@ const normalizeExportValue = (card, fieldKey) => {
     return Array.isArray(card?.comments) ? card.comments.length : 0;
   }
 
-  if (fieldKey === "prazo") {
-    return card?.prazo ? new Date(card.prazo).toLocaleDateString("pt-BR") : "";
-  }
+  // if (fieldKey === "prazo") {
+  //   return card?.prazo ? new Date(card.prazo).toLocaleDateString("pt-BR") : "";
+  // }
 
   const value = card?.[fieldKey];
   return value ?? "";
@@ -1473,22 +1473,19 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
 
         {/* Tags de preço, prazo e SLA */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-          {/* Tag de preço */}
-          {card.preco && (
+          {/* Tag de mensalidade */}
+          {card.mensalidade > 0 && (
             <span style={styles.priceTag}>
-              <DollarSign size={12} /> {formatPrice(card.preco)}
+              <DollarSign size={12} /> Mensalidade: {Number(card.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
-          {/* Tag de prazo com destaque visual para atrasado */}
-          {card.prazo && (
-            <span style={{
-              ...styles.deadlineTag,
-              background: isOverdue(card.prazo) ? "#ffebee" : "#fff3e0", // Vermelho se atrasado
-              color: isOverdue(card.prazo) ? "#c62828" : "#e65100",
-            }}>
-              <CalendarDays size={12} /> {new Date(card.prazo).toLocaleDateString("pt-BR")}
+          {/* Tag de instalação */}
+          {card.instalacao > 0 && (
+            <span style={styles.priceTag}>
+              <DollarSign size={12} /> Instalação: {Number(card.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
+          {/* Prazo removido */}
           {/* Tag de SLA (Service Level Agreement) */}
           {card.sla > 0 && (
             <span style={{ ...styles.deadlineTag, background: "#e3f2fd", color: "#1565c0" }}>
@@ -1522,12 +1519,16 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
 
 // Componente principal do Kanban Board
 export default function Board() {
+  // Estado para seleção múltipla
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedCards, setSelectedCards] = useState([]);
   const trelloPrefs = readTrelloPrefs();
   // Estados principais
   const [cards, setCards] = useState([]);           // Lista de todos os cards
   const [selectedCard, setSelectedCard] = useState(null); // Card selecionado para detalhes
   const [statusEdit, setStatusEdit] = useState("");    // Coluna temporária para edição (id em string)
-  const [commentText, setCommentText] = useState("");      // Texto do comentário sendo escrito
+  // Remover o estado global do comentário para evitar re-renderizações pesadas
+  // O estado do texto do comentário será controlado apenas dentro do CommentInput
   const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false);
   const [replyDraftByCommentId, setReplyDraftByCommentId] = useState({});
   const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
@@ -1537,7 +1538,7 @@ export default function Board() {
   const [vendorEdit, setVendorEdit] = useState("");
   const [vendorSearchCreate, setVendorSearchCreate] = useState("");
   const [vendorSearchDetails, setVendorSearchDetails] = useState("");
-  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [pendingAttachments, setPendingAttachments] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
@@ -1551,7 +1552,7 @@ export default function Board() {
     cliente: "",
     telefone: "",
     endereco: "",
-    coordenadas: { lat: "", lng: "" },
+    coordenadas: "",
     tipoServico: "",
     mensalidade: "",
     instalacao: "",
@@ -1598,6 +1599,14 @@ export default function Board() {
   const defaultColumnName = columns[0] || "Novo";
 
   const densityPresets = {
+    mini: {
+      columnWidth: "210px",
+      cardMinWidth: "185px",
+      cardPadding: "6px 5px",
+      columnMinHeight: "340px",
+      columnPadding: "4px",
+      metaFontSize: "9px",
+    },
     compacto: {
       columnWidth: "320px",
       cardMinWidth: "294px",
@@ -2148,18 +2157,7 @@ export default function Board() {
 
   // Manipulador de mudanças nos campos do formulário de novo card
   const handleInputChange = (field, value) => {
-    // Tratamento especial para coordenadas
-    if (field === "lat" || field === "lng") {
-      setNewCard((prev) => ({
-        ...prev,
-        coordenadas: {
-          ...prev.coordenadas,
-          [field]: value,
-        },
-      }));
-    } else {
-      setNewCard((prev) => ({ ...prev, [field]: value }));
-    }
+    setNewCard((prev) => ({ ...prev, [field]: value }));
     setError(""); // Limpa erro ao modificar campos
   };
 
@@ -2180,9 +2178,9 @@ export default function Board() {
     setStatusEdit(String(getCardColumnId(card) || ""));
     setVendorEdit(String(card?.vendedor?.id || card?.vendedor_id || ""));
     setVendorSearchDetails("");
-    setCommentText("");
+    // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
-    setPendingAttachment(null);
+    setPendingAttachments([]); // Corrige: limpa anexos pendentes
   };
 
   // Fecha modal de detalhes
@@ -2191,13 +2189,13 @@ export default function Board() {
     setSelectedCard(null);
     setVendorEdit("");
     setVendorSearchDetails("");
-    setCommentText("");
+    // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
     setReplyDraftByCommentId({});
     setActiveReplyCommentId(null);
     setEditingReplyKey(null);
     setEditingReplyText("");
-    setPendingAttachment(null);
+    setPendingAttachments([]); // Corrige: limpa anexos pendentes
     setPreviewImage(null);
     setPreviewZoom(1);
   };
@@ -2394,17 +2392,35 @@ export default function Board() {
     }
   };
 
-  const handleAttachmentSelect = (file) => {
-    if (!file) return;
+  // Estado local do texto do comentário
+  const [commentText, setCommentText] = useState("");
+  const [isCommentLoading, setIsCommentLoading] = useState(false);
+  const [editingCommentIdx, setEditingCommentIdx] = useState(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result;
-      if (!base64) return;
-      setPendingAttachment({ name: file.name, type: file.type, data: base64 });
-    };
-    reader.readAsDataURL(file);
+  // Recebe array de arquivos, lê todos e adiciona ao pendingAttachments
+  const handleAttachmentSelect = (files) => {
+    if (!files || files.length === 0) return;
+    const newFiles = Array.isArray(files) ? files : [files];
+    let filesProcessed = 0;
+    const newAttachments = [];
+    newFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result;
+        if (base64) {
+          newAttachments.push({ name: file.name, type: file.type, data: base64 });
+        }
+        filesProcessed++;
+        if (filesProcessed === newFiles.length) {
+          setPendingAttachments((prev) => [...prev, ...newAttachments]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
+
+  // Limpa anexos pendentes
+  const handleClearAttachment = () => setPendingAttachments([]);
 
   const getAvatarInitials = (name) => {
     const safeName = String(name || "Usuário").trim();
@@ -2418,38 +2434,56 @@ export default function Board() {
   };
 
   // Adiciona comentário ao card
-  const handleAddComment = async () => {
+  // Adiciona comentário ao card
+
+  const handleAddComment = async (commentTextArg) => {
     if (!selectedCard) return;
 
-    const normalizedText = commentText.trim();
-    if (!normalizedText && !pendingAttachment) return;
+    const normalizedText = (commentTextArg || "").trim();
+    if (!normalizedText && pendingAttachments.length === 0) return;
 
-    // Recupera dados do usuário para identificar autor
     const userData = JSON.parse(localStorage.getItem("user") || "null");
     const author = userData?.nome || userData?.username || userData?.email || "Usuário";
     const authorAvatar = userData?.avatar || "";
 
-    // Cria novo comentário
-    const newComment = {
-      id: Date.now(), // ID temporário baseado no timestamp
-      text: normalizedText,
-      author,
-      authorAvatar,
-      createdAt: new Date().toISOString(),
-      ...(pendingAttachment ? { attachment: pendingAttachment } : {}),
-    };
+    let updatedComments;
 
-    const updatedComments = [...(selectedCard.comments || []), newComment];
+    // ADICIONAR: se está editando, substitui no índice; senão, adiciona novo
+    if (editingCommentIdx !== null) {
+      updatedComments = (selectedCard.comments || []).map((c, i) =>
+        i === editingCommentIdx
+          ? { ...c, text: normalizedText, updatedAt: new Date().toISOString() }
+          : c
+      );
+    } else {
+      const newComment = {
+        id: Date.now(),
+        text: normalizedText,
+        author,
+        authorAvatar,
+        createdAt: new Date().toISOString(),
+        attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
+      };
+      updatedComments = [...(selectedCard.comments || []), newComment];
+    }
 
+    setIsCommentLoading(true);
+    setError("");
+    const commentTimeout = setTimeout(() => setIsCommentLoading(false), 120000);
     try {
-      // Envia para API
       await persistCommentsOnSelectedCard(updatedComments);
-      setCommentText(""); // Limpa campo de comentário
+      setCommentText("");
       setIsCommentComposerOpen(false);
-      setPendingAttachment(null);
+      setPendingAttachments([]);
+      setIsCommentLoading(false);
+      setEditingCommentIdx(null); // ADICIONAR: limpa o estado de edição
+      clearTimeout(commentTimeout);
     } catch (err) {
-      console.error("erro ao adicionar comentário", err);
-      setError("Erro ao adicionar comentário");
+      console.error("erro ao salvar comentário", err);
+      alert("Erro ao salvar comentário: " + (err?.message || err));
+      setError("Erro ao salvar comentário. Tente novamente.");
+      setIsCommentLoading(false);
+      clearTimeout(commentTimeout);
     }
   };
 
@@ -2543,16 +2577,13 @@ export default function Board() {
 
   // Cria novo card com validação de campos obrigatórios
   const handleCreateCard = async () => {
-    const { cliente, telefone, endereco, tipoServico, colunaId } = newCard;
+    const { cliente, telefone, endereco, tipoServico } = newCard;
     // Validação detalhada de campos obrigatórios
     if (!cliente || !cliente.trim()) {
       setError("Cliente é obrigatório");
       return;
     }
-    if (!telefone || !telefone.trim()) {
-      setError("Telefone é obrigatório");
-      return;
-    }
+    // Telefone não é mais obrigatório
     if (!endereco || !endereco.trim()) {
       setError("Endereço é obrigatório");
       return;
@@ -2561,9 +2592,11 @@ export default function Board() {
       setError("Tipo de serviço é obrigatório");
       return;
     }
+    // Se colunaId não for selecionada, buscar coluna com nome 'Chegando agora (Gabi)'
+    let colunaId = newCard.colunaId;
     if (!colunaId || !Number.isFinite(Number(colunaId))) {
-      setError("Selecione a etapa inicial do card");
-      return;
+      const chegada = orderedColumnDefs.find(col => String(col.nome).toLowerCase().includes("chegando agora") && String(col.nome).toLowerCase().includes("gabi"));
+      colunaId = chegada ? chegada.id : (orderedColumnDefs[0]?.id || null);
     }
 
     setIsCreating(true);
@@ -2579,6 +2612,11 @@ export default function Board() {
       }
 
       // Prepara payload para envio
+      let coordenadas = newCard.coordenadas;
+      if (typeof coordenadas === "string" && coordenadas.includes(",")) {
+        const [lat, lng] = coordenadas.split(",").map(s => s.trim());
+        coordenadas = { lat, lng };
+      }
       const payload = {
         titulo: newCard.titulo?.trim() || "",
         cliente: newCard.cliente.trim(),
@@ -2590,12 +2628,9 @@ export default function Board() {
         instalacao: newCard.instalacao ? Number(newCard.instalacao) : 0,
         tempoContratual: newCard.tempoContratual ? Number(newCard.tempoContratual) : 0,
         sla: newCard.sla ? Number(newCard.sla) : 0,
-        prazo: newCard.prazo || null,
+        // prazo removido
         observacoes: newCard.observacoes?.trim() || "",
-        coordenadas: {
-          lat: newCard.coordenadas.lat?.trim() || "",
-          lng: newCard.coordenadas.lng?.trim() || "",
-        },
+        coordenadas,
         colunaId: Number(colunaId),
         vendedorId: newCard.vendedorId || sellerId,
         ip: "",
@@ -2622,7 +2657,7 @@ export default function Board() {
           mensalidade: "",
           instalacao: "",
           sla: 0,
-          prazo: "",
+          // prazo removido
           observacoes: "",
           vendedorId: "",
         });
@@ -2823,7 +2858,7 @@ export default function Board() {
         titulo: card?.name || "",
         desc: extraNotes,
         observacoes: extraNotes,
-        prazo: card?.due || null,
+        // prazo removido
         comments: commentsByCard.get(card?.id) || [],
         vendedor: mainMember?.fullName || mainMember?.username || "",
       };
@@ -3014,6 +3049,67 @@ export default function Board() {
     }, 420);
   };
 
+  // Função para alternar seleção de um card
+  const toggleCardSelection = (cardId) => {
+    setSelectedCards((prev) =>
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId]
+    );
+  };
+
+  // Função para selecionar todos os cards de uma coluna
+  const selectAllInColumn = (columnId) => {
+    const columnCards = cardsByColumn[String(columnId)] || [];
+    const ids = columnCards.map(getCardKey);
+    // Se todos já estão selecionados, desmarca todos da coluna
+    if (ids.every((id) => selectedCards.includes(id))) {
+      setSelectedCards((prev) => prev.filter((id) => !ids.includes(id)));
+    } else {
+      setSelectedCards((prev) => Array.from(new Set([...prev, ...ids])));
+    }
+  };
+
+  // Função para limpar seleção e sair do modo múltiplo
+  const clearSelectedCards = () => {
+    setSelectedCards([]);
+    setMultiSelectMode(false);
+  };
+
+  // Função para mover todos os cards selecionados para uma coluna
+  const handleMoveSelectedCards = async (targetColumnId) => {
+    if (!selectedCards.length) return;
+    setError("");
+    const targetColumn = columnDefs.find((item) => item.id === targetColumnId);
+    if (!targetColumn) {
+      setError("Coluna de destino inválida.");
+      return;
+    }
+    // Atualização otimista
+    setCards((prev) => prev.map((card) =>
+      selectedCards.includes(getCardKey(card))
+        ? {
+            ...card,
+            status: targetColumn.nome,
+            coluna: targetColumn.nome,
+            coluna_id: targetColumn.id,
+            colunaId: targetColumn.id,
+          }
+        : card
+    ));
+    // Atualiza no backend
+    try {
+      await Promise.all(
+        selectedCards.map((cardId) =>
+          api.put(`/cards/${cardId}`, { coluna_id: targetColumn.id })
+        )
+      );
+      clearSelectedCards();
+    } catch (e) {
+      setError("Erro ao mover cards em lote. Tente novamente.");
+    }
+  };
+
   // Renderização do componente principal
   return (
     <div style={styles.container}>
@@ -3028,12 +3124,30 @@ export default function Board() {
           100% { box-shadow: 0 0 0 12px rgba(127, 90, 240, 0), 0 8px 20px rgba(95, 61, 198, 0.18); }
         }`}
       </style>
-      {/* Cabeçalho com título e botões de ação */}
+      {/* Botão para ativar/desativar seleção múltipla */}
+      <div style={{ marginBottom: 18 }}>
+        {!multiSelectMode ? (
+          <button
+            style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+            onClick={() => setMultiSelectMode(true)}
+          >
+            Selecionar vários
+          </button>
+        ) : (
+          <button
+            style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+            onClick={clearSelectedCards}
+          >
+            Cancelar seleção
+          </button>
+        )}
+      </div>
       <div style={styles.header}>
         <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban de Entregas</h1>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={styles.densityGroup}>
             {[
+              { key: "mini", label: "Mini" },
               { key: "compacto", label: "Compacto" },
               { key: "medio", label: "Médio" },
               { key: "confortavel", label: "Confortável" },
@@ -3152,7 +3266,89 @@ export default function Board() {
         </div>
       </div>
 
-      {/* Container de filtros - busca, status e vendedor */}
+      {/* Barra de ação em lote para mover cards selecionados */}
+      {multiSelectMode && selectedCards.length > 0 && (
+        <div style={{
+          background: '#f7f3ff',
+          border: '1px solid #d6d0ff',
+          borderRadius: 12,
+          padding: '14px 18px',
+          marginBottom: 18,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          boxShadow: '0 2px 8px rgba(90,48,255,0.07)',
+        }}>
+          <span style={{ color: '#5a30ff', fontWeight: 700, fontSize: 15 }}>
+            {selectedCards.length} card(s) selecionado(s)
+          </span>
+          <span style={{ color: '#7b68cc', fontSize: 14 }}>Mover para:</span>
+          <select
+            style={{
+              border: '1px solid #d6d0ff',
+              borderRadius: 8,
+              padding: '7px 14px',
+              fontSize: 15,
+              color: '#5a30ff',
+              fontWeight: 600,
+              background: '#fff',
+              marginRight: 10,
+            }}
+            onChange={e => {
+              const colId = Number(e.target.value);
+              if (colId) handleMoveSelectedCards(colId);
+              e.target.value = '';
+            }}
+            defaultValue=""
+          >
+            <option value="" disabled>Selecione a coluna</option>
+            {orderedColumnDefs.map(col => (
+              <option key={col.id} value={col.id}>{col.nome}</option>
+            ))}
+          </select>
+          <button
+            style={{
+              background: '#fff',
+              border: '1px solid #e57373',
+              borderRadius: 8,
+              color: '#e53935',
+              fontWeight: 700,
+              padding: '7px 18px',
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+            onClick={async () => {
+              if (window.confirm(`Excluir ${selectedCards.length} card(s) selecionado(s)? Essa ação não pode ser desfeita.`)) {
+                setError("");
+                try {
+                  await Promise.all(selectedCards.map(cardId => api.delete(`/cards/${cardId}`)));
+                  setCards(prev => prev.filter(card => !selectedCards.includes(getCardKey(card))));
+                  clearSelectedCards();
+                } catch {
+                  setError("Erro ao excluir cards em lote. Tente novamente.");
+                }
+              }
+            }}
+          >
+            Excluir selecionados
+          </button>
+          <button
+            style={{
+              background: '#fff',
+              border: '1px solid #d6d0ff',
+              borderRadius: 8,
+              color: '#5a30ff',
+              fontWeight: 700,
+              padding: '7px 18px',
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+            onClick={clearSelectedCards}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
       <div style={styles.filterContainer}>
         {/* Campo de busca textual */}
         <input
@@ -3296,6 +3492,17 @@ export default function Board() {
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                        {/* Checkbox de seleção de todos os cards da coluna */}
+                        {multiSelectMode && (
+                          <input
+                            type="checkbox"
+                            checked={columnCards.length > 0 && columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
+                            indeterminate={columnCards.some((card) => selectedCards.includes(getCardKey(card))) && !columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
+                            onChange={() => selectAllInColumn(column.id)}
+                            style={{ marginRight: 6, accentColor: '#5a30ff', width: 18, height: 18 }}
+                            title="Selecionar todos da coluna"
+                          />
+                        )}
                         {/* Nome da coluna */}
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <GripVertical size={14} /> {col}
@@ -3399,15 +3606,25 @@ export default function Board() {
                       <td key={column.id || col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
                         <DroppableColumn id={`column-${column.id}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
                           {visible.map((card) => (
-                            <DraggableCard
-                              key={getCardKey(card)}
-                              card={card}
-                              onOpen={handleOpenCard}
-                              densityCfg={densityCfg}
-                              isPromoted={promotedCardId === getCardKey(card)}
-                              isTargeted={targetedCardId === String(getCardKey(card))}
-                              domId={getCardDomId(getCardKey(card))}
-                            />
+                            <div key={getCardKey(card)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                              {multiSelectMode && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCards.includes(getCardKey(card))}
+                                  onChange={() => toggleCardSelection(getCardKey(card))}
+                                  style={{ marginTop: 8, accentColor: '#5a30ff', width: 18, height: 18 }}
+                                  title="Selecionar card"
+                                />
+                              )}
+                              <DraggableCard
+                                card={card}
+                                onOpen={handleOpenCard}
+                                densityCfg={densityCfg}
+                                isPromoted={promotedCardId === getCardKey(card)}
+                                isTargeted={targetedCardId === String(getCardKey(card))}
+                                domId={getCardDomId(getCardKey(card))}
+                              />
+                            </div>
                           ))}
                           {columnCards.length > 5 && !expanded && (
                             <button
@@ -3578,6 +3795,19 @@ export default function Board() {
                       onBlur={handleCreateFieldBlur}
                       placeholder="Rua, número, bairro, cidade"
                     />
+                    <label style={{...styles.createLabel, marginTop: 8}}><MapPin size={13} /> Coordenadas (opcional)</label>
+                    <input
+                      style={styles.createInput}
+                      type="text"
+                      value={newCard.coordenadas}
+                      onChange={(e) => handleInputChange("coordenadas", e.target.value)}
+                      onFocus={handleCreateFieldFocus}
+                      onBlur={handleCreateFieldBlur}
+                      placeholder="Latitude,Longitude (ex: -23.55,-46.63)"
+                    />
+                    <span style={{ color: "#7a73a1", fontSize: 12, marginTop: 4 }}>
+                      Para coordenadas, use o formato: <b>latitude,longitude</b> (ex: -23.55,-46.63)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3657,17 +3887,7 @@ export default function Board() {
                         placeholder="0"
                       />
                     </div>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><CalendarDays size={13} /> Prazo</label>
-                      <input
-                        style={styles.createInput}
-                        type="date"
-                        value={newCard.prazo}
-                        onChange={(e) => handleInputChange("prazo", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                      />
-                    </div>
+                    {/* Campo Prazo removido */}
                     <div style={styles.createField}>
                       <label style={styles.createLabel}><FileText size={13} /> Tempo Contratual</label>
                       <input
@@ -3720,33 +3940,6 @@ export default function Board() {
                   <span style={styles.createSectionChip}>Detalhes</span>
                 </div>
                 <div style={styles.createSectionGrid}>
-                  <div style={styles.createRow}>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><MapPin size={13} /> Latitude</label>
-                      <input
-                        style={styles.createInput}
-                        type="text"
-                        value={newCard.coordenadas.lat}
-                        onChange={(e) => handleInputChange("lat", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                        placeholder="-23.550520"
-                      />
-                    </div>
-                    <div style={styles.createField}>
-                      <label style={styles.createLabel}><MapPin size={13} /> Longitude</label>
-                      <input
-                        style={styles.createInput}
-                        type="text"
-                        value={newCard.coordenadas.lng}
-                        onChange={(e) => handleInputChange("lng", e.target.value)}
-                        onFocus={handleCreateFieldFocus}
-                        onBlur={handleCreateFieldBlur}
-                        placeholder="-46.633308"
-                      />
-                    </div>
-                  </div>
-
                   <div style={styles.createField}>
                     <label style={styles.createLabel}><FileText size={13} /> Observações</label>
                     <textarea
@@ -3914,68 +4107,70 @@ export default function Board() {
                 <div style={styles.detailsMainBody}>
                 {/* Seção de informações principais do card */}
                 <div style={styles.detailsSection}>
+              {/* Informações básicas - igual ao formulário de criação */}
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><User size={14} /> Cliente:</span> 
-                <span style={styles.detailsValue}>{selectedCard.cliente}</span>
-              </div>
-              {/* Exibe o tipo do card (Venda, Cotação, POC) */}
-              {selectedCard.tipo_card && (
-                <div style={styles.detailsRow}>
-                  <span style={styles.detailsLabel}>Tipo do Card:</span>
-                  <span style={{
-                    ...styles.detailsValue,
-                    background: '#e7e3ff',
-                    color: '#5a30ff',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    borderRadius: 10,
-                    padding: '2px 14px',
-                    marginLeft: 8,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    border: '1px solid #cfc2ff',
-                    display: 'inline-block',
-                  }}>{selectedCard.tipo_card}</span>
-                </div>
-              )}
-              <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}>Telefone:</span> 
-                <span style={styles.detailsValue}>{selectedCard.telefone}</span>
+                <span style={styles.detailsLabel}>Título do Card:</span>
+                <span style={styles.detailsValue}>{selectedCard.titulo || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><MapPin size={14} /> Endereço:</span> 
-                <span style={styles.detailsValue}>{selectedCard.endereco}</span>
+                <span style={styles.detailsLabel}>Cliente:</span>
+                <span style={styles.detailsValue}>{selectedCard.cliente || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><Wrench size={14} /> Serviço:</span> 
-                <span style={styles.detailsValue}>{selectedCard.tipoServico}</span>
+                <span style={styles.detailsLabel}>Telefone:</span>
+                <span style={styles.detailsValue}>{selectedCard.telefone || '--'}</span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><DollarSign size={14} /> Mensalidade:</span> 
+                <span style={styles.detailsLabel}><MapPin size={14} /> Endereço:</span>
+                <span style={styles.detailsValue}>{selectedCard.endereco || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><MapPin size={14} /> Coordenadas:</span>
+                <span style={styles.detailsValue}>
+                  {(() => {
+                    let lat = '--', lng = '--';
+                    if (selectedCard?.coordenadas) {
+                      if (typeof selectedCard.coordenadas === 'string' && selectedCard.coordenadas.includes(',')) {
+                        const [latStr, lngStr] = selectedCard.coordenadas.split(',').map(s => s.trim());
+                        lat = latStr || '--';
+                        lng = lngStr || '--';
+                      } else if (typeof selectedCard.coordenadas === 'object' && selectedCard.coordenadas !== null) {
+                        lat = selectedCard.coordenadas.lat || selectedCard.coordenadas[0] || '--';
+                        lng = selectedCard.coordenadas.lng || selectedCard.coordenadas[1] || '--';
+                      }
+                    }
+                    return `${lat}, ${lng}`;
+                  })()}
+                </span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><Wrench size={14} /> Tipo de Serviço:</span>
+                <span style={styles.detailsValue}>{selectedCard.tipoServico || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Mensalidade:</span>
                 <span style={styles.detailsValue}>
                   {selectedCard.mensalidade ? Number(selectedCard.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
                 </span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><DollarSign size={14} /> Instalação:</span> 
+                <span style={styles.detailsLabel}><DollarSign size={14} /> Instalação:</span>
                 <span style={styles.detailsValue}>
                   {selectedCard.instalacao ? Number(selectedCard.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "--"}
                 </span>
               </div>
               <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}>⏱️ SLA:</span> 
-                <span style={styles.detailsValue}>{selectedCard.sla || "--"} horas</span>
+                <span style={styles.detailsLabel}>Tipo do Card:</span>
+                <span style={styles.detailsValue}>{selectedCard.tipo_card || '--'}</span>
+              </div>
+              <div style={styles.detailsRow}>
+                <span style={styles.detailsLabel}>⏱️ SLA:</span>
+                <span style={styles.detailsValue}>{selectedCard.sla || '--'} horas</span>
               </div>
               <div style={styles.detailsRow}>
                 <span style={styles.detailsLabel}><FileText size={14} /> Tempo Contratual:</span>
                 <span style={styles.detailsValue}>
-                  {selectedCard.tempoContratual ? `${selectedCard.tempoContratual} meses` : "--"}
-                </span>
-              </div>
-              <div style={styles.detailsRow}>
-                <span style={styles.detailsLabel}><CalendarDays size={14} /> Prazo:</span> 
-                <span style={styles.detailsValue}>
-                  {selectedCard.prazo ? new Date(selectedCard.prazo).toLocaleDateString("pt-BR") : "--"}
+                  {selectedCard.tempoContratual ? `${selectedCard.tempoContratual} meses` : '--'}
                 </span>
               </div>
               
@@ -4030,7 +4225,7 @@ export default function Board() {
             {selectedCard.observacoes && (
               <div style={styles.detailsObservacoes}>
                 <span style={{ fontWeight: 600, color: '#7c6fb7', marginRight: 6 }}>Observações:</span>
-                {selectedCard.observacoes}
+                <span style={{ whiteSpace: 'pre-line' }}>{selectedCard.observacoes}</span>
               </div>
             )}
                 </div>
@@ -4077,7 +4272,9 @@ export default function Board() {
                     Nenhum comentário ainda.
                   </p>
                 ) : (
-                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => (
+                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => {
+                    const originalIdx = (selectedCard.comments || []).length - 1 - idx;
+                    return (
                     <div key={comment.id} style={styles.detailsCommentItem}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4118,7 +4315,7 @@ export default function Board() {
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }} title="Excluir comentário" onClick={async () => {
-                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
+                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== originalIdx);
                             try {
                               await persistCommentsOnSelectedCard(updatedComments);
                             } catch (err) {
@@ -4126,19 +4323,13 @@ export default function Board() {
                             }
                           }}><Trash2 size={15} /></button>
                           <button style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }} title="Editar comentário" onClick={() => {
+                            setEditingCommentIdx(originalIdx);
+                            setCommentText(comment.text || "");
                             setIsCommentComposerOpen(true);
-                            setCommentText(comment.text);
-                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== idx);
-                            const cardUpdate = { ...selectedCard, comments: updatedComments };
-                            api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate).then((response) => {
-                              const updatedCard = response.data;
-                              promoteUpdatedCardToTop(updatedCard);
-                              setSelectedCard(updatedCard);
-                            });
                           }}><Pencil size={15} /></button>
                         </div>
                       </div>
-                      <div style={styles.detailsCommentText}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-line' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
                           const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
@@ -4377,7 +4568,64 @@ export default function Board() {
                         </div>
                       )}
 
-                      {comment.attachment && (
+                      {/* Exibe múltiplos anexos se houver attachments (array), senão exibe attachment único */}
+                      {Array.isArray(comment.attachments) && comment.attachments.length > 0 ? (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                          {comment.attachments.map((att, idx) => (
+                            <div key={idx} style={{ minWidth: 120, maxWidth: 220 }}>
+                              {att.type && att.type.startsWith('image/') ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreviewImage({ src: att.data, name: att.name || 'Imagem anexada' });
+                                    setPreviewZoom(1);
+                                  }}
+                                  style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'zoom-in' }}
+                                  title="Clique para ampliar"
+                                >
+                                  <img
+                                    src={att.data}
+                                    alt={att.name || 'Imagem anexada'}
+                                    style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }}
+                                  />
+                                </button>
+                              ) : att.type && att.type.startsWith('video/') ? (
+                                <video controls style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, display: 'block', border: '1px solid #e0e0e0', marginBottom: 6 }}>
+                                  <source src={att.data} type={att.type} />
+                                  Seu navegador não suporta vídeo.
+                                </video>
+                              ) : att.type === 'application/pdf' ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
+                                    <FileText size={18} /> PDF
+                                  </span>
+                                  <a href={att.data} target="_blank" rel="noopener noreferrer" style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Abrir</a>
+                                  <a href={att.data} download={att.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const printableWindow = window.open(att.data, '_blank', 'noopener,noreferrer');
+                                      if (printableWindow) {
+                                        setTimeout(() => printableWindow.print(), 600);
+                                      }
+                                    }}
+                                    style={{ border: 'none', background: 'transparent', color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                                  >
+                                    Imprimir
+                                  </button>
+                                </div>
+                              ) : (
+                                <a href={att.data} download={att.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, maxWidth: 180, display: 'inline-flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                  <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} />
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 120 }}>
+                                    {att.name}
+                                  </span>
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : comment.attachment && (
                         <div style={{ marginTop: 8 }}>
                           {comment.attachment.type && comment.attachment.type.startsWith('image/') ? (
                             <button
@@ -4429,7 +4677,8 @@ export default function Board() {
                         {new Date(comment.createdAt).toLocaleString('pt-BR')}
                       </small>
                     </div>
-                  ))
+                  );
+                  })
                 )}
               </div>
 
@@ -4458,22 +4707,22 @@ export default function Board() {
                 ) : (
                   <>
                     <CommentInput
-                      value={commentText}
-                      onChange={setCommentText}
                       onSend={handleAddComment}
-                      mentionUsers={mentionUsers}
                       onFile={handleAttachmentSelect}
-                      pendingAttachment={pendingAttachment}
-                      onClearAttachment={() => setPendingAttachment(null)}
-                      placeholder="Escreva um comentário, use @ para menção, ou anexe arquivos/fotos..."
+                      placeholder="Escreva um comentário..."
+                      mentionUsers={mentionUsers}
+                      pendingAttachments={pendingAttachments}
+                      onClearAttachment={handleClearAttachment}
+                      initialValue={editingCommentIdx !== null && selectedCard && selectedCard.comments && selectedCard.comments[editingCommentIdx] ? selectedCard.comments[editingCommentIdx].text : ""}
                     />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <button
                         type="button"
                         onClick={() => {
                           setIsCommentComposerOpen(false);
-                          setCommentText("");
-                          setPendingAttachment(null);
+                          setPendingAttachments([]);
+                          setEditingCommentIdx(null);
+                          // Não precisa mais limpar commentText
                         }}
                         style={{
                           border: "none",
@@ -4697,4 +4946,3 @@ export default function Board() {
     </div>
   );
 }
-

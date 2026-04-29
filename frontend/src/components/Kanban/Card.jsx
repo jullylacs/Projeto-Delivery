@@ -69,7 +69,7 @@ export default function Card({ card, usuarioLogado }) {
         <Info label="🌐 IP" value={card.ip} iconColor="#6c3bff" />
         <Info label="⏱ SLA" value={card.sla ? `${String(card.sla).replace(/[^\d]/g, '')} horas` : undefined} iconColor="#6c3bff" />
         <Info label="📄 Tempo Contratual" value={card.tempoContratual ? `${card.tempoContratual} meses` : undefined} iconColor="#6c3bff" />
-        <Info label="📅 Prazo" value={card.prazo} iconColor="#6c3bff" />
+        {/* Prazo removido */}
         <Info label="👤 Vendedor" value={card.vendedor || usuarioLogado} />
         {/* O vendedor será o do card ou, se não houver, o usuário logado */}
       </div>
