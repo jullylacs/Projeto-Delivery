@@ -26,6 +26,9 @@ import {
 import CardModal from "../Modal/CardModal";
 import CommentInput from "./CommentInput";
 
+import PDFPreviewCard from "../UI/PDFPreviewCard";
+import { getPdfObjectUrl } from "./pdfUtils";
+
 const KANBAN_PREFS_KEY = "kanbanPrefs";
 const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 const KANBAN_FOCUS_EVENT = "kanban-focus-card";
@@ -1383,12 +1386,11 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
       id={domId}
       ref={setNodeRef}
       style={style}
-      onMouseEnter={() => setIsHovered(true)}  // Ativa hover
-      onMouseLeave={() => setIsHovered(false)} // Desativa hover
-      {...attributes} // Propriedades de acessibilidade para drag and drop
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      {...attributes}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: card.tipo_card ? 8 : 0 }}>
-        {/* Badge do tipo_card no topo */}
         {card.tipo_card && (
           <div style={{
             background: '#e7e3ff',
@@ -1406,7 +1408,6 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
             {card.tipo_card}
           </div>
         )}
-        {/* Botão de copiar link do card (ícone) */}
         {(card._id || card.id) && (
           <button
             onClick={handleCopyLink}
@@ -1429,64 +1430,51 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
         )}
       </div>
       <div style={styles.cardHeader}>
-        {/* Alça para arrastar o card */}
         <div
           style={{ cursor: "grab", marginRight: 8, userSelect: "none", display: "inline-block" }}
-          {...listeners} // Event listeners para drag and drop
+          {...listeners}
         >
           <GripVertical size={18} style={{ marginRight: 6, color: "#7b68cc" }} />
         </div>
         <div style={{ flex: 1 }}>
-          {/* Título do card - usa título ou cliente como fallback */}
           <div style={styles.cardTitle}>
             {card.titulo || card.cliente || "Sem título"}
           </div>
-          {/* Exibe cliente se houver título separado */}
           {card.cliente && card.titulo && (
             <div style={{ fontSize: densityCfg?.metaFontSize || "11px", color: "#8b8aa2", marginTop: "2px" }}>
               {card.cliente}
             </div>
           )}
         </div>
-        {/* Badge com status do card */}
         <div style={styles.cardBadge}>
           <Zap size={12} /> {card.status || "Novo"}
         </div>
       </div>
 
       <div style={styles.cardInfo}>
-        {/* Tipo de serviço - exibe ícone de ferramenta */}
         {card.tipoServico && (
           <div style={{ ...styles.infoRow, fontSize: densityCfg?.metaFontSize || styles.infoRow.fontSize }}>
             <span style={styles.infoIcon}><Wrench size={14} /></span>
             <span style={styles.infoText}>{card.tipoServico}</span>
           </div>
         )}
-        
-        {/* Endereço - exibe ícone de localização */}
         {card.endereco && (
           <div style={{ ...styles.infoRow, fontSize: densityCfg?.metaFontSize || styles.infoRow.fontSize }}>
             <span style={styles.infoIcon}><MapPin size={14} /></span>
             <span style={styles.infoText}>{card.endereco}</span>
           </div>
         )}
-
-        {/* Tags de preço, prazo e SLA */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-          {/* Tag de mensalidade */}
           {card.mensalidade > 0 && (
             <span style={styles.priceTag}>
               <DollarSign size={12} /> Mensalidade: {Number(card.mensalidade).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
-          {/* Tag de instalação */}
           {card.instalacao > 0 && (
             <span style={styles.priceTag}>
               <DollarSign size={12} /> Instalação: {Number(card.instalacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           )}
-          {/* Prazo removido */}
-          {/* Tag de SLA (Service Level Agreement) */}
           {card.sla > 0 && (
             <span style={{ ...styles.deadlineTag, background: "#e3f2fd", color: "#1565c0" }}>
               ⏱️ SLA: {card.sla} horas
@@ -1495,7 +1483,57 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
         </div>
       </div>
 
-      {/* Rodapé do card com vendedor e botão de detalhes */}
+      {/* Anexos do card (exibe como cards, incluindo PDF preview) */}
+      {Array.isArray(card.attachments) && card.attachments.length > 0 && (
+        <div style={{ margin: '10px 0 0 0', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {card.attachments.map((att, idx) => (
+            <div key={idx} style={{ minWidth: 120, maxWidth: 220 }}>
+              {att.type && att.type.startsWith('image/') ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewImage({ src: att.data, name: att.name || 'Imagem anexada' });
+                    setPreviewZoom(1);
+                  }}
+                  style={{ border: 'none', background: 'transparent', padding: 0, cursor: 'zoom-in' }}
+                  title="Clique para ampliar"
+                >
+                  <img
+                    src={att.data}
+                    alt={att.name || 'Imagem anexada'}
+                    style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }}
+                  />
+                </button>
+              ) : att.type && att.type.startsWith('video/') ? (
+                <video controls style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, display: 'block', border: '1px solid #e0e0e0', marginBottom: 6 }}>
+                  <source src={att.data} type={att.type} />
+                  Seu navegador não suporta vídeo.
+                </video>
+              ) : att.type === 'application/pdf' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
+                    <FileText size={18} /> PDF
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPDF({ src: att.data, name: att.name || 'Arquivo PDF' })}
+                    style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >Visualizar</button>
+                  <a href={att.data} download={att.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
+                </div>
+              ) : (
+                <a href={att.data} download={att.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, maxWidth: 180, display: 'inline-flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                  <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 120 }}>
+                    {att.name}
+                  </span>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={styles.cardFooter}>
         <div style={styles.footerMeta}>
           <div style={styles.vendorInfo}>
@@ -1541,6 +1579,7 @@ export default function Board() {
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [previewImage, setPreviewImage] = useState(null);
   const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewPDF, setPreviewPDF] = useState(null); // { src, name }
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
   const [isEditCardOpen, setIsEditCardOpen] = useState(false); // Controle do modal de edição
   const [editingCard, setEditingCard] = useState(null);    // Card sendo editado
@@ -4572,7 +4611,7 @@ export default function Board() {
                       {Array.isArray(comment.attachments) && comment.attachments.length > 0 ? (
                         <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           {comment.attachments.map((att, idx) => (
-                            <div key={idx} style={{ minWidth: 120, maxWidth: 220 }}>
+                            <div key={idx} style={{ minWidth: 120, maxWidth: 220, background: '#f8f5ff', border: '1px solid #ded2ff', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px #f3f0ff' }}>
                               {att.type && att.type.startsWith('image/') ? (
                                 <button
                                   type="button"
@@ -4586,41 +4625,35 @@ export default function Board() {
                                   <img
                                     src={att.data}
                                     alt={att.name || 'Imagem anexada'}
-                                    style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }}
+                                    style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, border: '1px solid #e0e0e0', display: 'block', marginBottom: 6 }}
                                   />
                                 </button>
                               ) : att.type && att.type.startsWith('video/') ? (
-                                <video controls style={{ maxWidth: 180, maxHeight: 120, borderRadius: 8, display: 'block', border: '1px solid #e0e0e0', marginBottom: 6 }}>
+                                <video controls style={{ maxWidth: 120, maxHeight: 120, borderRadius: 8, display: 'block', border: '1px solid #e0e0e0', marginBottom: 6 }}>
                                   <source src={att.data} type={att.type} />
                                   Seu navegador não suporta vídeo.
                                 </video>
                               ) : att.type === 'application/pdf' ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
-                                    <FileText size={18} /> PDF
-                                  </span>
-                                  <a href={att.data} target="_blank" rel="noopener noreferrer" style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Abrir</a>
-                                  <a href={att.data} download={att.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const printableWindow = window.open(att.data, '_blank', 'noopener,noreferrer');
-                                      if (printableWindow) {
-                                        setTimeout(() => printableWindow.print(), 600);
-                                      }
-                                    }}
-                                    style={{ border: 'none', background: 'transparent', color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
-                                  >
-                                    Imprimir
-                                  </button>
-                                </div>
+                                <>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                    <FileText size={22} style={{ color: '#b71c1c' }} />
+                                    <span style={{ fontWeight: 700, color: '#4b3b9a', fontSize: 14, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.name || 'Arquivo PDF'}>{att.name || 'Arquivo PDF'}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewPDF({ src: att.data, name: att.name || 'Arquivo PDF' })}
+                                      style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                    >Visualizar</button>
+                                    <a href={att.data} download={att.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
+                                  </div>
+                                </>
                               ) : (
-                                <a href={att.data} download={att.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, maxWidth: 180, display: 'inline-flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                                  <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} />
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 120 }}>
-                                    {att.name}
-                                  </span>
-                                </a>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <Paperclip size={15} style={{ color: '#6c3bff' }} />
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 100, fontSize: 13 }} title={att.name}>{att.name}</span>
+                                  <a href={att.data} download={att.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, marginLeft: 4 }}>Baixar</a>
+                                </div>
                               )}
                             </div>
                           ))}
@@ -4648,7 +4681,11 @@ export default function Board() {
                               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
                                 <FileText size={18} /> PDF
                               </span>
-                              <a href={comment.attachment.data} target="_blank" rel="noopener noreferrer" style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Abrir</a>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPDF({ src: comment.attachment.data, name: comment.attachment.name || 'Arquivo PDF' })}
+                                style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                              >Visualizar</button>
                               <a href={comment.attachment.data} download={comment.attachment.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
                               <button
                                 type="button"
@@ -4884,6 +4921,17 @@ export default function Board() {
             />
           </div>
         </div>
+      )}
+
+      {/* Preview PDF Modal */}
+
+
+      {previewPDF && (
+        <PDFPreviewCard
+          fileUrl={getPdfObjectUrl(previewPDF.src)}
+          fileName={previewPDF.name}
+          onClose={() => setPreviewPDF(null)}
+        />
       )}
 
       {/* Modal de edição de card - usa componente CardModal para formulário completo */}
