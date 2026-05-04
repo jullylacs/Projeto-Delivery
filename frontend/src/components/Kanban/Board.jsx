@@ -1509,25 +1509,58 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
                   <source src={att.data} type={att.type} />
                   Seu navegador não suporta vídeo.
                 </video>
-              ) : att.type === 'application/pdf' ? (
+              ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#b71c1c', fontWeight: 700, fontSize: 14 }}>
-                    <FileText size={18} /> PDF
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: att.type === 'application/pdf' ? '#b71c1c' : '#6c3bff', fontWeight: 700, fontSize: 14 }}>
+                    {att.type === 'application/pdf' ? <FileText size={18} /> : <Paperclip size={15} />} {att.type === 'application/pdf' ? 'PDF' : (att.name || 'Arquivo')}
                   </span>
                   <button
                     type="button"
-                    onClick={() => setPreviewPDF({ src: att.data, name: att.name || 'Arquivo PDF' })}
-                    style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >Visualizar</button>
-                  <a href={att.data} download={att.name || 'arquivo.pdf'} style={{ color: '#4b3b9a', fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>Baixar</a>
+                    onClick={() => setPreviewPDF({ src: att.data, name: att.name || (att.type === 'application/pdf' ? 'Arquivo PDF' : att.name || 'Arquivo') })}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: 'linear-gradient(90deg, #6c3bff 0%, #4b3b9a 100%)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      padding: '6px 16px',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(76,51,154,0.10)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(90deg, #4b3b9a 0%, #6c3bff 100%)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(90deg, #6c3bff 0%, #4b3b9a 100%)'}
+                    title={att.type === 'application/pdf' ? 'Visualizar PDF' : 'Visualizar arquivo'}
+                  >
+                    {att.type === 'application/pdf' ? <FileText size={15} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} /> : <Paperclip size={13} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} />} Visualizar
+                  </button>
+                  <a
+                    href={att.data}
+                    download={att.name || (att.type === 'application/pdf' ? 'arquivo.pdf' : 'arquivo')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: 'linear-gradient(90deg, #fff 0%, #ece3ff 100%)',
+                      color: '#4b3b9a',
+                      border: '1px solid #d6cfff',
+                      borderRadius: 6,
+                      fontWeight: 700,
+                      fontSize: 13,
+                      padding: '6px 16px',
+                      marginLeft: 6,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(76,51,154,0.07)',
+                      textDecoration: 'none',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'linear-gradient(90deg, #ece3ff 0%, #fff 100%)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(90deg, #fff 0%, #ece3ff 100%)'}
+                    title={att.type === 'application/pdf' ? 'Baixar PDF' : 'Baixar arquivo'}
+                  >
+                    <Download size={15} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} /> Baixar
+                  </a>
                 </div>
-              ) : (
-                <a href={att.data} download={att.name} style={{ color: '#6c3bff', textDecoration: 'underline', fontSize: 13, maxWidth: 180, display: 'inline-flex', alignItems: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                  <Paperclip size={13} style={{ marginRight: 4, verticalAlign: "text-bottom" }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', maxWidth: 120 }}>
-                    {att.name}
-                  </span>
-                </a>
               )}
             </div>
           ))}
