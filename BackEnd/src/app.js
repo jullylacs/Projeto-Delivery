@@ -98,6 +98,9 @@ app.use(`${apiBasePath}/notifications`, notificationRoutes);
 app.use(`${apiBasePath}/roles`, roleRoutes);
 app.use(`${apiBasePath}/schedules`, scheduleRoutes);
 app.use(`${apiBasePath}/technicians`, technicianRoutes);
+// Ramais
+const ramalRoutes = require("./routes/ramalRoutes");
+app.use(`${apiBasePath}/ramais`, ramalRoutes);
 
 // OpenAPI + Swagger UI (sem dependência local)
 app.get(`${apiBasePath}/openapi.json`, (req, res) => {

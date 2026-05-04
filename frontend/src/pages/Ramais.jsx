@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import api from "../services/api";
 
 export default function RamaisPage() {
-  const [ramais, setRamais] = useState([
-    { ramal: "1001", responsavel: "João Silva" },
-    { ramal: "1002", responsavel: "Maria Souza" },
-  ]);
+  const [ramais, setRamais] = useState([]);
   // Estado para modal de edição
   const [editIndex, setEditIndex] = useState(null);
   const [editRamal, setEditRamal] = useState("");
@@ -16,12 +14,24 @@ export default function RamaisPage() {
   const user = userRaw ? JSON.parse(userRaw) : null;
   const isGestorOuAdmin = ["admin", "gestor"].includes(user?.perfil);
 
-  function adicionarRamal(e) {
+  // Buscar ramais ao carregar a página
+  useEffect(() => {
+    api.get("/ramais")
+      .then(res => setRamais(res.data))
+      .catch(() => setRamais([]));
+  }, []);
+
+  async function adicionarRamal(e) {
     e.preventDefault();
     if (!novoRamal.trim() || !novoResponsavel.trim()) return;
-    setRamais([...ramais, { ramal: novoRamal.trim(), responsavel: novoResponsavel.trim() }]);
-    setNovoRamal("");
-    setNovoResponsavel("");
+    try {
+      const res = await api.post("/ramais", { ramal: novoRamal.trim(), responsavel: novoResponsavel.trim() });
+      setRamais([...ramais, res.data]);
+      setNovoRamal("");
+      setNovoResponsavel("");
+    } catch (err) {
+      alert("Erro ao adicionar ramal: " + (err?.response?.data?.error || ""));
+    }
   }
 
   // Função para abrir modal de edição
@@ -32,13 +42,19 @@ export default function RamaisPage() {
   }
 
   // Função para salvar edição
-  function salvarEdicao(e) {
+  async function salvarEdicao(e) {
     e.preventDefault();
     if (!editRamal.trim() || !editResponsavel.trim()) return;
-    const novo = [...ramais];
-    novo[editIndex] = { ramal: editRamal.trim(), responsavel: editResponsavel.trim() };
-    setRamais(novo);
-    setEditIndex(null);
+    try {
+      const id = ramais[editIndex].id;
+      const res = await api.put(`/ramais/${id}`, { ramal: editRamal.trim(), responsavel: editResponsavel.trim() });
+      const novo = [...ramais];
+      novo[editIndex] = res.data;
+      setRamais(novo);
+      setEditIndex(null);
+    } catch (err) {
+      alert("Erro ao editar ramal: " + (err?.response?.data?.error || ""));
+    }
   }
 
   // Função para fechar modal
@@ -91,9 +107,15 @@ export default function RamaisPage() {
                 <td style={{ padding: 8 }}>
                   <button
                     style={{ background: "#fff0f6", color: "#d72660", border: "none", borderRadius: 6, padding: "4px 12px", cursor: "pointer", marginRight: 8 }}
-                    onClick={() => {
-                      const novo = ramais.filter((_, idx) => idx !== i);
-                      setRamais(novo);
+                    onClick={async () => {
+                      if (!window.confirm("Tem certeza que deseja excluir este ramal?")) return;
+                      try {
+                        const id = r.id;
+                        await api.delete(`/ramais/${id}`);
+                        setRamais(ramais.filter((_, idx) => idx !== i));
+                      } catch (err) {
+                        alert("Erro ao excluir ramal: " + (err?.response?.data?.error || ""));
+                      }
                     }}
                   >Excluir</button>
                   <button
