@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import api from "../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bold, Italic, List, ListOrdered, Quote, Code, Pin, Pencil, Trash2, Send, X, Check } from "lucide-react";
@@ -413,9 +414,25 @@ export default function MuralPage() {
   const user = userRaw ? JSON.parse(userRaw) : null;
   const isGestorOuAdmin = ["admin", "gestor"].includes(user?.perfil);
 
-  const [posts, setPosts] = useState([
-    { autor: "Admin", conteudo: "**Bem-vindos ao mural interno!** 🎉\n\nEste é o espaço oficial de comunicados da equipe. Fique atento às novidades.", data: "2026-05-04" }
-  ]);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+    // Buscar posts do mural ao carregar
+    useEffect(() => {
+      async function fetchPosts() {
+        setLoading(true);
+        setError("");
+        try {
+          const res = await api.get("/mural");
+          setPosts(res.data || []);
+        } catch (err) {
+          setError("Erro ao carregar mural");
+        } finally {
+          setLoading(false);
+        }
+      }
+      fetchPosts();
+    }, []);
   const [editIndex, setEditIndex] = useState(null);
   const [editConteudo, setEditConteudo] = useState("");
   const [novoPost, setNovoPost] = useState("");
@@ -430,13 +447,20 @@ export default function MuralPage() {
     setEditConteudo(posts[idx].conteudo);
   }
 
-  function salvarEdicao(e) {
+  async function salvarEdicao(e) {
     e.preventDefault();
     if (!editConteudo.trim()) return;
-    const novo = [...posts];
-    novo[editIndex].conteudo = editConteudo.trim();
-    setPosts(novo);
-    setEditIndex(null);
+    setError("");
+    try {
+      const post = posts[editIndex];
+      const res = await api.put(`/mural/${post.id}`, { conteudo: editConteudo.trim() });
+      const novo = [...posts];
+      novo[editIndex] = res.data;
+      setPosts(novo);
+      setEditIndex(null);
+    } catch (err) {
+      setError("Erro ao salvar edição");
+    }
   }
 
   function fecharModal() {
@@ -473,14 +497,34 @@ export default function MuralPage() {
     });
   };
 
-  function publicar(e) {
+  async function publicar(e) {
     e.preventDefault();
     if (!novoPost.trim()) return;
-    setPosts([
-      { autor: user?.nome || "Usuário", conteudo: novoPost, data: new Date().toISOString().slice(0, 10) },
-      ...posts
-    ]);
-    setNovoPost("");
+    setError("");
+    try {
+      const res = await api.post("/mural", {
+        autor: user?.nome || "Usuário",
+        conteudo: novoPost
+      });
+      setPosts([res.data, ...posts]);
+      setNovoPost("");
+    } catch (err) {
+      setError("Erro ao publicar comunicado");
+    }
+  }
+
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);
+  async function excluirPostConfirmado(idx) {
+    setError("");
+    const post = posts[idx];
+    try {
+      await api.delete(`/mural/${post.id}`);
+      setPosts(posts.filter((_, i) => i !== idx));
+      setConfirmDeleteIndex(null);
+    } catch (err) {
+      setError("Erro ao excluir comunicado");
+      setConfirmDeleteIndex(null);
+    }
   }
 
   const markdownComponents = {
@@ -549,7 +593,7 @@ export default function MuralPage() {
           )}
 
           {posts.map((post, i) => (
-            <div key={i} className="post-card">
+            <div key={post.id || i} className="post-card">
               <div className="post-card-accent" style={{ background: i === 0 ? "linear-gradient(90deg, #7c4dff, #e8405a)" : "linear-gradient(90deg, #4a3d60, #7c4dff)" }} />
               <div className="post-card-body">
                 <div className="post-meta">
@@ -569,7 +613,7 @@ export default function MuralPage() {
                   <button className="action-btn btn-edit" onClick={() => abrirModalEdicao(i)}>
                     <Pencil size={12} /> Editar
                   </button>
-                  <button className="action-btn btn-delete" onClick={() => setPosts(posts.filter((_, idx) => idx !== i))}>
+                  <button className="action-btn btn-delete" onClick={() => setConfirmDeleteIndex(i)}>
                     <Trash2 size={12} /> Excluir
                   </button>
                 </div>
@@ -600,6 +644,23 @@ export default function MuralPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteIndex !== null && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setConfirmDeleteIndex(null)}>
+          <div className="modal-box">
+            <h3 className="modal-title">Excluir comunicado</h3>
+            <p>Tem certeza que deseja excluir este comunicado? Esta ação não poderá ser desfeita.</p>
+            <div className="modal-btns">
+              <button type="button" onClick={() => setConfirmDeleteIndex(null)} className="btn-cancel">
+                <X size={13} style={{ display: "inline", marginRight: 4 }} />Cancelar
+              </button>
+              <button type="button" onClick={() => excluirPostConfirmado(confirmDeleteIndex)} className="btn-save" style={{background: 'var(--accent2)'}}>
+                <Trash2 size={13} /> Excluir
+              </button>
+            </div>
           </div>
         </div>
       )}
