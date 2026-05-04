@@ -47,6 +47,11 @@ const Notification = sequelize.define(
     card_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      references: {
+        model: "cards",
+        key: "id"
+      },
+      onDelete: "SET NULL"
     },
   },
   {

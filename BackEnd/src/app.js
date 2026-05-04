@@ -71,6 +71,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
+const muralRoutes = require("./routes/muralRoutes");
 const auth = require("./controllers/middleware/auth");
 
 // 🔹 Rotas versionadas da aplicação
@@ -98,6 +99,10 @@ app.use(`${apiBasePath}/notifications`, notificationRoutes);
 app.use(`${apiBasePath}/roles`, roleRoutes);
 app.use(`${apiBasePath}/schedules`, scheduleRoutes);
 app.use(`${apiBasePath}/technicians`, technicianRoutes);
+app.use(`${apiBasePath}/mural`, muralRoutes);
+// Ramais
+const ramalRoutes = require("./routes/ramalRoutes");
+app.use(`${apiBasePath}/ramais`, ramalRoutes);
 
 // OpenAPI + Swagger UI (sem dependência local)
 app.get(`${apiBasePath}/openapi.json`, (req, res) => {

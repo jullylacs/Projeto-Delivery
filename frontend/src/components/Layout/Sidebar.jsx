@@ -14,6 +14,8 @@ export default function Sidebar({ isOpen = true }) {
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
     { name: "Agenda", icon: "📅", path: "/agenda" },
+    { name: "Ramais", icon: "📞", path: "/ramais", public: true },
+    { name: "Mural", icon: "📝", path: "/mural", public: true },
     ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
   ];
 
