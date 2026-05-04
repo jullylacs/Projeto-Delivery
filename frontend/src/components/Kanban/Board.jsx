@@ -4346,8 +4346,14 @@ export default function Board() {
                 ) : (
                   [...(selectedCard.comments || [])].reverse().map((comment, idx) => {
                     const originalIdx = (selectedCard.comments || []).length - 1 - idx;
+                    const isSystem = comment.isSystem;
                     return (
-                    <div key={comment.id} style={styles.detailsCommentItem}>
+                    <div key={comment.id} style={{
+                      ...styles.detailsCommentItem,
+                      background: isSystem ? 'linear-gradient(90deg, #f3f0ff 80%, #e0e7ff 100%)' : undefined,
+                      borderLeft: isSystem ? '4px solid #7c6fb7' : undefined,
+                      opacity: isSystem ? 0.92 : 1,
+                    }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {comment.authorAvatar ? (
@@ -4369,8 +4375,8 @@ export default function Board() {
                                 width: 28,
                                 height: 28,
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #8f6bff, #5b3fc9)',
-                                color: '#fff',
+                                background: isSystem ? 'linear-gradient(135deg, #bcb6e6, #a3a0c9)' : 'linear-gradient(135deg, #8f6bff, #5b3fc9)',
+                                color: isSystem ? '#4b3b9a' : '#fff',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -4380,10 +4386,14 @@ export default function Board() {
                                 boxShadow: '0 2px 6px rgba(92, 58, 170, 0.22)',
                               }}
                             >
-                              {getAvatarInitials(comment.author || 'Usuário')}
+                              {isSystem ? 'S' : getAvatarInitials(comment.author || 'Usuário')}
                             </div>
                           )}
-                          <p style={styles.detailsCommentAuthor}>{comment.author || 'Usuário'}:</p>
+                          <p style={{
+                            ...styles.detailsCommentAuthor,
+                            color: isSystem ? '#7c6fb7' : undefined,
+                            fontWeight: isSystem ? 700 : undefined,
+                          }}>{isSystem ? 'Sistema' : (comment.author || 'Usuário')}:</p>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }} title="Excluir comentário" onClick={async () => {

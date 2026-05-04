@@ -180,12 +180,69 @@ exports.updateCard = async (req, res) => {
       return res.status(400).json({ error });
     }
 
+    // Detecta mudanças relevantes para comentário do sistema
+    let systemComment = null;
+    let user = req.user || {};
+    let userName = user.username || user.nome || null;
+    if (!userName && user.id) {
+      // Busca do banco se não veio no token
+      const dbUser = await User.findByPk(user.id);
+      userName = dbUser?.username || dbUser?.nome || dbUser?.email || `Usuário ${user.id}`;
+    }
+    if (!userName) {
+      userName = user.email || `Usuário ${user.id || "?"}`;
+    }
+    // Mudança de coluna
+    if (existing.coluna_id !== payload.coluna_id) {
+      // Buscar nomes das colunas
+      const ColumnModel = require("../models/Column");
+      const fromColumn = await ColumnModel.findByPk(existing.coluna_id);
+      const toColumn = await ColumnModel.findByPk(payload.coluna_id);
+      const fromName = fromColumn?.nome || "(desconhecida)";
+      const toName = toColumn?.nome || "(desconhecida)";
+      systemComment = {
+        id: `sys-${Date.now()}`,
+        text: `${userName} moveu o card de "${fromName}" para "${toName}"` ,
+        author: "Sistema",
+        authorAvatar: null,
+        createdAt: new Date(),
+        isSystem: true
+      };
+    } else {
+      // Mudança de detalhes (exceto coluna)
+      // Verifica se algum campo relevante foi alterado
+      const fieldsToCheck = [
+        "titulo", "cliente", "telefone", "endereco", "coordenadas", "tipoServico", "mensalidade", "instalacao", "tipo_card", "sla", "prazo", "tempoContratual", "observacoes", "vendedor_id"
+      ];
+      const changed = fieldsToCheck.some(field => {
+        const oldVal = JSON.stringify(existing[field] ?? null);
+        const newVal = JSON.stringify(payload[field] ?? null);
+        return oldVal !== newVal;
+      });
+      if (changed) {
+        systemComment = {
+          id: `sys-${Date.now()}`,
+          text: `${userName} editou os detalhes do card.`,
+          author: "Sistema",
+          authorAvatar: null,
+          createdAt: new Date(),
+          isSystem: true
+        };
+      }
+    }
+
     // Atualiza o card com os dados do body filtrando pelo ID
     // Equivalente ao findByIdAndUpdate do Mongoose
+    // Se houver comentário do sistema, adiciona ao array de comments
+    if (systemComment) {
+      let comments = Array.isArray(existing.comments) ? [...existing.comments] : [];
+      comments.push(systemComment);
+      payload.comments = comments;
+    }
+
     await Card.update(payload, { where: { id: targetId } });
 
     // Busca o card já atualizado para retornar ao cliente
-    // Equivalente ao { new: true } do Mongoose — que retornava o documento atualizado
     const card = await Card.findByPk(targetId, {
       include: [
         { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
@@ -193,7 +250,6 @@ exports.updateCard = async (req, res) => {
       ],
     });
 
-    // Retorna o card atualizado
     res.json(normalizeCard(card));
   } catch (err) {
     // Log detalhado para depuração
@@ -204,7 +260,6 @@ exports.updateCard = async (req, res) => {
       body: req.body,
       params: req.params,
     });
-    // Em caso de erro (ex: falha no banco), retorna status 500
     res.status(500).json({ error: err?.message || err?.name || "Erro ao atualizar card" });
   }
 };
