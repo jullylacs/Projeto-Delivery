@@ -97,10 +97,21 @@ export default function RamaisPage() {
         <tbody>
           {ramais.map((r, i) => (
             <tr key={i} style={{ borderBottom: "1px solid #ece3ff" }}>
+              {/*
               <td style={{ padding: 8, color: "#4b3b9a", fontWeight: 600, cursor: "pointer" }}
                   onClick={() => navigator.clipboard.writeText(r.ramal)}
                   title="Clique para copiar o ramal">
                 {r.ramal}
+              </td>
+              */}
+              <td style={{ padding: 8 }}>
+                <a
+                  href={`sip:${r.ramal}`}
+                  style={{ color: "#4b3b9a", fontWeight: 600, textDecoration: "none" }}
+                  title="Clique para ligar pelo ramal"
+                >
+                  {r.ramal}
+                </a>
               </td>
               <td style={{ padding: 8 }}>{r.responsavel}</td>
               {isGestorOuAdmin && (
