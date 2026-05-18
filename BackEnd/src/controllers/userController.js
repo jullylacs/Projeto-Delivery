@@ -117,6 +117,8 @@ exports.register = async (req, res) => {
       aprovado: false,
       aprovado_por: null,
       aprovado_em: null,
+      acesso_kanban_delivery: false,
+      acesso_kanban_comercial: false,
     };
 
     const user = await User.create(userData);
@@ -447,7 +449,17 @@ exports.getAll = async (req, res) => {
 exports.adminUpdateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { nome, email, perfil, telefone, departamento, avatar, aprovado } = req.body;
+    const {
+      nome,
+      email,
+      perfil,
+      telefone,
+      departamento,
+      avatar,
+      aprovado,
+      acesso_kanban_delivery,
+      acesso_kanban_comercial,
+    } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "ID inválido" });
@@ -474,6 +486,20 @@ exports.adminUpdateUser = async (req, res) => {
       departamento: departamento ? xss(departamento) : undefined,
       avatar: safeAvatar,
     };
+
+    if (acesso_kanban_delivery !== undefined) {
+      if (typeof acesso_kanban_delivery !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_delivery' inválido" });
+      }
+      updateData.acesso_kanban_delivery = acesso_kanban_delivery;
+    }
+
+    if (acesso_kanban_comercial !== undefined) {
+      if (typeof acesso_kanban_comercial !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_comercial' inválido" });
+      }
+      updateData.acesso_kanban_comercial = acesso_kanban_comercial;
+    }
 
     if (aprovado !== undefined) {
       if (typeof aprovado !== "boolean") {

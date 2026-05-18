@@ -44,6 +44,18 @@ const User = sequelize.define("User", {
     allowNull: true,
   },
 
+  // Acesso aos Kanbans (Delivery e Comercial são abas independentes)
+  acesso_kanban_delivery: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  acesso_kanban_comercial: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+
   // Campos adicionais usados no updateUserProfile
   telefone: DataTypes.STRING,
   departamento: DataTypes.STRING,

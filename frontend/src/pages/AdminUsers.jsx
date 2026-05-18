@@ -328,7 +328,13 @@ export default function AdminUsers() {
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
-  const [form, setForm] = useState({ nome: "", email: "", perfil: "convidado" });
+  const [form, setForm] = useState({
+    nome: "",
+    email: "",
+    perfil: "convidado",
+    acesso_kanban_delivery: false,
+    acesso_kanban_comercial: false,
+  });
 
   const totalFiltered = total;
 
@@ -485,13 +491,21 @@ export default function AdminUsers() {
       nome: user.nome || "",
       email: user.email || "",
       perfil: user.perfil || "convidado",
+      acesso_kanban_delivery: Boolean(user.acesso_kanban_delivery),
+      acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
     });
   };
 
   // Cancela a edição e limpa o formulário
   const cancelEdit = () => {
     setEditingId(null);
-    setForm({ nome: "", email: "", perfil: "convidado" });
+    setForm({
+      nome: "",
+      email: "",
+      perfil: "convidado",
+      acesso_kanban_delivery: false,
+      acesso_kanban_comercial: false,
+    });
   };
 
   // Envia as alterações do formulário para a API e recarrega a tabela
@@ -774,6 +788,7 @@ export default function AdminUsers() {
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("aprovado")}>
                 Aprovacao{sortIndicator("aprovado")}
               </th>
+              <th style={styles.th}>Acesso Kanban</th>
               <th style={styles.th}>Acoes</th>
             </tr>
           </thead>
@@ -846,6 +861,44 @@ export default function AdminUsers() {
                       {approvalStyle.label}
                     </span>
                   </td>
+                  <td style={styles.td}>
+                    {editing ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_delivery}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_delivery: e.target.checked }))
+                            }
+                          />
+                          Delivery
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_comercial}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_comercial: e.target.checked }))
+                            }
+                          />
+                          Comercial
+                        </label>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {user.acesso_kanban_delivery && (
+                          <span style={{ ...styles.badge, background: "#fff0f6", color: "#9b1b5a" }}>Delivery</span>
+                        )}
+                        {user.acesso_kanban_comercial && (
+                          <span style={{ ...styles.badge, background: "#f6ecff", color: "#6b2cb3" }}>Comercial</span>
+                        )}
+                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && (
+                          <span style={{ color: "#7a73a1", fontSize: 13 }}>—</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                     {editing ? (
@@ -873,7 +926,7 @@ export default function AdminUsers() {
             })}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
+                <td colSpan={7} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
                   Nenhum usuário encontrado para a busca.
                 </td>
               </tr>

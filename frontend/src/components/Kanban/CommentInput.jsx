@@ -9,7 +9,7 @@ const mentionContextFromText = (text, caretPosition) => {
   if (/\s/.test(query)) return null;
   return { start: atIndex, end: caretPosition, query };
 };
-import React, { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AtSign, Bold, Code, Italic, List, ListOrdered, Paperclip, Quote, SendHorizontal } from "lucide-react";
 
 const normalizeMentionUsers = (users = []) => {
@@ -45,11 +45,10 @@ export default function CommentInput({
   onClearAttachment,
   initialValue = "",
 }) {
+  // Inicializa o valor a partir de `initialValue`. NÃO reseta com useEffect:
+  // re-render do pai não pode clobberar o que o usuário já digitou. Para trocar
+  // entre "novo" e "editar comentário X", o Board usa `key` para remontar.
   const [value, setValue] = useState(initialValue);
-    // Atualiza o valor se initialValue mudar (ex: ao trocar de comentário para editar)
-    React.useEffect(() => {
-      setValue(initialValue);
-    }, [initialValue]);
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({
     isOpen: false,

@@ -5,6 +5,7 @@ router.get("/", controller.getColumns);
 router.post("/", controller.createColumn);
 router.put("/reorder", controller.reorderColumns);
 router.put("/:id", controller.updateColumn);
+router.delete("/:id/cards", controller.clearColumnCards);
 router.delete("/:id", controller.deleteColumn);
 
 module.exports = router;
