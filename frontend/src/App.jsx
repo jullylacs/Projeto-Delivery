@@ -7,6 +7,7 @@ import Header from "./components/Layout/Header";   // Cabeçalho do layout
 import Dashboard from "./pages/Dashboard";        // Página Dashboard
 import Kanban from "./pages/Kanban";              // Página Kanban
 import Agenda from "./pages/Agenda";              // Página Agenda
+import AgendaDelivery from "./pages/AgendaDelivery"; // Página Agenda Delivery
 import Profile from "./pages/Profile";            // Página Profile
 import RamaisPage from "./pages/Ramais";
 import MuralPage from "./pages/Mural";
@@ -17,13 +18,26 @@ import Register from "./pages/Register";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/profile", "/admin/users"];
+const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   if (!user || !["admin", "gestor"].includes(user.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+// Libera a rota apenas para quem pode acessar a Agenda Delivery.
+function DeliveryAgendaRoute({ children }) {
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  const allowed = ["delivery", "gestor_delivery", "admin", "gestor"];
+
+  if (!user || !allowed.includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -94,6 +108,10 @@ function MainLayout() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/agenda" element={<Agenda />} />
+            <Route
+              path="/agenda-delivery"
+              element={<DeliveryAgendaRoute><AgendaDelivery /></DeliveryAgendaRoute>}
+            />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/ramais" element={<RamaisPage />} />

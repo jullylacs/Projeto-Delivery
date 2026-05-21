@@ -25,7 +25,7 @@ const User = sequelize.define("User", {
 
   // Perfil/role do usuário
   perfil: {
-    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"),
+    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "gestor_delivery", "admin"),
     defaultValue: "convidado"
   },
 

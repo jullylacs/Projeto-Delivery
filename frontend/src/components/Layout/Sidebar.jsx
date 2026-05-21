@@ -10,10 +10,13 @@ export default function Sidebar({ isOpen = true }) {
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   // Itens do menu com nome, ícone e caminho
+  const canSeeAgendaDelivery = ["delivery", "gestor_delivery", "admin", "gestor"].includes(user?.perfil);
+
   const menuItems = [
     { name: "Dashboard", icon: "📊", path: "/dashboard" },
     { name: "Kanban", icon: "🗂️", path: "/kanban" },
     { name: "Agenda", icon: "📅", path: "/agenda" },
+    ...(canSeeAgendaDelivery ? [{ name: "Agenda Delivery", icon: "🛵", path: "/agenda-delivery" }] : []),
     { name: "Ramais", icon: "📞", path: "/ramais", public: true },
     { name: "Mural", icon: "📝", path: "/mural", public: true },
     ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),

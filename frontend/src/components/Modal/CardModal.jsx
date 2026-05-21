@@ -216,15 +216,18 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
   const handleSubmit = async () => {
     if (!validate()) return; // Se houver erros, não prossegue
 
+    // Envia APENAS os campos editáveis no formulário. Não espalhar `...card`
+    // aqui: o card pode trazer `comments` (JSONB com anexos em base64) e
+    // outros campos pesados, e o backend ignora `comments` em updateCard de
+    // qualquer forma. Mandar tudo causa 413 (nginx/Express limit = 5MB).
     const updatedCard = {
-      ...card, // Mantém propriedades existentes do card
-      ...formData, // Sobrescreve com os valores do formulário
+      ...formData,
       mensalidade: formData.mensalidade ? Number(formData.mensalidade) : undefined,
       instalacao: formData.instalacao ? Number(formData.instalacao) : undefined,
-      sla: formData.sla ? Number(formData.sla) : 0, // Converte SLA para número
+      sla: formData.sla ? Number(formData.sla) : 0,
     };
 
-    await onSave(updatedCard); // Chama função externa de salvamento
+    await onSave(updatedCard);
   };
 
   const handleFieldFocus = (event) => {

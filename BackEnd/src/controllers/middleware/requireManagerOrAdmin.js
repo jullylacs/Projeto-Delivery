@@ -1,6 +1,6 @@
 const { User } = require("../../models");
 
-// Middleware que permite acesso apenas para perfis admin ou gestor.
+// Middleware que permite acesso apenas para perfis admin, gestor ou gestor_delivery.
 module.exports = async (req, res, next) => {
   try {
     if (!req.userId) {
@@ -19,7 +19,7 @@ module.exports = async (req, res, next) => {
       return res.status(403).json({ message: "Usuário não aprovado" });
     }
 
-    if (!["admin", "gestor"].includes(user.perfil)) {
+    if (!["admin", "gestor", "gestor_delivery"].includes(user.perfil)) {
       return res.status(403).json({ message: "Acesso restrito a Admin/Gestor" });
     }
 

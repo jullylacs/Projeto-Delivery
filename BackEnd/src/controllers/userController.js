@@ -69,7 +69,7 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 // Detecta se a senha já é um hash bcrypt (evita re-hash acidental)
 const isBcryptHash = (value) => typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
 // Perfis válidos aceitos pelo sistema
-const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"];
+const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin"];
 // Aceita avatar como data URL de imagem ou URL http/https
 const sanitizeAvatar = (value) => {
   if (typeof value !== "string") return undefined;

@@ -1,13 +1,26 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
-const PERFIS = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"];
+const PERFIS = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin"];
+
+// Mapeia o valor do enum para um rótulo amigável exibido nos selects.
+const PERFIL_LABELS = {
+  convidado: "Convidado",
+  comercial: "Comercial",
+  operacional: "Operacional",
+  tecnico: "Técnico",
+  delivery: "Delivery",
+  gestor_delivery: "Gestora de Delivery",
+  gestor: "Gestor",
+  admin: "Admin",
+};
 const PAGE_SIZE_OPTIONS = [8, 12, 20, 50];
 const STORAGE_KEY = "adminUsersTableState";
 
 const ROLE_STYLES = {
   admin: { bg: "#ffe9d6", fg: "#913400", label: "Admin" },
   gestor: { bg: "#e8ecff", fg: "#2f3d99", label: "Gestor" },
+  gestor_delivery: { bg: "#ffe7f3", fg: "#9b1b5a", label: "Gestora de Delivery" },
   tecnico: { bg: "#dff5ff", fg: "#0e5a7a", label: "Tecnico" },
   operacional: { bg: "#e9f8eb", fg: "#1c6d30", label: "Operacional" },
   delivery: { bg: "#fff0f6", fg: "#9b1b5a", label: "Delivery" },
@@ -733,7 +746,14 @@ export default function AdminUsers() {
                 </>
               ) : (
                 <>
-                  <span style={{ minWidth: 90, fontWeight: 600 }}>{role.nome}</span>
+                  <span style={{ minWidth: 90, fontWeight: 600 }}>
+                    {PERFIL_LABELS[role.nome] || role.nome}
+                  </span>
+                  {PERFIS.includes(role.nome) && (
+                    <span style={{ color: "#9388b8", fontSize: 11, fontStyle: "italic" }}>
+                      (perfil do sistema)
+                    </span>
+                  )}
                   {role.descricao && <span style={{ color: "#7a73a1", fontSize: 12 }}>({role.descricao})</span>}
                   {!PERFIS.includes(role.nome) && (
                     <>
@@ -765,7 +785,8 @@ export default function AdminUsers() {
         </div>
         {roleError && <div style={{ color: "#a4001d", marginTop: 8, fontSize: 13 }}>{roleError}</div>}
         <div style={{ marginTop: 10, color: "#7a73a1", fontSize: 12 }}>
-          Os cargos criados aqui ficam disponíveis para seleção ao editar usuários.
+          Cargos customizados aqui são apenas rótulos auxiliares — só os perfis do sistema
+          podem ser atribuídos a usuários no momento.
         </div>
       </div>
 
@@ -844,11 +865,13 @@ export default function AdminUsers() {
                         onChange={(e) => setForm((p) => ({ ...p, perfil: e.target.value }))}
                         style={styles.input}
                       >
-                        {roles.map((perfil) => (
-                          <option key={perfil.id || perfil.nome} value={perfil.nome}>
-                            {perfil.nome}
-                          </option>
-                        ))}
+                        {roles
+                          .filter((perfil) => PERFIS.includes(perfil.nome))
+                          .map((perfil) => (
+                            <option key={perfil.id || perfil.nome} value={perfil.nome}>
+                              {PERFIL_LABELS[perfil.nome] || perfil.nome}
+                            </option>
+                          ))}
                       </select>
                     ) : (
                       <span style={{ ...styles.badge, background: roleStyle.bg, color: roleStyle.fg }}>
