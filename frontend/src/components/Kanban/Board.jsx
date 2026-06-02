@@ -1619,20 +1619,14 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
 
 // Zona de drop flutuante para transferir um card entre Kanbans.
 // Visível apenas durante o drag de um card e quando há outro board acessível.
-function TransferDropZone({ toBoard, visible }) {
+function TransferDropZone({ toBoard }) {
   const { setNodeRef, isOver } = useDroppable({ id: `transfer:${toBoard}` });
   const label = BOARD_LABELS[toBoard] || toBoard;
-  if (!visible) return null;
   return (
     <div
       ref={setNodeRef}
       style={{
-        position: "fixed",
-        bottom: 24,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 60,
-        padding: "14px 22px",
+        padding: "14px 28px",
         borderRadius: 14,
         border: isOver ? "2px solid #5a30ff" : "2px dashed #8f75ff",
         background: isOver ? "#ede6ff" : "rgba(255,255,255,0.95)",
@@ -1641,10 +1635,12 @@ function TransferDropZone({ toBoard, visible }) {
         fontSize: 14,
         boxShadow: "0 12px 28px rgba(45, 18, 87, 0.18)",
         pointerEvents: "auto",
-        transition: "background 160ms ease, border-color 160ms ease",
+        transition: "background 160ms ease, border-color 160ms ease, transform 160ms ease",
+        transform: isOver ? "scale(1.04)" : "scale(1)",
+        whiteSpace: "nowrap",
       }}
     >
-      Solte para transferir para {label}
+      📦 Transferir para {label}
     </div>
   );
 }
@@ -4056,9 +4052,22 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           ) : null}
         </DragOverlay>
         {/* Zonas de transferência entre Kanbans — só aparecem durante drag de um card. */}
-        {canTransferTo.map((toBoard) => (
-          <TransferDropZone key={toBoard} toBoard={toBoard} visible={!!activeId} />
-        ))}
+        {canTransferTo.length > 0 && !!activeId && (
+          <div style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 60,
+            display: "flex",
+            gap: 12,
+            pointerEvents: "none",
+          }}>
+            {canTransferTo.map((toBoard) => (
+              <TransferDropZone key={toBoard} toBoard={toBoard} />
+            ))}
+          </div>
+        )}
       </DndContext>
 
       {/* Modal de criação de card */}
@@ -4724,24 +4733,28 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               📌
                             </button>
                           )}
-                          <button
-                            style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
-                            title="Excluir comentário"
-                            onClick={() => handleDeleteComment(comment.id)}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                          <button
-                            style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
-                            title="Editar comentário"
-                            onClick={() => {
-                              setEditingCommentId(comment.id);
-                              setCommentText(comment.text || "");
-                              setIsCommentComposerOpen(true);
-                            }}
-                          >
-                            <Pencil size={15} />
-                          </button>
+                          {!isSystem && (
+                            <>
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
+                                title="Excluir comentário"
+                                onClick={() => handleDeleteComment(comment.id)}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
+                                title="Editar comentário"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id);
+                                  setCommentText(comment.text || "");
+                                  setIsCommentComposerOpen(true);
+                                }}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-wrap' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
