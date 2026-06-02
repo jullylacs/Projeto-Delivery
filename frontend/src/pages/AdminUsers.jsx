@@ -247,7 +247,7 @@ const styles = {
 export default function AdminUsers() {
     // Estado para novo cargo
     const [newRole, setNewRole] = useState("");
-    const [roles, setRoles] = useState(PERFIS);
+    const [roles, setRoles] = useState(PERFIS.map(n => ({ nome: n, id: n })));
     const [editingRoleId, setEditingRoleId] = useState(null);
     const [editingRoleName, setEditingRoleName] = useState("");
     const [editingRoleDesc, setEditingRoleDesc] = useState("");
@@ -389,10 +389,12 @@ export default function AdminUsers() {
         setUsers(res.data);
         setTotal(res.data.length);
         setTotalPages(1);
+        console.log("[AdminUsers] usuários (array):", res.data.length);
       } else {
         const rows = res.data.data || [];
         const serverTotalPages = res.data.pagination?.totalPages || 1;
         setUsers(rows);
+        console.log("[AdminUsers] usuários (paginado):", rows.length, "total:", res.data.pagination?.total);
         setTotal(res.data.pagination?.total || 0);
         setTotalPages(serverTotalPages);
 
@@ -776,7 +778,8 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.filter((user) => PERFIS.includes(user.perfil)).map((user) => {
+            {users.map((user) => {
+              if (!user?.id) return null;
               const editing = editingId === user.id;
               const roleStyle = getRoleStyle(user.perfil);
               const approvalStyle = user.aprovado ? APPROVAL_STYLES.approved : APPROVAL_STYLES.pending;
@@ -865,9 +868,7 @@ export default function AdminUsers() {
                         onChange={(e) => setForm((p) => ({ ...p, perfil: e.target.value }))}
                         style={styles.input}
                       >
-                        {roles
-                          .filter((perfil) => PERFIS.includes(perfil.nome))
-                          .map((perfil) => (
+                        {roles.map((perfil) => (
                             <option key={perfil.id || perfil.nome} value={perfil.nome}>
                               {PERFIL_LABELS[perfil.nome] || perfil.nome}
                             </option>
