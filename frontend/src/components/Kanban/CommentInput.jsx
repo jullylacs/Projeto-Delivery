@@ -31,14 +31,12 @@ const normalizeMentionUsers = (users = []) =>
 
 export default function CommentInput({
   onSend,
-  onFile,
   placeholder,
   mentionUsers = [],
-  pendingAttachments = [],
-  onClearAttachment,
   initialValue = "",
 }) {
   const [value, setValue] = useState(initialValue);
+  const [attachments, setAttachments] = useState([]);
   const [focused, setFocused] = useState(false);
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({
@@ -122,12 +120,28 @@ export default function CommentInput({
     });
   };
 
+  // Processa arquivos internamente — elimina race condition com FileReader externo
   const handleFile = (e) => {
-    if (e.target.files?.length) { onFile?.(Array.from(e.target.files)); e.target.value = ""; }
+    if (!e.target.files?.length) return;
+    const files = Array.from(e.target.files);
+    e.target.value = "";
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result;
+        if (base64) setAttachments((prev) => [...prev, { name: file.name, type: file.type, data: base64 }]);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
+  const removeAttachment = (idx) => setAttachments((prev) => prev.filter((_, i) => i !== idx));
+
   const handleSend = () => {
-    if (value.trim()) { onSend?.(value); setValue(""); }
+    if (!value.trim() && attachments.length === 0) return;
+    onSend?.(value, attachments);
+    setValue("");
+    setAttachments([]);
   };
 
   const toolbarActions = [
@@ -322,7 +336,7 @@ export default function CommentInput({
         />
 
         {/* Preview de anexos */}
-        {pendingAttachments?.length > 0 && (
+        {attachments.length > 0 && (
           <div style={{
             margin: "0 10px 8px",
             border: "1px solid var(--border)",
@@ -334,7 +348,7 @@ export default function CommentInput({
             flexWrap: "wrap",
             overflowX: "auto",
           }}>
-            {pendingAttachments.map((att, idx) => (
+            {attachments.map((att, idx) => (
               <div key={idx} style={{ position: "relative", flexShrink: 0 }}>
                 {att.type?.startsWith("image/") ? (
                   <img src={att.data} alt={att.name || "Imagem"} style={{ maxWidth: 100, maxHeight: 90, borderRadius: 8, display: "block", border: "1px solid var(--border)" }} />
@@ -348,8 +362,8 @@ export default function CommentInput({
                     <span style={{ maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={att.name}>{att.name || "Arquivo"}</span>
                   </div>
                 )}
-                {onClearAttachment && (
-                  <button type="button" onClick={() => onClearAttachment(idx)} title="Remover"
+                {(
+                  <button type="button" onClick={() => removeAttachment(idx)} title="Remover"
                     style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-label)", cursor: "pointer", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
                     <X size={11} />
                   </button>
@@ -375,7 +389,7 @@ export default function CommentInput({
             </label>
           </div>
 
-          <button type="button" onClick={handleSend} disabled={!value.trim()} style={sendBtnStyle}>
+          <button type="button" onClick={handleSend} disabled={!value.trim() && attachments.length === 0} style={{ ...sendBtnStyle, opacity: (value.trim() || attachments.length > 0) ? 1 : 0.5, cursor: (value.trim() || attachments.length > 0) ? "pointer" : "not-allowed" }}>
             <SendHorizontal size={13} /> Enviar
           </button>
         </div>

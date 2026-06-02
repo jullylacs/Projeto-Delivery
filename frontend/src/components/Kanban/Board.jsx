@@ -2685,30 +2685,14 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   // texto ia parar no comentário errado quando a lista mudava entre abrir e salvar.
   const [editingCommentId, setEditingCommentId] = useState(null);
 
-  // Recebe array de arquivos, lê todos e adiciona ao pendingAttachments
-  const handleAttachmentSelect = (files) => {
-    if (!files || files.length === 0) return;
-    const newFiles = Array.isArray(files) ? files : [files];
-    let filesProcessed = 0;
-    const newAttachments = [];
-    newFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result;
-        if (base64) {
-          newAttachments.push({ name: file.name, type: file.type, data: base64 });
-        }
-        filesProcessed++;
-        if (filesProcessed === newFiles.length) {
-          setPendingAttachments((prev) => [...prev, ...newAttachments]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+  // Limpa um anexo específico pelo índice
+  const handleClearAttachment = (idx) => {
+    if (typeof idx === "number") {
+      setPendingAttachments((prev) => prev.filter((_, i) => i !== idx));
+    } else {
+      setPendingAttachments([]);
+    }
   };
-
-  // Limpa anexos pendentes
-  const handleClearAttachment = () => setPendingAttachments([]);
 
   const getAvatarInitials = (name) => {
     const safeName = String(name || "Usuário").trim();
@@ -2724,11 +2708,16 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   // Adiciona comentário ao card
   // Adiciona comentário ao card
 
-  const handleAddComment = async (commentTextArg) => {
+  // Aceita (text, attachments) — os anexos vêm do CommentInput para evitar race condition
+  const handleAddComment = async (commentTextArg, inlineAttachments) => {
     if (!selectedCard) return;
 
     const normalizedText = (commentTextArg || "").trim();
-    if (!normalizedText && pendingAttachments.length === 0) return;
+    const attachments = Array.isArray(inlineAttachments) && inlineAttachments.length > 0
+      ? inlineAttachments
+      : pendingAttachments;
+
+    if (!normalizedText && attachments.length === 0) return;
 
     setIsCommentLoading(true);
     setError("");
@@ -2745,7 +2734,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       } else {
         res = await api.post(`/cards/${getCardKey(selectedCard)}/comments`, {
           text: normalizedText,
-          ...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+          ...(attachments.length > 0 ? { attachments } : {}),
         });
       }
       applyServerCard(res.data);
@@ -5224,11 +5213,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                     <CommentInput
                       key={editingCommentId ? `edit-${editingCommentId}` : "new-comment"}
                       onSend={handleAddComment}
-                      onFile={handleAttachmentSelect}
+
                       placeholder="Escreva um comentário..."
                       mentionUsers={mentionUsers}
-                      pendingAttachments={pendingAttachments}
-                      onClearAttachment={handleClearAttachment}
                       initialValue={
                         editingCommentId
                           ? (selectedCard?.comments?.find((c) => String(c.id) === String(editingCommentId))?.text || "")
