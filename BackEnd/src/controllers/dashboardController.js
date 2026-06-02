@@ -64,7 +64,7 @@ exports.getDashboardSummary = async (req, res) => {
       count: Number(row.count) || 0,
     }));
 
-    // 3) Performance por usuário/cargo — agrupa por perfil no JS depois.
+    // 3) Cards atribuídos e concluídos por usuário.
     const userRows = await sequelize.query(
       `SELECT
          u.perfil,
@@ -82,24 +82,45 @@ exports.getDashboardSummary = async (req, res) => {
       { replacements: repl, type: QueryTypes.SELECT }
     );
 
+    // 4) Cards atualizados por usuário (via atualizado_por_nome → proxy de atividade geral).
+    const atualizadosRows = await sequelize.query(
+      `SELECT
+         u.id AS user_id,
+         COUNT(c.id)::int AS atualizados
+       FROM users u
+       LEFT JOIN cards c ON c.atualizado_por_nome = u.nome
+       LEFT JOIN columns col ON col.id = c.coluna_id
+       WHERE u.aprovado = TRUE
+         ${board ? "AND (col.board = :board OR col.id IS NULL)" : ""}
+       GROUP BY u.id`,
+      { replacements: repl, type: QueryTypes.SELECT }
+    );
+
+    const atualizadosMap = new Map(
+      atualizadosRows.map((r) => [Number(r.user_id), Number(r.atualizados) || 0])
+    );
+
     const roleMap = new Map();
     for (const row of userRows) {
       const role = row.perfil?.trim() || "Sem cargo";
       if (!roleMap.has(role)) {
-        roleMap.set(role, { role, users: [], totalCards: 0, totalCompleted: 0 });
+        roleMap.set(role, { role, users: [], totalCards: 0, totalCompleted: 0, totalAtualizados: 0 });
       }
       const bucket = roleMap.get(role);
       const userTotal = Number(row.total) || 0;
       const userCompleted = Number(row.completed) || 0;
+      const userAtualizados = atualizadosMap.get(Number(row.user_id)) || 0;
       bucket.users.push({
         id: Number(row.user_id),
         nome: String(row.user_nome || `Usuário ${row.user_id}`),
         total: userTotal,
         completed: userCompleted,
+        atualizados: userAtualizados,
         ratio: userTotal > 0 ? (userCompleted / userTotal) * 100 : 0,
       });
       bucket.totalCards += userTotal;
       bucket.totalCompleted += userCompleted;
+      bucket.totalAtualizados += userAtualizados;
     }
 
     const roleStats = Array.from(roleMap.values()).map((r) => ({

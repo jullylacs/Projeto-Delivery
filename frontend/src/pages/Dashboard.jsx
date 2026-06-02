@@ -220,36 +220,56 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {roleStats.length > 0 && (
+      {roleStats.filter(r => r.role !== "admin").length > 0 && (
         <div style={{ ...styles.card, gridColumn: "1 / -1" }}>
-          <div style={styles.cardTitle}>👥 Performance por Cargo</div>
+          <div style={styles.cardTitle}>👥 Atividade por Cargo</div>
+          <div style={{ fontSize: 12, color: "var(--text-label)", marginBottom: 14, marginTop: -6 }}>
+            Baseado em cards atribuídos + cards editados/atualizados no sistema
+          </div>
           <div style={{ display: "grid", gap: "18px" }}>
-            {roleStats.map((role) => (
-              <div key={role.role} style={{ padding: "14px 12px", backgroundColor: "var(--bg-input)", borderRadius: "10px", borderLeft: "4px solid #8b64ff" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div style={{ fontWeight: "700", color: "var(--text)", fontSize: 15 }}>{role.role}</div>
-                  <div style={{ fontSize: "13px", fontWeight: "700", color: "#8b64ff" }}>
-                    {role.totalCompleted}/{role.totalCards} ({role.ratio.toFixed(0)}%)
-                  </div>
-                </div>
-                <div style={styles.progressBar}>
-                  <div style={{ ...styles.progressFill, width: `${role.ratio}%` }} />
-                </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-label)" }}>
-                  <b>Equipe:</b>
-                  <ul style={{ margin: "6px 0 0 0", padding: 0, listStyle: "none", display: "flex", flexWrap: "wrap", gap: 12 }}>
-                    {role.users.map((u) => (
-                      <li key={u.id} style={{ minWidth: 180 }}>
-                        <span style={{ fontWeight: 600, color: "var(--text)" }}>{u.nome}</span>
-                        <span style={{ marginLeft: 8, color: "#8b64ff", fontWeight: 600 }}>
-                          {u.completed}/{u.total} ({u.ratio.toFixed(0)}%)
+            {roleStats
+              .filter(r => r.role !== "admin")
+              .sort((a, b) => (b.totalAtualizados + b.totalCards) - (a.totalAtualizados + a.totalCards))
+              .map((role) => {
+                const maxAtividade = Math.max(
+                  ...roleStats.filter(r => r.role !== "admin").map(r => r.totalAtualizados + r.totalCards),
+                  1
+                );
+                const atividadeTotal = role.totalAtualizados + role.totalCards;
+                const atividadePct = Math.min(100, (atividadeTotal / maxAtividade) * 100);
+                return (
+                  <div key={role.role} style={{ padding: "14px 12px", backgroundColor: "var(--bg-input)", borderRadius: "10px", borderLeft: "4px solid #8b64ff" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                      <div style={{ fontWeight: "700", color: "var(--text)", fontSize: 15 }}>{role.role}</div>
+                      <div style={{ display: "flex", gap: 10, fontSize: 12 }}>
+                        <span style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 8px", color: "var(--text-label)" }}>
+                          🗂 {role.totalCards} atribuídos
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
+                        <span style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6, padding: "2px 8px", color: "#8b64ff", fontWeight: 700 }}>
+                          ✏️ {role.totalAtualizados} atualizados
+                        </span>
+                      </div>
+                    </div>
+                    <div style={styles.progressBar}>
+                      <div style={{ ...styles.progressFill, width: `${atividadePct}%` }} />
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-label)" }}>
+                      <b>Equipe:</b>
+                      <ul style={{ margin: "6px 0 0 0", padding: 0, listStyle: "none", display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        {role.users.map((u) => (
+                          <li key={u.id} style={{ minWidth: 200, background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px" }}>
+                            <div style={{ fontWeight: 700, color: "var(--text)", fontSize: 13 }}>{u.nome}</div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 3, fontSize: 11 }}>
+                              <span style={{ color: "var(--text-label)" }}>🗂 {u.total} atr.</span>
+                              <span style={{ color: "#8b64ff", fontWeight: 700 }}>✏️ {u.atualizados} atu.</span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
