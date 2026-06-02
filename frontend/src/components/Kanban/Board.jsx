@@ -666,7 +666,7 @@ const styles = {
     },
     detailsCommentText: {
       margin: '6px 0 0',
-      color: 'var(--text-muted, var(--text))',
+      color: 'var(--text)',
       fontSize: '13.5px',
       lineHeight: 1.55,
     },
