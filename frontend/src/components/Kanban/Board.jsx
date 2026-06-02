@@ -2654,6 +2654,18 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     }
   };
 
+  const handlePinComment = async (commentId) => {
+    if (!selectedCard || !commentId) return;
+    try {
+      const res = await api.patch(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/pin`
+      );
+      applyServerCard(res.data);
+    } catch {
+      setError("Erro ao fixar comentário");
+    }
+  };
+
   const handleChangeVendor = async () => {
     if (!selectedCard) return;
     if (!vendorEdit) {
@@ -4632,13 +4644,23 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                     Nenhum comentário ainda.
                   </p>
                 ) : (
-                  [...(selectedCard.comments || [])].reverse().map((comment) => {
+                  (() => {
+                    const allComments = selectedCard.comments || [];
+                    const pinned = allComments.filter(c => c.pinned);
+                    const rest = [...allComments.filter(c => !c.pinned)].reverse();
+                    return [...pinned, ...rest];
+                  })().map((comment) => {
                     const isSystem = comment.isSystem;
+                    const isPinned = !!comment.pinned;
                     return (
                     <div key={comment.id} style={{
                       ...styles.detailsCommentItem,
-                      background: isSystem ? 'linear-gradient(90deg, #f3f0ff 80%, #e0e7ff 100%)' : undefined,
-                      borderLeft: isSystem ? '4px solid #7c6fb7' : undefined,
+                      background: isPinned
+                        ? 'linear-gradient(90deg, #fefae8 0%, #fff8d6 100%)'
+                        : isSystem ? 'linear-gradient(90deg, var(--bg-input) 80%, var(--bg-card) 100%)' : 'var(--bg-input)',
+                      borderLeft: isPinned
+                        ? '4px solid #f59e0b'
+                        : isSystem ? '4px solid #7c6fb7' : undefined,
                       opacity: isSystem ? 0.92 : 1,
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -4676,13 +4698,30 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               {isSystem ? 'S' : getAvatarInitials(comment.author || 'Usuário')}
                             </div>
                           )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <p style={{
                             ...styles.detailsCommentAuthor,
                             color: isSystem ? '#7c6fb7' : undefined,
                             fontWeight: isSystem ? 700 : undefined,
+                            margin: 0,
                           }}>{isSystem ? 'Sistema' : (comment.author || 'Usuário')}:</p>
+                          {isPinned && (
+                            <span style={{ fontSize: 10, fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 999, padding: '1px 7px', letterSpacing: '0.3px' }}>
+                              📌 Fixado
+                            </span>
+                          )}
+                        </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
+                          {!isSystem && (
+                            <button
+                              style={{ background: 'none', border: 'none', color: isPinned ? '#b45309' : '#7264a8', fontSize: 16, cursor: 'pointer' }}
+                              title={isPinned ? 'Desafixar comentário' : 'Fixar comentário'}
+                              onClick={() => handlePinComment(comment.id)}
+                            >
+                              📌
+                            </button>
+                          )}
                           <button
                             style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
                             title="Excluir comentário"

@@ -37,6 +37,9 @@ export default function Login() {
       const res = await api.post("/users/login", { email, senha });
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
+      if (res.data.refreshToken) {
+        localStorage.setItem("refreshToken", res.data.refreshToken);
+      }
       navigate("/dashboard");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Erro ao conectar com o servidor."));

@@ -26,6 +26,7 @@ router.post("/:id/comments/:commentId/replies", auth, controller.addReply);
 router.patch("/:id/comments/:commentId/replies/:replyId", auth, controller.editReply);
 router.delete("/:id/comments/:commentId/replies/:replyId", auth, controller.deleteReply);
 
+router.patch("/:id/comments/:commentId/pin", auth, controller.pinComment);
 router.post("/:id/comments/:commentId/reactions", auth, controller.toggleReaction);
 
 // PUT /cards/:id — atualiza os dados de um card específico

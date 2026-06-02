@@ -689,6 +689,32 @@ exports.editComment = async (req, res) => {
   }
 };
 
+// 🔹 PATCH /cards/:id/comments/:commentId/pin — fixa ou desfixa um comentário
+exports.pinComment = async (req, res) => {
+  try {
+    const cardId = parseCardId(req.params.id);
+    const commentId = String(req.params.commentId || "");
+    if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
+
+    let found = false;
+    let newPinned = false;
+    await mutateCardComments(cardId, (comments) => {
+      return comments.map((c) => {
+        if (String(c.id) !== commentId) return c;
+        found = true;
+        newPinned = !c.pinned;
+        return { ...c, pinned: newPinned };
+      });
+    });
+
+    if (!found) return res.status(404).json({ error: "Comentário não encontrado" });
+    const full = await reloadCardWithRelations(cardId);
+    return res.json(normalizeCard(full));
+  } catch (err) {
+    return handleControllerError(res, err, "Erro ao fixar comentário");
+  }
+};
+
 // 🔹 DELETE /cards/:id/comments/:commentId — remove um comentário (por id)
 exports.deleteComment = async (req, res) => {
   try {
