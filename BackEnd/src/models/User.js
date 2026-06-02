@@ -25,7 +25,7 @@ const User = sequelize.define("User", {
 
   // Perfil/role do usuário
   perfil: {
-    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "gestor_delivery", "admin"),
+    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "gestor_delivery", "admin", "bko", "noc"),
     defaultValue: "convidado"
   },
 
@@ -44,13 +44,18 @@ const User = sequelize.define("User", {
     allowNull: true,
   },
 
-  // Acesso aos Kanbans (Delivery e Comercial são abas independentes)
+  // Acesso aos Kanbans (Delivery, Comercial e BKO são abas independentes)
   acesso_kanban_delivery: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,
   },
   acesso_kanban_comercial: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  acesso_kanban_bko: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,

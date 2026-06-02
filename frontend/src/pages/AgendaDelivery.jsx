@@ -19,9 +19,9 @@ const SCOPE = { individual: "individual", geral: "geral" };
 const PREFS_KEY = "agendaDeliveryPrefs";
 
 // Perfis que podem visualizar a Agenda Geral
-const SCOPE_GERAL_VIEWERS = ["delivery", "gestor_delivery", "admin", "gestor"];
+const SCOPE_GERAL_VIEWERS = ["delivery", "admin", "noc"];
 // Perfis que podem criar/editar/excluir eventos na Agenda Geral
-const SCOPE_GERAL_EDITORS = ["gestor_delivery", "admin"];
+const SCOPE_GERAL_EDITORS = ["delivery", "admin", "noc"];
 
 const EVENT_TYPES = [
   { value: "tarefa", label: "Tarefa" },
@@ -171,6 +171,12 @@ export default function AgendaDelivery() {
   const [apiError, setApiError] = useState("");
   const [toast, setToast] = useState("");
 
+  // Lista de usuários para menções
+  const [assignableUsers, setAssignableUsers] = useState([]);
+  useEffect(() => {
+    api.get("/users/assignable").then((r) => setAssignableUsers(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+  }, []);
+
   // Modal de evento (criar/editar)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("create"); // "create" | "edit"
@@ -186,6 +192,7 @@ export default function AgendaDelivery() {
   const [formFimTime, setFormFimTime] = useState("10:00");
   const [formCor, setFormCor] = useState(DEFAULT_COLOR);
   const [formDescricao, setFormDescricao] = useState("");
+  const [formMencoes, setFormMencoes] = useState([]); // array de user IDs
   const [formError, setFormError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -290,6 +297,7 @@ export default function AgendaDelivery() {
     setFormFimTime("10:00");
     setFormCor(DEFAULT_COLOR);
     setFormDescricao("");
+    setFormMencoes([]);
     setFormError("");
     setEditingEvent(null);
   };
@@ -332,6 +340,7 @@ export default function AgendaDelivery() {
     );
     setFormCor(evt.cor || DEFAULT_COLOR);
     setFormDescricao(evt.descricao_html || "");
+    setFormMencoes(Array.isArray(evt.mencoes) ? evt.mencoes : []);
     setFormError("");
     setIsModalOpen(true);
   };
@@ -381,6 +390,7 @@ export default function AgendaDelivery() {
       escopo: scope,
       tipo: formTipo,
       cor: formCor,
+      mencoes: formMencoes,
     };
   };
 
@@ -519,24 +529,27 @@ export default function AgendaDelivery() {
     return (
       <div
         key={evt.id}
+        className="agenda-event-chip"
         onClick={(ev) => {
           ev.stopPropagation();
           openEditModal(evt);
         }}
         title={evt.titulo}
         style={{
-          fontSize: 12,
-          lineHeight: 1.3,
+          fontSize: 11,
+          lineHeight: 1.35,
           color: "#fff",
           background: cor,
-          borderRadius: 4,
-          padding: "3px 6px",
+          borderRadius: 5,
+          padding: "3px 7px",
           marginBottom: 2,
           cursor: "pointer",
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
           fontWeight: 600,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
+          transition: "transform 0.12s, box-shadow 0.12s",
         }}
       >
         {evt.all_day ? "" : `${new Date(evt.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} `}
@@ -552,9 +565,9 @@ export default function AgendaDelivery() {
           key={`empty-${idx}`}
           style={{
             minHeight: 120,
-            borderRight: idx % 7 !== 6 ? "1px solid #eee8ff" : "none",
-            borderBottom: "1px solid #eee8ff",
-            background: "#faf8ff",
+            borderRight: idx % 7 !== 6 ? "1px solid #ede7ff" : "none",
+            borderBottom: "1px solid #ede7ff",
+            background: "#faf7ff",
           }}
         />
       );
@@ -569,28 +582,52 @@ export default function AgendaDelivery() {
     return (
       <div
         key={`${idx}-${key}`}
+        className="agenda-day-cell"
         onDoubleClick={() => {
           if (canCreateHere) openCreateModal(day);
         }}
         style={{
           minHeight: 120,
-          padding: 6,
-          background: isToday ? "#efeaff" : isInCurrentMonth ? "#fff" : "#faf8ff",
-          borderRight: viewMode === VIEW_MODE.month && idx % 7 !== 6 ? "1px solid #eee8ff" : viewMode === VIEW_MODE.week && idx !== 6 ? "1px solid #eee8ff" : "none",
-          borderBottom: viewMode === VIEW_MODE.month ? "1px solid #eee8ff" : "none",
+          padding: "8px 6px 6px",
+          background: isToday ? "#ede7ff" : isInCurrentMonth ? "#fff" : "#faf7ff",
+          borderRight: viewMode === VIEW_MODE.month && idx % 7 !== 6 ? "1px solid #ede7ff" : viewMode === VIEW_MODE.week && idx !== 6 ? "1px solid #ede7ff" : "none",
+          borderBottom: viewMode === VIEW_MODE.month ? "1px solid #ede7ff" : "none",
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          gap: 3,
           cursor: canCreateHere ? "pointer" : "default",
+          transition: "background 0.12s",
         }}
         title={canCreateHere ? "Duplo clique para criar evento" : ""}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#24334f" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: isToday ? "#6c3bff" : "transparent",
+            color: isToday ? "#fff" : isInCurrentMonth ? "#1e2d4a" : "#b0a6d8",
+            fontSize: 12,
+            fontWeight: 700,
+            padding: isToday ? "0 2px" : 0,
+          }}>
             {viewMode === VIEW_MODE.month ? day.getDate() : day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
           </span>
           {dayEvents.length > 0 && (
-            <span style={{ fontSize: 10, color: "#5b6f95", fontWeight: 700 }}>{dayEvents.length}</span>
+            <span style={{
+              fontSize: 10,
+              color: "#fff",
+              fontWeight: 700,
+              background: "#a590e0",
+              borderRadius: 999,
+              padding: "1px 6px",
+              lineHeight: 1.5,
+            }}>
+              {dayEvents.length}
+            </span>
           )}
         </div>
 
@@ -629,48 +666,71 @@ export default function AgendaDelivery() {
     const dayEvents = eventsByDay[key] || [];
     if (dayEvents.length === 0) {
       return (
-        <div style={{ padding: 24, color: "#7f8ba1", fontSize: 14, textAlign: "center" }}>
+        <div style={{ padding: "48px 24px", color: "#9b8fd8", fontSize: 14, textAlign: "center", fontWeight: 600 }}>
           Nenhum evento para este dia.
         </div>
       );
     }
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "16px" }}>
         {dayEvents.map((evt) => {
           const cor = evt.cor || DEFAULT_COLOR;
           return (
             <div
               key={evt.id}
+              className="agenda-day-card"
               onClick={() => openEditModal(evt)}
               style={{
-                border: "1px solid #ece4ff",
-                borderLeft: `5px solid ${cor}`,
-                borderRadius: 10,
+                borderTop: "1px solid #ede7ff",
+                borderRight: "1px solid #ede7ff",
+                borderBottom: "1px solid #ede7ff",
+                borderLeft: `4px solid ${cor}`,
+                borderRadius: 12,
                 background: "#fff",
-                padding: "12px 14px",
-                boxShadow: "0 4px 10px rgba(75, 52, 158, 0.06)",
+                padding: "14px 16px",
+                boxShadow: "0 2px 10px rgba(75, 52, 158, 0.07)",
                 cursor: "pointer",
+                transition: "box-shadow 0.15s, transform 0.1s",
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <strong style={{ color: "#2a3a56", fontSize: 16 }}>{evt.titulo}</strong>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: cor, borderRadius: 999, padding: "3px 8px" }}>
-                    {TYPE_LABEL[evt.tipo] || evt.tipo}
-                  </span>
-                </div>
+                <strong style={{ color: "#1e2d4a", fontSize: 15, fontWeight: 700 }}>{evt.titulo}</strong>
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "#fff",
+                  background: cor,
+                  borderRadius: 999,
+                  padding: "3px 10px",
+                  letterSpacing: "0.3px",
+                  whiteSpace: "nowrap",
+                }}>
+                  {TYPE_LABEL[evt.tipo] || evt.tipo}
+                </span>
               </div>
-              <div style={{ color: "#687690", fontSize: 13, fontWeight: 600 }}>
+              <div style={{ color: "#6b7a9f", fontSize: 12, fontWeight: 600 }}>
                 {formatEventTime(evt)}
               </div>
               {scope === SCOPE.geral && evt.usuario?.nome && (
-                <div style={{ color: "#8c82b6", fontSize: 12, marginTop: 4 }}>
-                  Criado por: {evt.usuario.nome}
+                <div style={{ color: "#9b8fd8", fontSize: 12, marginTop: 4 }}>
+                  Por: {evt.usuario.nome}
+                </div>
+              )}
+              {Array.isArray(evt.mencoes) && evt.mencoes.length > 0 && (
+                <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {evt.mencoes.map((uid) => {
+                    const u = assignableUsers.find((x) => x.id === uid);
+                    return u ? (
+                      <span key={uid} style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: "#6c3bff", borderRadius: 999, padding: "2px 8px" }}>
+                        @{u.nome.split(" ")[0]}
+                      </span>
+                    ) : null;
+                  })}
                 </div>
               )}
               {evt.descricao_html && (
                 <div
-                  style={{ marginTop: 8, color: "#4d4868", fontSize: 13, lineHeight: 1.5 }}
+                  style={{ marginTop: 10, color: "#4a4675", fontSize: 13, lineHeight: 1.6, borderTop: "1px solid #f0eaff", paddingTop: 8 }}
                   dangerouslySetInnerHTML={{ __html: evt.descricao_html }}
                 />
               )}
@@ -686,15 +746,26 @@ export default function AgendaDelivery() {
   // ===========================================================================
 
   return (
-    <div style={{ padding: "20px 22px", background: "#f2efff", minHeight: "94vh", color: "#1f2b46" }}>
-      {/* Cabeçalho com toggle de escopo */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+    <div style={{ padding: "22px 24px", background: "linear-gradient(160deg, #f0ecff 0%, #eaf0ff 100%)", minHeight: "94vh", color: "#1a1535" }}>
+      {/* Cabeçalho */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#1f2b46" }}>Agenda Delivery</h2>
-          <span style={{ fontSize: 12, color: "#7c879f", fontWeight: 600 }}>NVX</span>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1a1535", letterSpacing: "-0.4px" }}>Agenda Geral</h2>
+          <span style={{
+            fontSize: 10,
+            color: "#7c5fe8",
+            fontWeight: 800,
+            letterSpacing: "1.2px",
+            textTransform: "uppercase",
+            background: "#ede5ff",
+            borderRadius: 6,
+            padding: "2px 7px",
+            border: "1px solid #d4c4fa",
+          }}>NVX</span>
         </div>
 
-        <div style={{ display: "inline-flex", border: "1px solid #d8cffb", borderRadius: 8, padding: 2, background: "#fff" }}>
+        {/* Scope tabs */}
+        <div style={{ display: "inline-flex", border: "1.5px solid #d0c4f8", borderRadius: 12, padding: 3, background: "rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(100, 60, 200, 0.07)" }}>
           <button
             type="button"
             onClick={() => setScope(SCOPE.individual)}
@@ -715,14 +786,14 @@ export default function AgendaDelivery() {
       </div>
 
       {/* Barra de navegação */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={handleToday} style={primaryBtn}>Hoje</button>
-          <div style={{ display: "inline-flex", border: "1px solid #d8cffb", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
-            <button onClick={handlePrev} style={navBtn}>◀</button>
-            <button onClick={handleNext} style={{ ...navBtn, borderLeft: "1px solid #d8cffb" }}>▶</button>
+          <div style={{ display: "inline-flex", border: "1.5px solid #d0c4f8", borderRadius: 10, overflow: "hidden", background: "#fff", boxShadow: "0 1px 4px rgba(100,60,200,0.06)" }}>
+            <button onClick={handlePrev} className="agenda-btn-nav" style={navBtn}>‹</button>
+            <button onClick={handleNext} className="agenda-btn-nav" style={{ ...navBtn, borderLeft: "1px solid #e4daff" }}>›</button>
           </div>
-          <div style={{ display: "inline-flex", gap: 2, border: "1px solid #d8cffb", borderRadius: 8, padding: 2, background: "#fff" }}>
+          <div style={{ display: "inline-flex", gap: 2, border: "1.5px solid #d0c4f8", borderRadius: 10, padding: 3, background: "rgba(255,255,255,0.9)", boxShadow: "0 1px 4px rgba(100,60,200,0.06)" }}>
             {[
               { key: VIEW_MODE.month, label: "Mês" },
               { key: VIEW_MODE.week, label: "Semana" },
@@ -740,8 +811,8 @@ export default function AgendaDelivery() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <h3 style={{ margin: 0, color: "#23314f", fontSize: 18, fontWeight: 700 }}>{headerLabel}</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h3 style={{ margin: 0, color: "#2a1d5e", fontSize: 16, fontWeight: 700, letterSpacing: "-0.2px" }}>{headerLabel}</h3>
           {(scope === SCOPE.individual || canEditGeral) && (
             <button onClick={() => openCreateModal()} style={primaryBtn}>+ Novo evento</button>
           )}
@@ -749,23 +820,23 @@ export default function AgendaDelivery() {
       </div>
 
       {apiError && (
-        <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #f3b3b3", background: "#ffe9e9", color: "#9b1f1f", fontSize: 13, fontWeight: 600 }}>
-          {apiError}
+        <div style={{ marginBottom: 12, padding: "11px 14px", borderRadius: 10, border: "1px solid #f3b3b3", background: "#fff1f2", color: "#9b1f1f", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>⚠</span> {apiError}
         </div>
       )}
 
       {isLoading && (
-        <div style={{ marginBottom: 10, color: "#6b7a95", fontSize: 13, fontWeight: 600 }}>
-          Carregando eventos...
+        <div style={{ marginBottom: 10, color: "#8b7fcf", fontSize: 13, fontWeight: 600 }}>
+          Carregando eventos…
         </div>
       )}
 
       {/* Calendário */}
-      <div style={{ background: "#fff", border: "1px solid #d8cffb", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #ddd5fc", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 24px rgba(90, 60, 180, 0.09), 0 1px 4px rgba(90, 60, 180, 0.05)" }}>
         {viewMode !== VIEW_MODE.day && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #ece6ff", background: "#faf8ff" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #ece6ff", background: "linear-gradient(90deg, #f5f1ff 0%, #eff3ff 100%)" }}>
             {WEEKDAY_NAMES.map((d) => (
-              <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#6d61a8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", padding: "10px 4px" }}>
+              <div key={d} style={{ textAlign: "center", fontSize: 10, color: "#7264a8", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.8px", padding: "11px 4px" }}>
                 {d}
               </div>
             ))}
@@ -800,6 +871,8 @@ export default function AgendaDelivery() {
           formFimTime={formFimTime} setFormFimTime={setFormFimTime}
           formCor={formCor} setFormCor={setFormCor}
           formDescricao={formDescricao} setFormDescricao={setFormDescricao}
+          formMencoes={formMencoes} setFormMencoes={setFormMencoes}
+          assignableUsers={assignableUsers}
           formError={formError}
           isSaving={isSaving}
           canEdit={canEditEvent(editingEvent || { escopo: scope })}
@@ -814,14 +887,15 @@ export default function AgendaDelivery() {
           position: "fixed",
           bottom: 24,
           right: 24,
-          background: "#1f2b46",
+          background: "linear-gradient(135deg, #1f1535, #2e1d5e)",
           color: "#fff",
-          padding: "10px 16px",
-          borderRadius: 8,
+          padding: "11px 18px",
+          borderRadius: 12,
           fontSize: 13,
           fontWeight: 600,
-          boxShadow: "0 8px 18px rgba(31, 43, 70, 0.25)",
+          boxShadow: "0 8px 24px rgba(31, 21, 53, 0.35)",
           zIndex: 1500,
+          border: "1px solid rgba(255,255,255,0.08)",
         }}>
           {toast}
         </div>
@@ -845,6 +919,8 @@ function EventModal({
   formFimTime, setFormFimTime,
   formCor, setFormCor,
   formDescricao, setFormDescricao,
+  formMencoes, setFormMencoes,
+  assignableUsers,
   formError,
   isSaving,
   canEdit,
@@ -875,7 +951,8 @@ function EventModal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(31, 18, 64, 0.42)",
+        background: "rgba(20, 8, 50, 0.55)",
+        backdropFilter: "blur(4px)",
         zIndex: 1400,
         display: "flex",
         alignItems: "center",
@@ -888,216 +965,296 @@ function EventModal({
         style={{
           width: "min(560px, 100%)",
           maxHeight: "90vh",
-          overflowY: "auto",
           background: "#fff",
-          border: "1px solid #d8cffb",
-          borderRadius: 14,
-          boxShadow: "0 24px 48px rgba(40, 22, 90, 0.28)",
-          padding: 18,
+          borderRadius: 18,
+          boxShadow: "0 32px 64px rgba(40, 20, 90, 0.32), 0 8px 20px rgba(40, 20, 90, 0.12)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <strong style={{ color: "#2b1f6d", fontSize: 16 }}>
+        {/* Header colorido */}
+        <div style={{
+          background: "linear-gradient(135deg, #5c2eff 0%, #8b5cff 100%)",
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexShrink: 0,
+        }}>
+          <strong style={{ color: "#fff", fontSize: 15, fontWeight: 800, letterSpacing: "-0.3px" }}>
             {isEdit ? "Editar evento" : "Novo evento"}
           </strong>
-          <button onClick={onClose} type="button" style={{ background: "transparent", border: "none", cursor: "pointer", color: "#7a6bb5", fontWeight: 700, fontSize: 16 }}>
+          <button
+            onClick={onClose}
+            type="button"
+            style={{
+              background: "rgba(255,255,255,0.18)",
+              border: "none",
+              cursor: "pointer",
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 14,
+              width: 30,
+              height: 30,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1,
+            }}
+          >
             ✕
           </button>
         </div>
 
-        <form onSubmit={onSave} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* Título */}
-          <div>
-            <label style={labelStyle}>Título *</label>
-            <input
-              value={formTitulo}
-              onChange={(e) => setFormTitulo(e.target.value)}
-              placeholder="Título do evento"
-              style={inputStyle}
-              disabled={!canEdit}
-              required
-            />
-          </div>
-
-          {/* Tipo + cor */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
+        {/* Corpo com scroll */}
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          <form onSubmit={onSave} style={{ display: "flex", flexDirection: "column", gap: 14, padding: "20px 22px 22px" }}>
+            {/* Título */}
             <div>
-              <label style={labelStyle}>Tipo</label>
-              <select
-                value={formTipo}
-                onChange={(e) => setFormTipo(e.target.value)}
-                style={inputStyle}
-                disabled={!canEdit}
-              >
-                {EVENT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Cor</label>
-              <div style={{ display: "flex", gap: 6 }}>
-                {PALETTE.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => canEdit && setFormCor(c.value)}
-                    title={c.label}
-                    aria-label={c.label}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      background: c.value,
-                      border: formCor === c.value ? "3px solid #1f2b46" : "2px solid #fff",
-                      boxShadow: "0 0 0 1px rgba(120, 108, 165, 0.32)",
-                      cursor: canEdit ? "pointer" : "not-allowed",
-                      padding: 0,
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* All day */}
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2f2758", fontWeight: 600 }}>
-            <input
-              type="checkbox"
-              checked={formAllDay}
-              onChange={(e) => setFormAllDay(e.target.checked)}
-              disabled={!canEdit}
-            />
-            Dia inteiro
-          </label>
-
-          {/* Datas */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div>
-              <label style={labelStyle}>Início</label>
+              <label style={labelStyle}>Título *</label>
               <input
-                type="date"
-                value={formInicioDate}
-                onChange={(e) => setFormInicioDate(e.target.value)}
+                value={formTitulo}
+                onChange={(e) => setFormTitulo(e.target.value)}
+                placeholder="Título do evento"
                 style={inputStyle}
                 disabled={!canEdit}
                 required
               />
-              {!formAllDay && (
-                <input
-                  type="time"
-                  value={formInicioTime}
-                  onChange={(e) => setFormInicioTime(e.target.value)}
-                  style={{ ...inputStyle, marginTop: 6 }}
-                  disabled={!canEdit}
-                />
-              )}
             </div>
-            <div>
-              <label style={labelStyle}>Fim (opcional)</label>
+
+            {/* Tipo + cor */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 14, alignItems: "end" }}>
+              <div>
+                <label style={labelStyle}>Tipo</label>
+                <select
+                  value={formTipo}
+                  onChange={(e) => setFormTipo(e.target.value)}
+                  style={inputStyle}
+                  disabled={!canEdit}
+                >
+                  {EVENT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Cor</label>
+                <div style={{ display: "flex", gap: 7, paddingBottom: 1 }}>
+                  {PALETTE.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => canEdit && setFormCor(c.value)}
+                      title={c.label}
+                      aria-label={c.label}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        background: c.value,
+                        border: formCor === c.value ? "3px solid #1f1535" : "2.5px solid #fff",
+                        boxShadow: formCor === c.value
+                          ? `0 0 0 1.5px ${c.value}, 0 2px 6px rgba(0,0,0,0.2)`
+                          : "0 0 0 1px rgba(120, 108, 165, 0.25)",
+                        cursor: canEdit ? "pointer" : "not-allowed",
+                        padding: 0,
+                        transition: "transform 0.1s, box-shadow 0.1s",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* All day */}
+            <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "#2f2758", fontWeight: 700, cursor: "pointer" }}>
               <input
-                type="date"
-                value={formFimDate}
-                onChange={(e) => setFormFimDate(e.target.value)}
-                style={inputStyle}
+                type="checkbox"
+                checked={formAllDay}
+                onChange={(e) => setFormAllDay(e.target.checked)}
                 disabled={!canEdit}
+                style={{ width: 15, height: 15, accentColor: "#6c3bff" }}
               />
-              {!formAllDay && (
+              Dia inteiro
+            </label>
+
+            {/* Datas */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Início</label>
                 <input
-                  type="time"
-                  value={formFimTime}
-                  onChange={(e) => setFormFimTime(e.target.value)}
-                  style={{ ...inputStyle, marginTop: 6 }}
+                  type="date"
+                  value={formInicioDate}
+                  onChange={(e) => setFormInicioDate(e.target.value)}
+                  style={inputStyle}
                   disabled={!canEdit}
+                  required
+                />
+                {!formAllDay && (
+                  <input
+                    type="time"
+                    value={formInicioTime}
+                    onChange={(e) => setFormInicioTime(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 8 }}
+                    disabled={!canEdit}
+                  />
+                )}
+              </div>
+              <div>
+                <label style={labelStyle}>Fim (opcional)</label>
+                <input
+                  type="date"
+                  value={formFimDate}
+                  onChange={(e) => setFormFimDate(e.target.value)}
+                  style={inputStyle}
+                  disabled={!canEdit}
+                />
+                {!formAllDay && (
+                  <input
+                    type="time"
+                    value={formFimTime}
+                    onChange={(e) => setFormFimTime(e.target.value)}
+                    style={{ ...inputStyle, marginTop: 8 }}
+                    disabled={!canEdit}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Descrição */}
+            <div>
+              <label style={labelStyle}>Descrição</label>
+              {canEdit ? (
+                <RichTextEditor
+                  value={formDescricao}
+                  onChange={setFormDescricao}
+                  placeholder="Detalhes do evento..."
+                  minHeight={140}
+                />
+              ) : (
+                <div
+                  style={{ padding: 12, border: "1.5px solid #ddd5fc", borderRadius: 10, background: "#faf7ff", minHeight: 80, color: "#4d4868", fontSize: 13, lineHeight: 1.6 }}
+                  dangerouslySetInnerHTML={{ __html: formDescricao || "<em style='color:#9b8fd8'>(sem descrição)</em>" }}
                 />
               )}
             </div>
-          </div>
 
-          {/* Descrição */}
-          <div>
-            <label style={labelStyle}>Descrição</label>
-            {canEdit ? (
-              <RichTextEditor
-                value={formDescricao}
-                onChange={setFormDescricao}
-                placeholder="Detalhes do evento..."
-                minHeight={140}
-              />
-            ) : (
-              <div
-                style={{ padding: 10, border: "1px solid #d8cffb", borderRadius: 8, background: "#faf8ff", minHeight: 80 }}
-                dangerouslySetInnerHTML={{ __html: formDescricao || "<em>(sem descrição)</em>" }}
-              />
-            )}
-          </div>
-
-          {formError && (
-            <div style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #f3b3b3", background: "#ffe9e9", color: "#9b1f1f", fontSize: 13, fontWeight: 600 }}>
-              {formError}
-            </div>
-          )}
-
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 4 }}>
+            {/* Menções */}
             <div>
-              {isEdit && canEdit && (
+              <label style={labelStyle}>Mencionar usuários</label>
+              {/* Chips de mencionados */}
+              {formMencoes.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                  {formMencoes.map((uid) => {
+                    const u = assignableUsers.find((x) => x.id === uid);
+                    if (!u) return null;
+                    return (
+                      <span key={uid} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: "#fff", background: "#6c3bff", borderRadius: 999, padding: "3px 10px" }}>
+                        @{u.nome.split(" ")[0]}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => setFormMencoes((prev) => prev.filter((id) => id !== uid))}
+                            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0, fontSize: 13, lineHeight: 1, opacity: 0.8 }}
+                          >×</button>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {/* Dropdown para adicionar */}
+              {canEdit && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (id && !formMencoes.includes(id)) setFormMencoes((prev) => [...prev, id]);
+                  }}
+                  style={{ ...inputStyle, color: formMencoes.length === assignableUsers.length ? "#b0a6d8" : "#2f2758" }}
+                >
+                  <option value="">+ Adicionar menção…</option>
+                  {assignableUsers
+                    .filter((u) => !formMencoes.includes(u.id))
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>{u.nome}</option>
+                    ))}
+                </select>
+              )}
+            </div>
+
+            {formError && (
+              <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #f3b3b3", background: "#fff1f2", color: "#9b1f1f", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                <span>⚠</span> {formError}
+              </div>
+            )}
+
+            <div style={{ borderTop: "1px solid #f0eaff", marginTop: 2 }} />
+
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <div>
+                {isEdit && canEdit && (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    disabled={isSaving}
+                    style={{
+                      border: "1.5px solid #ffc4cf",
+                      background: "#fff5f6",
+                      color: "#b00020",
+                      padding: "9px 16px",
+                      borderRadius: 10,
+                      cursor: isSaving ? "wait" : "pointer",
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }}
+                  >
+                    Excluir
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="button"
-                  onClick={onDelete}
-                  disabled={isSaving}
+                  onClick={onClose}
                   style={{
-                    border: "1px solid #ffb9c6",
-                    background: "#fff1f4",
-                    color: "#a4001d",
-                    padding: "9px 14px",
-                    borderRadius: 8,
-                    cursor: isSaving ? "wait" : "pointer",
+                    border: "1.5px solid #d4c8fb",
+                    background: "#f6f2ff",
+                    color: "#4b2d84",
+                    padding: "9px 16px",
+                    borderRadius: 10,
+                    cursor: "pointer",
                     fontWeight: 700,
                     fontSize: 13,
                   }}
                 >
-                  Excluir
+                  Cancelar
                 </button>
-              )}
+                {canEdit && (
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    style={{
+                      background: isSaving ? "#b8a8f5" : "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)",
+                      color: "#fff",
+                      border: "none",
+                      padding: "9px 20px",
+                      borderRadius: 10,
+                      cursor: isSaving ? "wait" : "pointer",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      boxShadow: isSaving ? "none" : "0 3px 10px rgba(108, 59, 255, 0.32)",
+                    }}
+                  >
+                    {isSaving ? "Salvando…" : "Salvar"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={onClose}
-                style={{
-                  border: "1px solid #d4c8fb",
-                  background: "#faf7ff",
-                  color: "#4b2d84",
-                  padding: "9px 14px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 13,
-                }}
-              >
-                Cancelar
-              </button>
-              {canEdit && (
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  style={{
-                    background: "#6c3bff",
-                    color: "#fff",
-                    border: "none",
-                    padding: "9px 18px",
-                    borderRadius: 8,
-                    cursor: isSaving ? "wait" : "pointer",
-                    fontWeight: 700,
-                    fontSize: 13,
-                  }}
-                >
-                  {isSaving ? "Salvando..." : "Salvar"}
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1109,51 +1266,60 @@ function EventModal({
 
 const labelStyle = {
   display: "block",
-  fontSize: 12,
-  color: "#5f4e8f",
-  fontWeight: 700,
-  marginBottom: 4,
+  fontSize: 10,
+  color: "#6b5ca8",
+  fontWeight: 800,
+  marginBottom: 5,
+  textTransform: "uppercase",
+  letterSpacing: "0.6px",
 };
 
 const inputStyle = {
   width: "100%",
-  padding: "9px 11px",
-  border: "1px solid #d8cffb",
-  borderRadius: 8,
+  padding: "10px 12px",
+  border: "1.5px solid #ddd5fc",
+  borderRadius: 10,
   outline: "none",
   fontSize: 13,
-  background: "#fff",
+  background: "#faf7ff",
   color: "#2f2758",
   boxSizing: "border-box",
 };
 
 const primaryBtn = {
-  padding: "8px 14px",
-  background: "#6c3bff",
+  padding: "8px 16px",
+  background: "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)",
   color: "#fff",
   border: "none",
-  borderRadius: 8,
+  borderRadius: 10,
   cursor: "pointer",
   fontWeight: 700,
   fontSize: 12,
+  boxShadow: "0 3px 10px rgba(108, 59, 255, 0.32)",
+  letterSpacing: "0.2px",
 };
 
 const navBtn = {
-  padding: "8px 12px",
+  padding: "6px 16px",
   border: "none",
   background: "#fff",
   cursor: "pointer",
   color: "#5d4d9f",
-  fontWeight: 700,
+  fontWeight: 800,
+  fontSize: 18,
+  lineHeight: 1,
 };
 
 const tabBtnStyle = (isActive) => ({
-  padding: "6px 12px",
+  padding: "7px 14px",
   fontSize: 12,
   fontWeight: 700,
-  borderRadius: 6,
+  borderRadius: 8,
   border: "none",
   cursor: "pointer",
-  background: isActive ? "#efe9ff" : "transparent",
-  color: isActive ? "#5a3cb8" : "#8a96ad",
+  background: isActive ? "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)" : "transparent",
+  color: isActive ? "#fff" : "#8a7bc8",
+  boxShadow: isActive ? "0 2px 8px rgba(108, 59, 255, 0.35)" : "none",
+  transition: "all 0.15s ease",
+  letterSpacing: "0.2px",
 });

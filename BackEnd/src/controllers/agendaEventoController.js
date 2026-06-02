@@ -1,6 +1,50 @@
 const { Op } = require("sequelize");
-const { AgendaEvento, User } = require("../models");
+const { sequelize, AgendaEvento, User } = require("../models");
 const { sanitizeRichHtml } = require("../utils/sanitizeHtml");
+
+// Envia notificações de menção usando o mesmo padrão raw SQL + ON CONFLICT
+// do notificationController (o tipo é um ENUM no banco, Notification.create não funciona).
+async function notificarMencoes({ eventoId, titulo, autorNome, autorId, mencoes, prevMencoes = [] }) {
+  const novas = mencoes.filter((id) => !prevMencoes.includes(id) && id !== autorId);
+  if (!novas.length) return;
+
+  await Promise.allSettled(
+    novas.map((userId) => {
+      const sourceKey = `agenda-menc-${eventoId}-${userId}`;
+      const metadata = JSON.stringify({
+        sourceKey,
+        agendaEventoId: eventoId,
+        priority: "high",
+        when: new Date(),
+        originalKind: "mention",
+      });
+      return sequelize.query(
+        `INSERT INTO notifications
+           (usuario_id, card_id, tipo, titulo, mensagem, lida, limpa, metadata, "createdAt", "updatedAt")
+         VALUES
+           (:usuario_id, NULL, 'mention', :titulo, :mensagem, false, false, CAST(:metadata AS JSONB), NOW(), NOW())
+         ON CONFLICT (usuario_id, ((metadata->>'sourceKey')))
+           WHERE metadata ? 'sourceKey'
+         DO UPDATE SET
+           titulo    = EXCLUDED.titulo,
+           mensagem  = EXCLUDED.mensagem,
+           metadata  = notifications.metadata
+                         || (EXCLUDED.metadata - 'when')
+                         || jsonb_build_object('when',
+                              COALESCE(notifications.metadata->'when', EXCLUDED.metadata->'when')),
+           "updatedAt" = NOW()`,
+        {
+          replacements: {
+            usuario_id: userId,
+            titulo:   `${autorNome} mencionou você em um evento`,
+            mensagem: `"${titulo}"`,
+            metadata,
+          },
+        }
+      );
+    })
+  );
+}
 
 // Perfis com permissão para criar/visualizar eventos de escopo "geral".
 // Mantemos duas listas (read pode ser mais ampla que write) para refletir
@@ -8,11 +52,12 @@ const { sanitizeRichHtml } = require("../utils/sanitizeHtml");
 // admin/gestor_delivery podem escrever nele.
 const PERFIS_GERAL_READ = new Set([
   "delivery",
+  "noc",
   "gestor_delivery",
   "admin",
   "gestor",
 ]);
-const PERFIS_GERAL_WRITE = new Set(["gestor_delivery", "admin"]);
+const PERFIS_GERAL_WRITE = new Set(["delivery", "noc", "gestor_delivery", "admin"]);
 
 // Atributos retornados quando incluímos o autor do evento.
 const USUARIO_ATTRIBUTES = ["id", "nome", "email", "perfil"];
@@ -51,7 +96,12 @@ exports.create = async (req, res) => {
       escopo,
       tipo,
       cor,
+      mencoes: mencoesRaw,
     } = req.body || {};
+
+    const mencoes = Array.isArray(mencoesRaw)
+      ? mencoesRaw.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+      : [];
 
     // Validação de obrigatórios
     if (!titulo || typeof titulo !== "string" || !titulo.trim()) {
@@ -102,6 +152,22 @@ exports.create = async (req, res) => {
       escopo,
       tipo: tipo || "tarefa",
       cor: typeof cor === "string" && cor.trim() ? cor.trim() : null,
+    });
+
+    // Salva mencoes via SQL direto para garantir o JSONB (bypass de quirks do Sequelize)
+    await sequelize.query(
+      `UPDATE agenda_eventos SET mencoes = :mencoes::jsonb WHERE id = :id`,
+      { replacements: { mencoes: JSON.stringify(mencoes), id: evento.id } }
+    );
+
+    // Notifica usuários mencionados
+    const autor = await User.findByPk(req.userId, { attributes: ["nome"] });
+    await notificarMencoes({
+      eventoId: evento.id,
+      titulo: evento.titulo,
+      autorNome: autor?.nome || "Alguém",
+      autorId: Number(req.userId),
+      mencoes,
     });
 
     // Retorna já com o relacionamento populado para o front.
@@ -239,6 +305,7 @@ exports.update = async (req, res) => {
       escopo,
       tipo,
       cor,
+      mencoes: mencoesRaw,
     } = req.body || {};
 
     const patch = {};
@@ -297,7 +364,34 @@ exports.update = async (req, res) => {
         typeof cor === "string" && cor.trim() ? cor.trim() : null;
     }
 
+    // Atualiza menções e notifica apenas os recém-adicionados
+    const prevMencoes = Array.isArray(evento.mencoes) ? evento.mencoes : [];
+    let novasMencoes = prevMencoes;
+
+    if (mencoesRaw !== undefined) {
+      novasMencoes = Array.isArray(mencoesRaw)
+        ? mencoesRaw.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+        : [];
+      // Salva mencoes via SQL direto (bypass de quirks do Sequelize com JSONB)
+      await sequelize.query(
+        `UPDATE agenda_eventos SET mencoes = :mencoes::jsonb WHERE id = :id`,
+        { replacements: { mencoes: JSON.stringify(novasMencoes), id: evento.id } }
+      );
+    }
+
     await evento.update(patch);
+
+    if (novasMencoes.length) {
+      const autor = await User.findByPk(req.userId, { attributes: ["nome"] });
+      await notificarMencoes({
+        eventoId: evento.id,
+        titulo: patch.titulo ?? evento.titulo,
+        autorNome: autor?.nome || "Alguém",
+        autorId: Number(req.userId),
+        mencoes: novasMencoes,
+        prevMencoes,
+      });
+    }
 
     const atualizado = await AgendaEvento.findByPk(evento.id, {
       include: [{ model: User, as: "usuario", attributes: USUARIO_ATTRIBUTES }],

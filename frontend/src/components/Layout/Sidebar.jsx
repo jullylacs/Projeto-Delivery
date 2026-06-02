@@ -1,126 +1,160 @@
-import { useNavigate, useLocation } from "react-router-dom"; 
-// useNavigate: permite navegação programática
-// useLocation: fornece informação da rota atual
+import { useNavigate, useLocation } from "react-router-dom";
 
-// Componente da barra lateral com menu de navegação
 export default function Sidebar({ isOpen = true }) {
-  const navigate = useNavigate(); // Hook para redirecionamento de rotas
-  const location = useLocation(); // Hook para detectar a rota atual
+  const navigate = useNavigate();
+  const location = useLocation();
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
 
-  // Itens do menu com nome, ícone e caminho
-  const canSeeAgendaDelivery = ["delivery", "gestor_delivery", "admin", "gestor"].includes(user?.perfil);
+  const canSeeAgendaDelivery = ["delivery", "admin", "noc"].includes(user?.perfil);
 
   const menuItems = [
-    { name: "Dashboard", icon: "📊", path: "/dashboard" },
-    { name: "Kanban", icon: "🗂️", path: "/kanban" },
-    { name: "Agenda", icon: "📅", path: "/agenda" },
-    ...(canSeeAgendaDelivery ? [{ name: "Agenda Delivery", icon: "🛵", path: "/agenda-delivery" }] : []),
-    { name: "Ramais", icon: "📞", path: "/ramais", public: true },
-    { name: "Mural", icon: "📝", path: "/mural", public: true },
-    ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "👥", path: "/admin/users" }] : []),
+    { name: "Dashboard",       icon: "⊞",  path: "/dashboard" },
+    { name: "Gráficos",        icon: "◈",  path: "/graficos" },
+    { name: "Kanban",          icon: "⬡",  path: "/kanban" },
+    { name: "Agenda",          icon: "◷",  path: "/agenda" },
+    ...(canSeeAgendaDelivery ? [{ name: "Agenda Geral", icon: "⬡", path: "/agenda-delivery" }] : []),
+    { name: "Ramais",          icon: "✆",  path: "/ramais" },
+    { name: "Mural",           icon: "◈",  path: "/mural" },
+    ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "◉", path: "/admin/users" }] : []),
   ];
+
+  const emojiMap = {
+    "/dashboard":       "📊",
+    "/graficos":        "📈",
+    "/kanban":          "🗂️",
+    "/agenda":          "📅",
+    "/agenda-delivery": "🛵",
+    "/ramais":          "📞",
+    "/mural":           "📝",
+    "/admin/users":     "👥",
+  };
 
   return (
     <div
       style={{
-        width: "250px", // largura fixa da sidebar
+        width: "250px",
         minWidth: "250px",
         flexShrink: 0,
-        height: "100vh", // altura completa da tela
+        height: "100vh",
         boxSizing: "border-box",
-        background: "linear-gradient(180deg, #2c0b52, #4f238f)", // gradiente roxo
+        background: "linear-gradient(180deg, #1e0638 0%, #2c0b52 35%, #3d1472 70%, #4f238f 100%)",
         color: "#fff",
         display: "flex",
         flexDirection: "column",
-        padding: "25px 15px",
-        borderRight: "1px solid rgba(255,255,255,0.05)", // linha separando do conteúdo
+        padding: "0",
+        borderRight: "1px solid rgba(255,255,255,0.04)",
         transform: isOpen ? "translateX(0)" : "translateX(-100%)",
         opacity: isOpen ? 1 : 0,
-        transition: "transform 320ms ease, opacity 240ms ease",
+        transition: "transform 320ms cubic-bezier(0.4,0,0.2,1), opacity 240ms ease",
         pointerEvents: isOpen ? "auto" : "none",
+        boxShadow: "4px 0 24px rgba(0,0,0,0.25)",
       }}
     >
-      
-      {/* Logo do sistema */}
+      {/* Logo */}
       <div
+        onClick={() => navigate("/dashboard")}
         style={{
           display: "flex",
           alignItems: "center",
           gap: "12px",
-          marginBottom: "40px",
-          cursor: "pointer"
+          padding: "24px 20px 20px",
+          cursor: "pointer",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          marginBottom: "8px",
         }}
-        onClick={() => navigate("/dashboard")} // Ao clicar, vai para dashboard
       >
         <div
           style={{
-            width: "45px",
-            height: "45px",
-            borderRadius: "12px",
-            background: "linear-gradient(135deg, #9d4edd, #c77dff)", // gradiente roxo
+            width: "40px",
+            height: "40px",
+            borderRadius: "11px",
+            background: "linear-gradient(135deg, #7a4dff, #c77dff)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "20px"
+            fontSize: "18px",
+            flexShrink: 0,
+            boxShadow: "0 4px 12px rgba(124,77,255,0.45)",
           }}
         >
           🚀
         </div>
-        <h2 style={{ margin: 0, fontWeight: "500" }}>Delivery</h2>
+        <div>
+          <div style={{ fontWeight: "700", fontSize: "15px", letterSpacing: "0.3px", lineHeight: 1.2 }}>
+            Delivery
+          </div>
+          <div style={{ fontSize: "11px", opacity: 0.5, letterSpacing: "0.5px", marginTop: "2px" }}>
+            NVX Fibra LTDA
+          </div>
+        </div>
       </div>
 
-      {/* Menu de navegação */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      {/* Menu */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px 12px", flex: 1 }}>
         {menuItems.map((item, index) => {
-          const isActive = location.pathname === item.path; 
-          // verifica se a rota atual é igual ao caminho do item
+          const isActive = location.pathname === item.path;
           return (
             <div
-              key={index} // chave do item
-              onClick={() => navigate(item.path)} // navega ao clicar
+              key={index}
+              onClick={() => navigate(item.path)}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "12px",
-                padding: "12px 15px",
-                borderRadius: "12px",
+                gap: "11px",
+                padding: "10px 12px",
+                borderRadius: "10px",
                 cursor: "pointer",
                 background: isActive
-                  ? "linear-gradient(90deg, #6f3dde, #8a5dff)" // ativo
-                  : "transparent", // inativo
-                transition: "0.2s",
-                fontSize: "14px"
+                  ? "rgba(255,255,255,0.12)"
+                  : "transparent",
+                transition: "background 180ms ease, transform 120ms ease",
+                fontSize: "13.5px",
+                fontWeight: isActive ? "600" : "400",
+                letterSpacing: "0.15px",
+                position: "relative",
+                borderLeft: isActive ? "3px solid #c77dff" : "3px solid transparent",
               }}
               onMouseEnter={(e) => {
-                if (!isActive) 
-                  e.currentTarget.style.background = "rgba(255,255,255,0.08)"; // hover
+                if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.07)";
               }}
               onMouseLeave={(e) => {
-                if (!isActive)
-                  e.currentTarget.style.background = "transparent"; // volta ao normal
+                if (!isActive) e.currentTarget.style.background = "transparent";
               }}
             >
-              <span>{item.icon}</span> {/* Ícone do item */}
-              <span>{item.name}</span> {/* Nome do item */}
+              <span style={{ fontSize: "16px", width: "20px", textAlign: "center", flexShrink: 0 }}>
+                {emojiMap[item.path] || item.icon}
+              </span>
+              <span style={{ opacity: isActive ? 1 : 0.82 }}>{item.name}</span>
+              {isActive && (
+                <div style={{
+                  marginLeft: "auto",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "#c77dff",
+                  boxShadow: "0 0 6px #c77dff",
+                  flexShrink: 0,
+                }} />
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Footer da sidebar */}
+      {/* Footer */}
       <div
         style={{
-          marginTop: "auto", // posiciona no final da sidebar
-          fontSize: "12px",
-          opacity: 0.6, // mais transparente
-          textAlign: "center"
+          padding: "16px 20px",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          fontSize: "11px",
+          opacity: 0.35,
+          textAlign: "center",
+          letterSpacing: "0.4px",
         }}
       >
         © 2026 Delivery System
       </div>
-
     </div>
   );
 }

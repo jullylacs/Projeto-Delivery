@@ -1,7 +1,7 @@
 const { Column, Card } = require("../models");
 const { fn, col, where, Op } = require("sequelize");
 
-const VALID_BOARDS = ["delivery", "comercial"];
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
 
 const DEFAULT_DELIVERY_COLUMNS = [
   "Novo",
@@ -23,13 +23,26 @@ const DEFAULT_COMERCIAL_COLUMNS = [
   "Perdido",
 ];
 
+const DEFAULT_BKO_COLUMNS = [
+  "Novo",
+  "Em análise",
+  "Aguardando documentos",
+  "Em processamento",
+  "Pendente aprovação",
+  "Concluído",
+  "Cancelado",
+];
+
 const resolveBoard = (raw, fallback = "delivery") => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : fallback;
 };
 
-const defaultSeedFor = (board) =>
-  board === "comercial" ? DEFAULT_COMERCIAL_COLUMNS : DEFAULT_DELIVERY_COLUMNS;
+const defaultSeedFor = (board) => {
+  if (board === "comercial") return DEFAULT_COMERCIAL_COLUMNS;
+  if (board === "bko") return DEFAULT_BKO_COLUMNS;
+  return DEFAULT_DELIVERY_COLUMNS;
+};
 
 const normalizeColumn = (column) => {
   const raw = column?.toJSON ? column.toJSON() : { ...column };

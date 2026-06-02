@@ -387,17 +387,18 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
 
     <div
       style={{
-        height: "70px",
-        background: "rgba(76, 29, 149, 0.9)", // Roxo translúcido
-        backdropFilter: "blur(10px)",          // Desfoque de fundo
+        height: "62px",
+        background: "linear-gradient(90deg, #3d1472 0%, #4c1d95 50%, #4f238f 100%)",
+        backdropFilter: "blur(16px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.1)", // Linha inferior
+        padding: "0 24px",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
         color: "#fff",
         position: "relative",
         zIndex: 3000,
+        boxShadow: "0 2px 16px rgba(0,0,0,0.22)",
       }}
     >
       {/* Título */}
@@ -443,8 +444,10 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         <h2
           style={{
             margin: 0,
-            fontWeight: "500",
-            letterSpacing: "0.5px"
+            fontWeight: "600",
+            fontSize: "16px",
+            letterSpacing: "0.4px",
+            opacity: 0.95,
           }}
         >
           🚀 NVX Fibra LTDA

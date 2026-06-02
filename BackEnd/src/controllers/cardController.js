@@ -2,7 +2,7 @@ const { randomUUID } = require("crypto");
 const { Card, User, Column, sequelize } = require("../models"); // Importa o model de Card (Sequelize/PostgreSQL)
 const { fn, col, where, QueryTypes, Op } = require("sequelize");
 
-const VALID_BOARDS = ["delivery", "comercial"];
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;
@@ -556,6 +556,13 @@ exports.updateCard = async (req, res) => {
 
     await Card.update(payload, { where: { id: targetId } });
 
+    // Salva o nome do atualizador via SQL direto (garante independência do model em memória)
+    console.log(`[ATUALIZADO_POR] card=${targetId} nome="${userName}"`);
+    await sequelize.query(
+      `UPDATE cards SET atualizado_por_nome = :nome WHERE id = :id`,
+      { replacements: { nome: userName, id: Number(targetId) }, type: QueryTypes.UPDATE }
+    );
+
     // Se houver comentário do sistema, faz append atômico (SELECT FOR UPDATE).
     if (systemComment) {
       await appendCommentAtomically(targetId, systemComment);
@@ -569,7 +576,10 @@ exports.updateCard = async (req, res) => {
       ],
     });
 
-    res.json(normalizeCard(card));
+    const normalized = normalizeCard(card);
+    // Injeta diretamente para não depender do model em memória
+    normalized.atualizado_por_nome = userName;
+    res.json(normalized);
   } catch (err) {
     // Log detalhado para depuração
     console.error("[updateCard] Erro ao atualizar card:", {

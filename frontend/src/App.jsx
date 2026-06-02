@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./components/Layout/Sidebar"; // Barra lateral do layout
 import Header from "./components/Layout/Header";   // Cabeçalho do layout
 import Dashboard from "./pages/Dashboard";        // Página Dashboard
+import Graficos from "./pages/Graficos";           // Página Gráficos
 import Kanban from "./pages/Kanban";              // Página Kanban
 import Agenda from "./pages/Agenda";              // Página Agenda
 import AgendaDelivery from "./pages/AgendaDelivery"; // Página Agenda Delivery
@@ -18,7 +19,7 @@ import Register from "./pages/Register";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users"];
+const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
@@ -35,7 +36,7 @@ function AdminRoute({ children }) {
 function DeliveryAgendaRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
-  const allowed = ["delivery", "gestor_delivery", "admin", "gestor"];
+  const allowed = ["delivery", "admin", "noc"];
 
   if (!user || !allowed.includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
@@ -98,7 +99,7 @@ function MainLayout() {
             padding: "20px",
             overflowY: "auto",
             overflowX: "hidden",
-            height: "calc(100vh - 70px)",
+            height: "calc(100vh - 62px)",
             background: "#f2efff",
             minWidth: 0,
           }}
@@ -106,6 +107,7 @@ function MainLayout() {
           {/* Sub-rotas dentro do layout principal */}
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/graficos" element={<Graficos />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route

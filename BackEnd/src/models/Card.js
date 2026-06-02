@@ -87,7 +87,14 @@ const Card = sequelize.define("Card", {
     },
     onDelete: "SET NULL",
     allowNull: true
-  }
+  },
+
+  // Nome do último usuário que atualizou o card (desnormalizado para evitar JOIN extra)
+  atualizado_por_nome: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+  },
 
 }, {
   tableName: "cards",

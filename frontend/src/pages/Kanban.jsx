@@ -3,7 +3,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 const Board = lazy(() => import("../components/Kanban/Board"));
 
 const BOARD_TAB_KEY = "kanbanBoardTab";
-const VALID_BOARDS = ["delivery", "comercial"];
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
 
 function readPreferredBoard() {
   try {
@@ -40,7 +40,7 @@ function KanbanSkeleton() {
   };
 
   return (
-    <div style={{ padding: "20px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "80vh" }}>
+    <div style={{ padding: "20px", background: "#f2efff", minHeight: "80vh" }}>
       <style>
         {`@keyframes kanbanPulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}
       </style>
@@ -70,20 +70,21 @@ function KanbanSkeleton() {
   );
 }
 
-function BoardTabs({ activeBoard, onChange }) {
+function BoardTabs({ activeBoard, onChange, availableBoards }) {
   const tabStyle = (active) => ({
-    padding: "10px 20px",
-    borderRadius: "10px 10px 0 0",
-    border: "1px solid #d6d0ff",
-    borderBottom: active ? "1px solid transparent" : "1px solid #d6d0ff",
-    background: active ? "#ffffff" : "#f3eeff",
-    color: active ? "#3b126b" : "#7159a8",
-    fontWeight: active ? 700 : 600,
-    fontSize: "14px",
+    padding: "7px 20px",
+    borderRadius: "8px",
+    border: "none",
+    background: active
+      ? "linear-gradient(135deg, #7a4dff, #9d4edd)"
+      : "transparent",
+    color: active ? "#fff" : "#7159a8",
+    fontWeight: active ? 700 : 500,
+    fontSize: "13.5px",
     cursor: "pointer",
-    transition: "background 160ms ease, color 160ms ease",
-    position: "relative",
-    top: active ? "1px" : "0",
+    transition: "background 160ms ease, color 160ms ease, box-shadow 160ms ease",
+    boxShadow: active ? "0 3px 10px rgba(124,77,255,0.35)" : "none",
+    letterSpacing: "0.1px",
   });
 
   return (
@@ -91,17 +92,26 @@ function BoardTabs({ activeBoard, onChange }) {
       style={{
         display: "flex",
         gap: "4px",
-        padding: "0 20px",
-        marginTop: "8px",
-        borderBottom: "1px solid #d6d0ff",
+        padding: "0 20px 12px",
+        marginTop: "4px",
+        alignItems: "center",
       }}
     >
-      <button type="button" style={tabStyle(activeBoard === "delivery")} onClick={() => onChange("delivery")}>
-        Delivery
-      </button>
-      <button type="button" style={tabStyle(activeBoard === "comercial")} onClick={() => onChange("comercial")}>
-        Comercial
-      </button>
+      {availableBoards.includes("delivery") && (
+        <button type="button" style={tabStyle(activeBoard === "delivery")} onClick={() => onChange("delivery")}>
+          🛵 Delivery
+        </button>
+      )}
+      {availableBoards.includes("comercial") && (
+        <button type="button" style={tabStyle(activeBoard === "comercial")} onClick={() => onChange("comercial")}>
+          💼 Comercial
+        </button>
+      )}
+      {availableBoards.includes("bko") && (
+        <button type="button" style={tabStyle(activeBoard === "bko")} onClick={() => onChange("bko")}>
+          🗂️ BKO
+        </button>
+      )}
     </div>
   );
 }
@@ -133,20 +143,20 @@ export default function Kanban() {
   const user = useMemo(() => readUserFromStorage(), []);
   const canDelivery = Boolean(user?.acesso_kanban_delivery);
   const canComercial = Boolean(user?.acesso_kanban_comercial);
+  const canBko = Boolean(user?.acesso_kanban_bko);
 
   const availableBoards = useMemo(() => {
     const list = [];
     if (canDelivery) list.push("delivery");
     if (canComercial) list.push("comercial");
+    if (canBko) list.push("bko");
     return list;
-  }, [canDelivery, canComercial]);
+  }, [canDelivery, canComercial, canBko]);
 
   const [activeBoard, setActiveBoard] = useState(() => {
     const preferred = readPreferredBoard();
-    if (preferred && (preferred === "delivery" ? canDelivery : canComercial)) {
-      return preferred;
-    }
-    return canDelivery ? "delivery" : canComercial ? "comercial" : null;
+    if (preferred && availableBoards.includes(preferred)) return preferred;
+    return availableBoards[0] ?? null;
   });
 
   useEffect(() => {
@@ -168,7 +178,7 @@ export default function Kanban() {
 
   return (
     <Suspense fallback={<KanbanSkeleton />}>
-      {showTabs && <BoardTabs activeBoard={boardToRender} onChange={setActiveBoard} />}
+      {showTabs && <BoardTabs activeBoard={boardToRender} onChange={setActiveBoard} availableBoards={availableBoards} />}
       <Board
         board={boardToRender}
         canTransferTo={availableBoards.filter((b) => b !== boardToRender)}

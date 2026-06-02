@@ -34,11 +34,11 @@ const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
 
-const VALID_BOARDS = ["delivery", "comercial"];
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
 
 const getKanbanPrefsKey = (board) => `${KANBAN_PREFS_KEY}:${board || "delivery"}`;
 
-const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial" };
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO" };
 
 const normalizeColumnEntity = (item, index = 0) => ({
   id: Number(item?.id ?? item?._id ?? index + 1),
@@ -506,15 +506,15 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
     detailsModalCard: {
-      background: 'linear-gradient(165deg, #f8f6ff 0%, #f1ecff 42%, #ede7ff 100%)',
-      borderRadius: '24px',
-      boxShadow: '0 24px 52px rgba(57, 31, 136, 0.24), 0 3px 14px rgba(0,0,0,0.08)',
-      padding: '22px 24px',
+      background: '#ffffff',
+      borderRadius: '20px',
+      boxShadow: '0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)',
+      padding: '0',
       width: 'min(1280px, calc(100vw - 24px))',
-      maxHeight: '90vh',
+      maxHeight: '92vh',
       margin: '0 auto',
       position: 'relative',
-      border: '1px solid #d2c6ff',
+      border: '1px solid #e4dcff',
       minHeight: '620px',
       fontFamily: 'inherit',
       display: 'flex',
@@ -525,7 +525,7 @@ const styles = {
     detailsContent: {
       display: 'grid',
       gridTemplateColumns: '0.55fr 1.45fr',
-      gap: '14px',
+      gap: '0',
       minHeight: 0,
       flex: 1,
       overflow: 'hidden',
@@ -533,110 +533,105 @@ const styles = {
     detailsMain: {
       display: 'flex',
       flexDirection: 'column',
-      background: '#f7f4ff',
-      border: '1px solid #d9ccff',
-      borderRadius: '18px',
-      padding: '18px',
+      background: '#faf8ff',
+      borderRight: '1px solid #ede8ff',
+      padding: '20px',
       minHeight: 0,
+      overflowY: 'auto',
     },
     detailsMainBody: {
       flex: 1,
       minHeight: 0,
       overflowY: 'auto',
-      paddingRight: '6px',
+      paddingRight: '4px',
     },
     detailsHeader: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '18px',
-      padding: '10px 12px',
-      borderRadius: '14px',
-      background: 'linear-gradient(135deg, rgba(132, 99, 255, 0.16), rgba(85, 57, 196, 0.14))',
-      border: '1px solid rgba(111, 87, 226, 0.26)',
+      padding: '18px 22px',
+      background: 'linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+      flexShrink: 0,
     },
     detailsTitle: {
       margin: 0,
-      color: '#4c3393',
-      fontSize: '26px',
+      color: '#ffffff',
+      fontSize: '18px',
       fontWeight: 700,
-      letterSpacing: '-0.5px',
+      letterSpacing: '-0.2px',
       display: 'flex',
       alignItems: 'center',
       gap: '10px',
     },
     detailsSection: {
-      marginBottom: '18px',
-      paddingBottom: '12px',
-      borderBottom: '1px solid #ece7fa',
+      marginBottom: '14px',
+      paddingBottom: '14px',
+      borderBottom: '1px solid #f0ebff',
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px',
+      gap: '8px',
     },
     detailsRow: {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'flex-start',
-      gap: '4px',
-      fontSize: '16px',
-      color: '#3e2c9e',
-      fontWeight: 500,
-      padding: '8px 10px',
-      background: '#f8f5ff',
-      border: '1px solid #e6deff',
+      gap: '3px',
+      padding: '10px 12px',
+      background: '#ffffff',
+      border: '1px solid #ede8ff',
       borderRadius: '10px',
+      transition: 'border-color 150ms ease',
     },
     detailsLabel: {
       minWidth: 'unset',
-      color: '#7c6fb7',
-      fontWeight: 600,
-      fontSize: '12px',
+      color: '#9580c8',
+      fontWeight: 700,
+      fontSize: '10.5px',
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
+      gap: '5px',
       textTransform: 'uppercase',
-      letterSpacing: '0.4px',
+      letterSpacing: '0.6px',
     },
     detailsValue: {
       color: '#2d225a',
       fontWeight: 600,
-      fontSize: '17px',
-      lineHeight: 1.35,
+      fontSize: '14px',
+      lineHeight: 1.4,
     },
     detailsStatusRow: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      margin: '10px 0 0 0',
+      gap: '10px',
+      margin: '8px 0 0 0',
+      flexWrap: 'wrap',
     },
     detailsActions: {
-      margin: '14px 0 0 0',
-      paddingTop: '12px',
-      borderTop: '1px solid #e0d6ff',
+      margin: '16px 0 0 0',
+      paddingTop: '14px',
+      borderTop: '1px solid #ede8ff',
       display: 'flex',
-      gap: '12px',
+      gap: '8px',
       flexWrap: 'wrap',
       justifyContent: 'flex-start',
-      background: '#f7f4ff',
-      borderRadius: '12px',
     },
     detailsObservacoes: {
-      background: '#ede7ff',
-      gridTemplateColumns: 'minmax(360px, 420px) minmax(0, 1fr)',
-      padding: '16px 18px',
+      background: '#f5f1ff',
+      padding: '12px 14px',
       color: '#4b3b9a',
-      fontSize: '14px',
-      marginTop: '8px',
+      fontSize: '13.5px',
+      marginTop: '4px',
       marginBottom: '8px',
-      border: '1px solid #d8cdfd',
+      border: '1px solid #e4daff',
+      borderRadius: '10px',
+      lineHeight: 1.55,
     },
     detailsComments: {
       marginTop: 0,
-      background: '#f0ecff',
-      borderRadius: '16px',
-      padding: '16px',
+      background: '#ffffff',
+      padding: '20px',
       minWidth: 0,
-      boxShadow: 'inset 0 0 0 1px #ddd3ff',
       minHeight: '540px',
       display: 'flex',
       flexDirection: 'column',
@@ -648,41 +643,44 @@ const styles = {
       minWidth: 0,
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: '12px',
-      paddingBottom: '10px',
-      borderBottom: '1px solid #ddd1ff',
+      marginBottom: '14px',
+      paddingBottom: '12px',
+      borderBottom: '1px solid #ede8ff',
     },
     detailsCommentsList: {
       flex: 1,
       flexWrap: 'wrap',
       minHeight: 0,
       overflowY: 'auto',
-      paddingRight: '6px',
+      paddingRight: '4px',
     },
     detailsComposer: {
       marginTop: '12px',
-      paddingTop: '10px',
-      borderTop: '1px solid #ddd1ff',
-      background: '#f0ecff',
+      paddingTop: '12px',
+      borderTop: '1px solid #ede8ff',
+      background: '#ffffff',
     },
     detailsCommentItem: {
-      padding: '14px',
-      background: '#ffffff',
-      borderRadius: '12px',
-      marginBottom: '12px',
-      border: '1px solid #e1d8ff',
+      padding: '12px 14px',
+      background: '#fdfcff',
+      borderRadius: '10px',
+      marginBottom: '8px',
+      border: '1px solid #ede8ff',
     },
     detailsCommentAuthor: {
       margin: 0,
-      color: '#4f3dab',
+      color: '#6d5bb5',
       fontWeight: 600,
+      fontSize: '13px',
     },
     detailsCommentText: {
       margin: '6px 0 0',
-      color: '#4f3dab',
+      color: '#7a6ea8',
+      fontSize: '13.5px',
+      lineHeight: 1.55,
     },
     detailsCommentDate: {
-      color: '#7c6fb7',
+      color: '#9b90c8',
       fontSize: '11px',
       marginTop: '8px',
       display: 'block',
@@ -690,23 +688,29 @@ const styles = {
     },
     detailsCloseBtn: {
       border: 'none',
-      background: 'transparent',
-      fontSize: '28px',
+      background: 'rgba(255,255,255,0.15)',
+      borderRadius: '8px',
+      width: '32px',
+      height: '32px',
+      fontSize: '18px',
       cursor: 'pointer',
-      color: '#7f6ad7',
-      transition: 'color 0.2s',
-      marginLeft: '12px',
+      color: 'rgba(255,255,255,0.8)',
+      transition: 'background 150ms ease, color 150ms ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
     },
   container: {
     padding: "20px",
     minHeight: "80vh",
-    background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
+    background: "#f2efff",
     width: "100%",
     minWidth: 0,
     boxSizing: "border-box",
   },
   header: {
-    marginBottom: "28px",
+    marginBottom: "20px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -714,28 +718,30 @@ const styles = {
   },
   title: {
     color: "#3c2f9f",
-    fontSize: "28px",
+    fontSize: "24px",
     fontWeight: "700",
     letterSpacing: "-0.5px",
-    background: "linear-gradient(90deg, #8b64ff, #5a30ff)",
+    background: "linear-gradient(90deg, #7a4dff, #4c1d95)",
     backgroundClip: "text",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
+    margin: 0,
   },
   addButton: {
-    background: "linear-gradient(135deg, #7f5af0 0%, #5a36d6 100%)",
+    background: "linear-gradient(135deg, #7a4dff 0%, #9d4edd 100%)",
     color: "#fff",
     border: "none",
-    padding: "11px 20px",
+    padding: "10px 18px",
     borderRadius: "10px",
     cursor: "pointer",
-    boxShadow: "0 6px 14px rgba(82, 45, 199, 0.35)",
+    boxShadow: "0 4px 14px rgba(124, 77, 255, 0.4)",
     fontWeight: "600",
-    fontSize: "14px",
-    transition: "all 0.2s ease",
+    fontSize: "13.5px",
+    transition: "transform 150ms ease, box-shadow 150ms ease",
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    gap: "7px",
+    letterSpacing: "0.1px",
   },
   tableContainer: {
     width: "100%",
@@ -743,9 +749,9 @@ const styles = {
     overflowX: "auto",
     overflowY: "hidden",
     borderRadius: "16px",
-    background: "#faf9ff",
-    border: "1px solid #d6d0ff",
-    padding: "12px 0",
+    background: "transparent",
+    border: "none",
+    padding: "4px 0 12px",
     boxSizing: "border-box",
     position: "relative",
     scrollBehavior: "smooth",
@@ -759,42 +765,43 @@ const styles = {
     tableLayout: "auto",
   },
   th: {
-    background: "#fff",
+    background: "linear-gradient(160deg, #ffffff 0%, #faf8ff 100%)",
     color: "#3c2f9f",
-    padding: "10px 12px",
+    padding: "12px 14px",
     textAlign: "left",
-    fontSize: "13px",
-    fontWeight: "600",
-    letterSpacing: "0.2px",
-    borderRadius: "12px 12px 0 0",
-    border: "1px solid #d6d0ff",
-    borderBottom: "none",
+    fontSize: "12.5px",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    borderRadius: "14px 14px 0 0",
+    border: "1px solid #ddd6ff",
+    borderBottom: "2px solid #c4b5fd",
     minWidth: "360px",
+    boxShadow: "0 -2px 8px rgba(76,29,149,0.05)",
   },
   td: {
     padding: "0",
     verticalAlign: "top",
-    background: "#fff",
-    border: "1px solid #d6d0ff",
-    borderTop: "none",
-    borderRadius: "0 0 12px 12px",
+    background: "transparent",
+    border: "none",
+    borderRadius: "0 0 14px 14px",
     minWidth: "360px",
     width: "360px",
   },
   cardItem: {
-    background: "#fff",
+    background: "#ffffff",
     borderRadius: "12px",
     padding: "16px 14px",
-    marginBottom: "10px",
-    boxShadow: "0 8px 18px rgba(62,44,158,0.08)",
-    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    marginBottom: "8px",
+    boxShadow: "0 2px 8px rgba(76,29,149,0.07), 0 1px 2px rgba(76,29,149,0.04)",
+    transition: "transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms ease",
     cursor: "grab",
     borderWidth: "1px",
     borderStyle: "solid",
-    borderTopColor: "#d6d0ff",
-    borderRightColor: "#d6d0ff",
-    borderBottomColor: "#d6d0ff",
+    borderTopColor: "#e8e2ff",
+    borderRightColor: "#e8e2ff",
+    borderBottomColor: "#e8e2ff",
     borderLeftColor: "#7c5cff",
+    borderLeftWidth: "3px",
     position: "relative",
     display: "flex",
     flexDirection: "column",
@@ -832,10 +839,10 @@ const styles = {
   },
   cardItemHover: {
     transform: "translateY(-2px)",
-    boxShadow: "0 10px 18px rgba(75, 35, 182, 0.22)",
-    borderTopColor: "#bca8ff",
-    borderRightColor: "#bca8ff",
-    borderBottomColor: "#bca8ff",
+    boxShadow: "0 8px 20px rgba(76,29,149,0.15), 0 2px 6px rgba(76,29,149,0.08)",
+    borderTopColor: "#c4b5fd",
+    borderRightColor: "#c4b5fd",
+    borderBottomColor: "#c4b5fd",
     borderLeftColor: "#7c5cff",
   },
   cardItemPromoted: {
@@ -895,8 +902,8 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: "12px",
-    borderTop: "1px solid #e8deff",
+    paddingTop: "10px",
+    borderTop: "1px solid #f0ebff",
     marginTop: "4px",
   },
   vendorInfo: {
@@ -918,19 +925,20 @@ const styles = {
   },
   detailButton: {
     background: "#ede6ff",
-    border: "none",
+    border: "1px solid #d8ccff",
     color: "#5b3ad1",
-    fontSize: "12px",
-    fontWeight: "500",
+    fontSize: "11.5px",
+    fontWeight: "600",
     cursor: "pointer",
-    padding: "6px 12px",
+    padding: "5px 11px",
     borderRadius: "7px",
-    transition: "all 0.2s ease",
+    transition: "background 150ms ease, box-shadow 150ms ease",
     display: "flex",
     alignItems: "center",
     gap: "4px",
     position: "relative",
     zIndex: 2,
+    letterSpacing: "0.1px",
   },
   priceTag: {
     fontWeight: "700",
@@ -965,22 +973,24 @@ const styles = {
   },
   modal: {
     background: "#fff",
-    borderRadius: "24px",
-    padding: "28px",
+    borderRadius: "16px",
+    padding: "24px",
     width: "100%",
     maxWidth: "540px",
-    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-    border: "1px solid rgba(108,59,255,0.1)",
+    boxShadow: "0 24px 48px rgba(30,10,80,0.2), 0 4px 12px rgba(0,0,0,0.06)",
+    border: "1px solid #e4dcff",
   },
   createModal: {
-    background: "linear-gradient(180deg, #fcfbff 0%, #f6f1ff 100%)",
-    borderRadius: "26px",
-    padding: "20px",
-    width: "min(920px, calc(100vw - 28px))",
-    maxHeight: "88vh",
-    overflowY: "auto",
-    boxShadow: "0 28px 60px rgba(43, 20, 111, 0.24)",
-    border: "1px solid #ddd4ff",
+    background: "#ffffff",
+    borderRadius: "20px",
+    padding: "0",
+    width: "min(940px, calc(100vw - 28px))",
+    maxHeight: "90vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)",
+    border: "1px solid #e4dcff",
+    overflow: "hidden",
   },
   modalTitle: {
     marginBottom: "20px",
@@ -989,15 +999,13 @@ const styles = {
     fontWeight: "600",
   },
   createHero: {
-    display: "grid",
-    gridTemplateColumns: "1fr 220px",
-    gap: "14px",
-    padding: "16px",
-    background: "linear-gradient(135deg, #ffffff 0%, #f2ebff 100%)",
-    border: "1px solid #e3d8ff",
-    borderRadius: "20px",
-    marginBottom: "18px",
-    boxShadow: "0 10px 24px rgba(92, 57, 201, 0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0",
+    padding: "20px 24px",
+    background: "linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    marginBottom: "0",
   },
   createHeroTitleWrap: {
     display: "flex",
@@ -1006,17 +1014,17 @@ const styles = {
   },
   createHeroTitle: {
     margin: 0,
-    color: "#41288f",
-    fontSize: "24px",
+    color: "#ffffff",
+    fontSize: "20px",
     fontWeight: "700",
-    letterSpacing: "-0.5px",
+    letterSpacing: "-0.3px",
     display: "flex",
     alignItems: "center",
     gap: "10px",
   },
   createHeroText: {
     margin: 0,
-    color: "#6b5baa",
+    color: "rgba(255,255,255,0.65)",
     fontSize: "13px",
     lineHeight: 1.55,
     maxWidth: "470px",
@@ -1030,11 +1038,11 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "6px",
-    padding: "6px 10px",
+    padding: "5px 10px",
     borderRadius: "999px",
-    background: "#efe8ff",
-    border: "1px solid #ddd1ff",
-    color: "#5a43af",
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.2)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: "12px",
     fontWeight: "600",
   },
@@ -1044,15 +1052,14 @@ const styles = {
     alignContent: "start",
   },
   createMetaCard: {
-    background: "rgba(255,255,255,0.92)",
-    border: "1px solid #e6dcff",
-    borderRadius: "16px",
+    background: "rgba(255,255,255,0.1)",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: "12px",
     padding: "12px 14px",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
   },
   createMetaLabel: {
     margin: 0,
-    color: "#8978c1",
+    color: "rgba(255,255,255,0.55)",
     fontSize: "10px",
     fontWeight: "700",
     letterSpacing: "0.7px",
@@ -1060,20 +1067,26 @@ const styles = {
   },
   createMetaValue: {
     margin: "5px 0 0",
-    color: "#3f2b85",
+    color: "rgba(255,255,255,0.9)",
     fontSize: "14px",
     fontWeight: "700",
   },
   createBody: {
     display: "grid",
-    gap: "12px",
+    gap: "0",
+    padding: "20px 24px",
+    background: "#faf8ff",
+    overflowY: "auto",
+    flex: 1,
+    minHeight: 0,
   },
   createSection: {
-    background: "#f9f6ff",
-    border: "1px solid #e1d8ff",
-    borderRadius: "18px",
-    padding: "14px",
-    boxShadow: "0 8px 18px rgba(84, 56, 190, 0.06)",
+    background: "#ffffff",
+    border: "1px solid #ede8ff",
+    borderRadius: "14px",
+    padding: "16px",
+    marginBottom: "12px",
+    boxShadow: "0 1px 4px rgba(76,29,149,0.05)",
   },
   createSectionHeader: {
     display: "flex",
@@ -1084,21 +1097,23 @@ const styles = {
   },
   createSectionTitle: {
     margin: 0,
-    color: "#463191",
-    fontSize: "14px",
+    color: "#3c2f9f",
+    fontSize: "13px",
     fontWeight: "700",
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    gap: "7px",
+    letterSpacing: "0.1px",
   },
   createSectionChip: {
-    fontSize: "11px",
+    fontSize: "10.5px",
     fontWeight: "700",
     color: "#6d59b4",
-    background: "#eee7ff",
+    background: "#ede8ff",
     border: "1px solid #d8ccff",
     borderRadius: "999px",
-    padding: "4px 9px",
+    padding: "3px 9px",
+    letterSpacing: "0.3px",
   },
   createSectionGrid: {
     display: "grid",
@@ -1130,28 +1145,28 @@ const styles = {
   },
   createInput: {
     width: "100%",
-    border: "1px solid #d9d0f9",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#ffffff",
+    border: "1px solid #ddd6ff",
+    borderRadius: "10px",
+    padding: "10px 13px",
+    background: "#faf8ff",
     color: "#201b5f",
-    fontSize: "13px",
+    fontSize: "13.5px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
     boxSizing: "border-box",
     fontFamily: "inherit",
   },
   createTextArea: {
     width: "100%",
-    border: "1px solid #d9d0f9",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#ffffff",
+    border: "1px solid #ddd6ff",
+    borderRadius: "10px",
+    padding: "10px 13px",
+    background: "#faf8ff",
     color: "#201b5f",
-    fontSize: "13px",
-    minHeight: "110px",
+    fontSize: "13.5px",
+    minHeight: "100px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, background 160ms ease",
     boxSizing: "border-box",
     fontFamily: "inherit",
     resize: "vertical",
@@ -1167,75 +1182,81 @@ const styles = {
   },
   modalInput: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
+    border: "1px solid #ddd6ff",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    background: "#faf8ff",
     color: "#1e1a61",
-    fontSize: "14px",
+    fontSize: "13.5px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, box-shadow 160ms ease",
     boxSizing: "border-box",
+    fontFamily: "inherit",
   },
   modalTextArea: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
+    border: "1px solid #ddd6ff",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    background: "#faf8ff",
     color: "#1e1a61",
-    fontSize: "14px",
+    fontSize: "13.5px",
     minHeight: "80px",
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
     resize: "vertical",
+    transition: "border-color 160ms ease",
   },
   actionGroup: {
     display: "flex",
     justifyContent: "flex-end",
-    gap: "12px",
+    gap: "8px",
     marginTop: "20px",
   },
   cancelBtn: {
-    border: "1px solid #e2e0f0",
+    border: "1px solid #ddd6ff",
     background: "#ffffff",
     color: "#5b4eaa",
-    padding: "10px 20px",
-    borderRadius: "12px",
+    padding: "9px 18px",
+    borderRadius: "9px",
     cursor: "pointer",
-    fontWeight: "500",
-    transition: "all 0.2s ease",
+    fontWeight: "600",
+    fontSize: "13px",
+    transition: "background 150ms ease, border-color 150ms ease",
   },
   saveBtn: {
     border: "none",
-    background: "linear-gradient(135deg, #7c5bff, #5a30ff)",
+    background: "linear-gradient(135deg, #7a4dff, #9d4edd)",
     color: "#fff",
-    padding: "10px 24px",
-    borderRadius: "12px",
+    padding: "9px 22px",
+    borderRadius: "9px",
     cursor: "pointer",
     fontWeight: "600",
-    transition: "all 0.2s ease",
+    fontSize: "13px",
+    transition: "opacity 150ms ease, transform 150ms ease",
+    boxShadow: "0 3px 10px rgba(124,77,255,0.35)",
   },
   errorText: {
-    color: "#d32f2f",
+    color: "#c0392b",
     fontSize: "13px",
     fontWeight: "500",
     margin: "12px 0 0",
-    padding: "8px",
-    background: "#ffebee",
+    padding: "10px 12px",
+    background: "#fef2f2",
     borderRadius: "8px",
+    border: "1px solid #fecaca",
   },
   filterContainer: {
     display: "grid",
     gridTemplateColumns: "1fr 200px 200px auto",
-    gap: "12px",
-    marginBottom: "24px",
-    padding: "12px",
-    backgroundColor: "#efe8ff",
-    borderRadius: "14px",
-    border: "1px solid #dbd0ff",
-    boxShadow: "none",
+    gap: "10px",
+    marginBottom: "16px",
+    padding: "12px 14px",
+    backgroundColor: "#ffffff",
+    borderRadius: "12px",
+    border: "1px solid #e4dcff",
+    boxShadow: "0 1px 4px rgba(76,29,149,0.06)",
   },
   densityGroup: {
     display: "inline-flex",
@@ -1273,11 +1294,13 @@ const DroppableColumn = memo(function DroppableColumn({ id, children, minHeight,
       ref={setNodeRef}
       style={{
         minHeight: minHeight || "540px",
-        background: isOver ? "#ece2ff" : "#f7f3ff",
-        borderRadius: "0 0 12px 12px",
-        border: "1px dashed #d4c4ff",
-        transition: "background 0.2s ease",
+        background: isOver ? "#ede8ff" : "#f5f2ff",
+        borderRadius: "0 0 14px 14px",
+        border: isOver ? "1px solid #c4b5fd" : "1px solid #ddd6ff",
+        borderTop: "none",
+        transition: "background 160ms ease, border-color 160ms ease",
         padding: padding || "10px",
+        boxShadow: isOver ? "inset 0 2px 8px rgba(124,77,255,0.08)" : "none",
       }}
     >
       {children}
@@ -1368,24 +1391,25 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
     return new Date(deadline) < new Date();
   };
 
-  const formatTimeSinceUpdate = (dateValue) => {
-    if (!dateValue) return "Atualizado agora";
+  const formatTimeSinceUpdate = (dateValue, updaterName) => {
+    const quem = updaterName ? `por ${updaterName.split(" ")[0]} ` : "";
+    if (!dateValue) return `Atualizado ${quem}agora`;
     const date = new Date(dateValue);
-    if (Number.isNaN(date.getTime())) return "Atualizado agora";
+    if (Number.isNaN(date.getTime())) return `Atualizado ${quem}agora`;
 
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
 
-    if (diffMinutes < 1) return "Atualizado agora";
-    if (diffMinutes < 60) return `Atualizado há ${diffMinutes} min`;
+    if (diffMinutes < 1) return `Atualizado ${quem}agora`;
+    if (diffMinutes < 60) return `Atualizado ${quem}há ${diffMinutes} min`;
 
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `Atualizado há ${diffHours} h`;
+    if (diffHours < 24) return `Atualizado ${quem}há ${diffHours} h`;
 
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `Atualizado há ${diffDays} d`;
+    if (diffDays < 7) return `Atualizado ${quem}há ${diffDays} d`;
 
-    return `Atualizado em ${date.toLocaleDateString("pt-BR")}`;
+    return `Atualizado ${quem}em ${date.toLocaleDateString("pt-BR")}`;
   };
 
   // Manipulador para abrir o modal de detalhes do card
@@ -1587,7 +1611,7 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
             <User size={12} />
             <span>{card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor"}</span>
           </div>
-          <span style={styles.updatedInfo}>{formatTimeSinceUpdate(card.updatedAt || card.createdAt)}</span>
+          <span style={styles.updatedInfo}>{formatTimeSinceUpdate(card.updatedAt || card.createdAt, card.atualizado_por_nome)}</span>
         </div>
         <button
           onClick={handleDetailClick}
@@ -1657,6 +1681,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
   const [editingReplyKey, setEditingReplyKey] = useState(null);
   const [editingReplyText, setEditingReplyText] = useState("");
+  const [replyMentionQueryByCommentId, setReplyMentionQueryByCommentId] = useState({});
   const [hoveredReactionKey, setHoveredReactionKey] = useState(null);
   const [vendorEdit, setVendorEdit] = useState("");
   const [vendorSearchCreate, setVendorSearchCreate] = useState("");
@@ -4037,47 +4062,39 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
         <div style={styles.modalOverlay}>
           <div style={styles.createModal}>
             <div style={styles.createHero}>
-              <div style={styles.createHeroTitleWrap}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <h2 style={styles.createHeroTitle}>
                   <Plus size={20} /> Criar novo card
                 </h2>
-                <p style={styles.createHeroText}>
-                  Monte a solicitação com o mesmo padrão visual do Bitrix: dados principais primeiro, contexto operacional em seguida e um fechamento claro para a equipe.
-                </p>
-                <div style={styles.createHeroBadgeRow}>
-                  <span style={styles.createHeroBadge}><Wrench size={13} /> Fluxo comercial</span>
-                  <span style={styles.createHeroBadge}><Zap size={13} /> Entrada rápida</span>
-                  <span style={styles.createHeroBadge}><CalendarDays size={13} /> Pronto para operação</span>
-                </div>
-              </div>
-
-              <div style={styles.createHeroSide}>
-                <div style={styles.createMetaCard}>
-                  <p style={styles.createMetaLabel}>Responsável</p>
-                  <p style={styles.createMetaValue}>{selectedVendorOption?.label || seller}</p>
-                </div>
-                <div style={styles.createMetaCard}>
-                  <p style={styles.createMetaLabel}>Etapa inicial</p>
-                  <select
-                    style={{
-                      ...styles.createInput,
-                      fontWeight: 700,
-                      color: '#5a30ff',
-                      background: '#f7f5ff',
-                      border: '1px solid #d6d0ff',
-                      cursor: 'pointer',
-                      marginTop: 2,
-                      minWidth: 120,
-                    }}
-                    value={newCard.colunaId || orderedColumnDefs[0]?.id || ''}
-                    onChange={e => {
-                      setNewCard((prev) => ({ ...prev, colunaId: Number(e.target.value) }));
-                    }}
-                  >
-                    {orderedColumnDefs.map(col => (
-                      <option key={col.id} value={col.id}>{col.nome}</option>
-                    ))}
-                  </select>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={styles.createMetaCard}>
+                    <p style={styles.createMetaLabel}>Responsável</p>
+                    <p style={{ ...styles.createMetaValue, margin: 0 }}>{selectedVendorOption?.label || seller}</p>
+                  </div>
+                  <div style={styles.createMetaCard}>
+                    <p style={styles.createMetaLabel}>Etapa inicial</p>
+                    <select
+                      style={{
+                        ...styles.createInput,
+                        fontWeight: 700,
+                        color: "rgba(255,255,255,0.9)",
+                        background: "rgba(255,255,255,0.1)",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        cursor: "pointer",
+                        marginTop: 4,
+                        minWidth: 140,
+                        padding: "6px 10px",
+                      }}
+                      value={newCard.colunaId || orderedColumnDefs[0]?.id || ''}
+                      onChange={e => {
+                        setNewCard((prev) => ({ ...prev, colunaId: Number(e.target.value) }));
+                      }}
+                    >
+                      {orderedColumnDefs.map(col => (
+                        <option key={col.id} value={col.id}>{col.nome}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4441,7 +4458,10 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 <ClipboardList size={19} />
                 {selectedCard.titulo || selectedCard.cliente || "Detalhes do card"}
               </h2>
-              <button onClick={handleCloseCard} style={styles.detailsCloseBtn} title="Fechar">x</button>
+              <button onClick={handleCloseCard} style={styles.detailsCloseBtn} title="Fechar"
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+              >✕</button>
             </div>
             <div style={styles.detailsContent}>
               <div style={styles.detailsMain}>
@@ -4898,22 +4918,77 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       )}
 
                       {String(activeReplyCommentId) === String(comment.id) && (
-                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                          <input
-                            type="text"
-                            value={replyDraftByCommentId?.[comment.id] || ''}
-                            onChange={(e) => setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder="Escreva uma resposta..."
-                            style={{
-                              flex: 1,
-                              border: '1px solid #d8cdfd',
-                              background: '#fff',
-                              color: '#3f3292',
-                              borderRadius: 8,
-                              fontSize: 12,
-                              padding: '8px 10px',
-                            }}
-                          />
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, position: 'relative' }}>
+                            <input
+                              type="text"
+                              value={replyDraftByCommentId?.[comment.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: val }));
+                                const atIdx = val.lastIndexOf('@');
+                                if (atIdx !== -1) {
+                                  const afterAt = val.slice(atIdx + 1);
+                                  if (!afterAt.includes(' ')) {
+                                    setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: afterAt.toLowerCase() }));
+                                    return;
+                                  }
+                                }
+                                setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                                if (e.key === 'Enter' && !replyMentionQueryByCommentId?.[comment.id]) handleAddReply(comment.id);
+                              }}
+                              onBlur={() => setTimeout(() => setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null })), 150)}
+                              placeholder="Escreva uma resposta... use @ para mencionar"
+                              style={{
+                                width: '100%',
+                                border: '1px solid #d8cdfd',
+                                background: '#fff',
+                                color: '#3f3292',
+                                borderRadius: 8,
+                                fontSize: 12,
+                                padding: '8px 10px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                            {/* Dropdown de menção */}
+                            {replyMentionQueryByCommentId?.[comment.id] !== null &&
+                             replyMentionQueryByCommentId?.[comment.id] !== undefined && (() => {
+                              const query = replyMentionQueryByCommentId[comment.id] || '';
+                              const filtered = (directoryUsers || [])
+                                .filter((u) => u.nome?.toLowerCase().includes(query) || u.email?.toLowerCase().includes(query))
+                                .slice(0, 6);
+                              if (!filtered.length) return null;
+                              return (
+                                <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#fff', border: '1px solid #d8cdfd', borderRadius: 10, boxShadow: '0 4px 16px rgba(90,60,180,0.14)', zIndex: 9999, overflow: 'hidden' }}>
+                                  {filtered.map((u) => (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        const current = replyDraftByCommentId?.[comment.id] || '';
+                                        const atIdx = current.lastIndexOf('@');
+                                        const newText = current.slice(0, atIdx) + '@' + u.nome + ' ';
+                                        setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: newText }));
+                                        setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                                      }}
+                                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: '#3f3292', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f0ff'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6c3bff', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                                        {u.nome?.charAt(0)?.toUpperCase()}
+                                      </span>
+                                      {u.nome}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleAddReply(comment.id)}
@@ -4926,6 +5001,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               fontWeight: 700,
                               cursor: 'pointer',
                               padding: '8px 10px',
+                              flexShrink: 0,
                             }}
                           >
                             Enviar
@@ -5271,19 +5347,20 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       {/* Modal de edição de card - usa componente CardModal para formulário completo */}
       {isEditCardOpen && editingCard && (
         <div style={styles.modalOverlay}>
-          <div style={{ ...styles.modal, maxWidth: "700px", maxHeight: "85vh", overflowY: "auto" }}>
+          <div style={{ ...styles.modal, maxWidth: "700px", maxHeight: "88vh", overflowY: "auto", padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {/* Cabeçalho do modal de edição */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0, color: "#4c3393", fontSize: "22px" }}><Pencil size={18} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Editar Card</h2>
-              <button 
-                onClick={() => { setIsEditCardOpen(false); setEditingCard(null); }} 
-                style={{ border: "none", background: "transparent", fontSize: "24px", cursor: "pointer", color: "#7f6ad7", transition: "color 0.2s" }}
-                onMouseEnter={(e) => e.currentTarget.style.color = "#ff4444"}
-                onMouseLeave={(e) => e.currentTarget.style.color = "#7f6ad7"}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", background: "linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+              <h2 style={{ margin: 0, color: "#ffffff", fontSize: "17px", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><Pencil size={16} />Editar Card</h2>
+              <button
+                onClick={() => { setIsEditCardOpen(false); setEditingCard(null); }}
+                style={{ border: "none", background: "rgba(255,255,255,0.15)", borderRadius: 8, width: 32, height: 32, fontSize: "16px", cursor: "pointer", color: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 150ms ease" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
               >
-                x
+                ✕
               </button>
             </div>
+            <div style={{ padding: "20px", overflowY: "auto", flex: 1, background: "#faf8ff" }}>
             
             {/* Componente CardModal reutilizável para edição */}
             <CardModal 
@@ -5330,6 +5407,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 setEditingCard(null);
               }}
             />
+            </div>
           </div>
         </div>
       )}

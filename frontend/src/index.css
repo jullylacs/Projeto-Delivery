@@ -1,8 +1,39 @@
-﻿body {
+:root {
+  --bg: #f2efff;
+  --bg-card: #ffffff;
+  --text: #1f2b46;
+  --text-muted: #6b7280;
+  --purple-900: #2c0b52;
+  --purple-700: #4c1d95;
+  --purple-600: #4f238f;
+  --purple-500: #6f3dde;
+  --purple-400: #7a4dff;
+  --purple-300: #9d4edd;
+  --purple-200: #c77dff;
+  --purple-100: #efe8ff;
+  --purple-50: #f8f5ff;
+  --border: #e4dcff;
+  --shadow-sm: 0 1px 3px rgba(76,29,149,0.08), 0 1px 2px rgba(76,29,149,0.06);
+  --shadow-md: 0 4px 16px rgba(76,29,149,0.12), 0 2px 6px rgba(76,29,149,0.08);
+  --shadow-lg: 0 8px 32px rgba(76,29,149,0.16), 0 4px 12px rgba(76,29,149,0.1);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
   margin: 0;
-  background: #f2efff;
-  color: #1f2b46;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html, body {
@@ -17,6 +48,52 @@ html, body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
   overflow: hidden;
+}
+
+/* Scrollbar refinada */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8cffb;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b9a8f5;
+}
+
+/* Seleção de texto */
+::selection {
+  background: rgba(124, 77, 255, 0.2);
+  color: var(--text);
+}
+
+/* Botões e inputs — reset base elegante */
+button {
+  font-family: inherit;
+}
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* AgendaDelivery — hover states */
+.agenda-day-cell:hover {
+  background-color: #f5efff !important;
+}
+.agenda-event-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.24) !important;
+}
+.agenda-day-card:hover {
+  box-shadow: 0 6px 20px rgba(80, 50, 170, 0.13) !important;
+  transform: translateY(-1px);
+}
+.agenda-btn-nav:hover {
+  background: #f0eaff !important;
 }

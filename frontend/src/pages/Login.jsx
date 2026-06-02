@@ -1,14 +1,26 @@
-import { useState } from "react"; // Hook useState para gerenciar estados locais
-import { useNavigate, Link } from "react-router-dom"; // useNavigate para navegação programática, Link para navegação entre rotas
-import api from "../services/api"; // Instância de API para comunicação com backend
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import api from "../services/api";
 
-// Componente da página de login
+const inputStyle = {
+  width: "100%",
+  padding: "13px 16px",
+  borderRadius: "10px",
+  border: "1px solid rgba(255,255,255,0.15)",
+  background: "rgba(255,255,255,0.07)",
+  color: "#fff",
+  fontSize: "14px",
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "border-color 180ms ease, background 180ms ease",
+};
+
 export default function Login() {
-  const [email, setEmail] = useState(""); // Estado para armazenar o email digitado
-  const [senha, setSenha] = useState(""); // Estado para armazenar a senha digitada
-  const [loading, setLoading] = useState(false); // Estado que indica se a requisição está em andamento
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const navigate = useNavigate(); // Hook para redirecionar usuário após login
+  const navigate = useNavigate();
 
   const getApiErrorMessage = (error, fallback) => {
     const data = error?.response?.data;
@@ -18,153 +30,189 @@ export default function Login() {
     return fallback;
   };
 
-  // Função que realiza login via API
   const login = async () => {
     try {
-      setLoading(true); // Ativa loading
+      setLoading(true);
       setErrorMessage("");
-      const res = await api.post("/users/login", { email, senha }); // Chamada POST para login
-      localStorage.setItem("token", res.data.token); // Salva token no localStorage
-      localStorage.setItem("user", JSON.stringify(res.data.user)); // Salva dados do usuário no localStorage
-      navigate("/dashboard"); // Redireciona para dashboard
+      const res = await api.post("/users/login", { email, senha });
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      navigate("/dashboard");
     } catch (error) {
-      // Caso ocorra erro, exibe mensagem apropriada
-      setErrorMessage("Falha no login: " + getApiErrorMessage(error, "Erro ao conectar"));
+      setErrorMessage(getApiErrorMessage(error, "Erro ao conectar com o servidor."));
     } finally {
-      setLoading(false); // Desativa loading independente do resultado
+      setLoading(false);
     }
   };
 
-  // Permite que o usuário pressione Enter para enviar o login
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      login(); // Chama função de login
-    }
+    if (e.key === "Enter") login();
   };
-  
-  // Renderização do componente
+
   return (
     <div style={{
-      display: "flex", // Centraliza o conteúdo horizontal e verticalmente
+      display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      height: "100vh", // Ocupa toda a altura da tela
-      background: "linear-gradient(135deg, #2a0a4a, #4b1f8a)" // Gradiente de fundo
+      height: "100vh",
+      background: "linear-gradient(135deg, #0f0320 0%, #1e0638 40%, #2c0b52 70%, #3d1472 100%)",
+      overflow: "hidden",
+      position: "relative",
     }}>
+      {/* Orbes decorativos de fundo */}
       <div style={{
-        background: "rgba(255,255,255,0.07)", // Fundo semi-transparente
-        padding: "50px", // Espaçamento interno
-        borderRadius: "20px", // Bordas arredondadas
-        border: "1px solid rgba(255,255,255,0.1)", // Borda sutil
-        backdropFilter: "blur(10px)", // Efeito de blur
-        width: "100%",
-        maxWidth: "400px", // Largura máxima do container
-        textAlign: "center",
-        color: "#fff"
-      }}>
-        {/* Título do sistema */}
-        <h1 style={{ marginBottom: "30px", fontSize: "32px" }}>🚀 Delivery</h1>
-        <p style={{ marginBottom: "30px", opacity: 0.8 }}>Sistema de Gerenciamento</p>
+        position: "absolute", width: "500px", height: "500px",
+        borderRadius: "50%", top: "-120px", left: "-160px",
+        background: "radial-gradient(circle, rgba(124,77,255,0.18) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+      <div style={{
+        position: "absolute", width: "400px", height: "400px",
+        borderRadius: "50%", bottom: "-100px", right: "-80px",
+        background: "radial-gradient(circle, rgba(199,125,255,0.14) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+      <div style={{
+        position: "absolute", width: "300px", height: "300px",
+        borderRadius: "50%", top: "50%", left: "55%",
+        background: "radial-gradient(circle, rgba(90,48,255,0.1) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
 
+      {/* Card principal */}
+      <div style={{
+        background: "rgba(255,255,255,0.05)",
+        padding: "48px 44px",
+        borderRadius: "20px",
+        border: "1px solid rgba(255,255,255,0.1)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        width: "100%",
+        maxWidth: "420px",
+        color: "#fff",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.4), 0 0 0 1px rgba(199,125,255,0.08)",
+        position: "relative",
+        zIndex: 1,
+      }}>
+
+        {/* Logo e título */}
+        <div style={{ textAlign: "center", marginBottom: "36px" }}>
+          <div style={{
+            width: "56px", height: "56px",
+            borderRadius: "16px",
+            background: "linear-gradient(135deg, #7a4dff, #c77dff)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "24px",
+            margin: "0 auto 16px",
+            boxShadow: "0 8px 24px rgba(124,77,255,0.4)",
+          }}>
+            🚀
+          </div>
+          <h1 style={{ margin: "0 0 6px", fontSize: "24px", fontWeight: "700", letterSpacing: "-0.3px" }}>
+            Bem-vindo de volta
+          </h1>
+          <p style={{ margin: 0, opacity: 0.5, fontSize: "14px" }}>
+            Sistema de Gerenciamento NVX
+          </p>
+        </div>
+
+        {/* Erro */}
         {errorMessage && (
           <div style={{
-            padding: "10px 12px",
-            marginBottom: "16px",
-            borderRadius: "8px",
-            background: "rgba(239, 68, 68, 0.18)",
-            border: "1px solid rgba(239, 68, 68, 0.5)",
-            color: "#ffd1d8",
+            padding: "11px 14px",
+            marginBottom: "20px",
+            borderRadius: "10px",
+            background: "rgba(239,68,68,0.15)",
+            border: "1px solid rgba(239,68,68,0.35)",
+            color: "#fecaca",
             fontSize: "13px",
-            textAlign: "left"
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}>
+            <span style={{ flexShrink: 0 }}>⚠️</span>
             {errorMessage}
           </div>
         )}
-        
-        {/* Campo de email */}
-        <input
-          placeholder="Email"
-          type="email"
-          value={email} // Valor do input vinculado ao estado
-          onChange={e => setEmail(e.target.value)} // Atualiza estado ao digitar
-          onKeyPress={handleKeyPress} // Permite login ao pressionar Enter
-          style={{
-            width: "100%",
-            padding: "12px 15px",
-            marginBottom: "15px",
-            borderRadius: "8px",
-            border: "1px solid rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.1)",
-            color: "#fff",
-            fontSize: "14px",
-            boxSizing: "border-box"
-          }}
-        />
-        
-        {/* Campo de senha */}
-        <input
-          placeholder="Senha"
-          type="password"
-          value={senha} // Valor do input vinculado ao estado
-          onChange={e => setSenha(e.target.value)} // Atualiza estado ao digitar
-          onKeyPress={handleKeyPress} // Permite login ao pressionar Enter
-          style={{
-            width: "100%",
-            padding: "12px 15px",
-            marginBottom: "15px",
-            borderRadius: "8px",
-            border: "1px solid rgba(255,255,255,0.2)",
-            background: "rgba(255,255,255,0.1)",
-            color: "#fff",
-            fontSize: "14px",
-            boxSizing: "border-box"
-          }}
-        />
 
-        {/* Botão de login */}
+        {/* Campos */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "24px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", opacity: 0.65, marginBottom: "6px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+              Email
+            </label>
+            <input
+              placeholder="seu@email.com"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyPress={handleKeyPress}
+              style={inputStyle}
+              onFocus={e => { e.target.style.borderColor = "rgba(199,125,255,0.6)"; e.target.style.background = "rgba(255,255,255,0.1)"; }}
+              onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.15)"; e.target.style.background = "rgba(255,255,255,0.07)"; }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", opacity: 0.65, marginBottom: "6px", letterSpacing: "0.5px", textTransform: "uppercase" }}>
+              Senha
+            </label>
+            <input
+              placeholder="••••••••"
+              type="password"
+              value={senha}
+              onChange={e => setSenha(e.target.value)}
+              onKeyPress={handleKeyPress}
+              style={inputStyle}
+              onFocus={e => { e.target.style.borderColor = "rgba(199,125,255,0.6)"; e.target.style.background = "rgba(255,255,255,0.1)"; }}
+              onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.15)"; e.target.style.background = "rgba(255,255,255,0.07)"; }}
+            />
+          </div>
+        </div>
+
+        {/* Botão */}
         <button
-          onClick={login} // Chama função de login ao clicar
-          disabled={loading} // Desativa botão enquanto carrega
+          onClick={login}
+          disabled={loading}
           style={{
             width: "100%",
-            padding: "12px 15px",
-            borderRadius: "8px",
+            padding: "13px",
+            borderRadius: "10px",
             border: "none",
-            background: "linear-gradient(135deg, #7a4dff, #5a30ff)",
+            background: loading
+              ? "rgba(124,77,255,0.5)"
+              : "linear-gradient(135deg, #7a4dff 0%, #9d4edd 50%, #c77dff 100%)",
             color: "#fff",
-            fontSize: "16px",
-            fontWeight: "bold",
+            fontSize: "15px",
+            fontWeight: "600",
             cursor: loading ? "not-allowed" : "pointer",
-            transition: "0.2s",
-            opacity: loading ? 0.7 : 1,
-            marginBottom: "15px"
+            transition: "opacity 200ms ease, transform 150ms ease, box-shadow 200ms ease",
+            boxShadow: loading ? "none" : "0 4px 20px rgba(124,77,255,0.45)",
+            letterSpacing: "0.2px",
+            marginBottom: "24px",
           }}
-          onMouseEnter={(e) => !loading && (e.currentTarget.style.transform = "scale(1.02)")} // Pequena animação ao passar mouse
-          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(124,77,255,0.55)"; } }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(124,77,255,0.45)"; }}
         >
-          {loading ? "Entrando..." : "Entrar"} {/* Texto muda quando carregando */}
+          {loading ? "Entrando..." : "Entrar"}
         </button>
 
-        {/* Link para página de registro */}
-        <div style={{
-          textAlign: "center",
-          fontSize: "14px",
-          opacity: 0.8
-        }}>
-          Não tem conta? 
-          <Link to="/register" style={{
-            color: "#d8c6ff",
-            textDecoration: "none",
-            fontWeight: "bold",
-            marginLeft: "5px",
-            transition: "0.2s"
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = "0.7"} // Efeito hover
-          onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+        {/* Divisor */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }} />
+          <span style={{ fontSize: "12px", opacity: 0.4 }}>ou</span>
+          <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" }} />
+        </div>
+
+        {/* Link registro */}
+        <p style={{ margin: 0, textAlign: "center", fontSize: "14px", opacity: 0.65 }}>
+          Não tem conta?{" "}
+          <Link to="/register" style={{ color: "#c77dff", textDecoration: "none", fontWeight: "600" }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
           >
             Registre-se
           </Link>
-        </div>
+        </p>
       </div>
     </div>
   );

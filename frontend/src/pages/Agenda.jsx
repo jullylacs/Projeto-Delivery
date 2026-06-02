@@ -13,6 +13,7 @@ const TASK_STATUS = {
   planejado: "Planejado",
   andamento: "Em andamento",
   concluido: "Concluído",
+  cancelado: "Cancelado",
 };
 
 const TASK_STATUS_COLORS = {
@@ -40,6 +41,14 @@ const TASK_STATUS_COLORS = {
     chipText: "#1f7a3f",
     taskBorder: "#bfe9cd",
   },
+  cancelado: {
+    panelBg: "#fff5f5",
+    panelBorder: "#fecaca",
+    panelTitle: "#b91c1c",
+    chipBg: "#fee2e2",
+    chipText: "#b91c1c",
+    taskBorder: "#fecaca",
+  },
 };
 
 const AGENDA_PREFS_KEY = "agendaPrefs";
@@ -54,6 +63,7 @@ const UI_STATUS_TO_API = {
   planejado: "pendente",
   andamento: "em_execucao",
   concluido: "finalizado",
+  cancelado: "cancelado",
 };
 
 const API_STATUS_TO_UI = {
@@ -62,6 +72,7 @@ const API_STATUS_TO_UI = {
   reagendado: "planejado",
   em_execucao: "andamento",
   finalizado: "concluido",
+  cancelado: "cancelado",
 };
 
 const toUiStatus = (apiStatus) => API_STATUS_TO_UI[apiStatus] || "planejado";
@@ -123,7 +134,9 @@ export default function Agenda() {
   const [editingNoteId, setEditingNoteId] = useState(null); // ID da tarefa que está sendo editada
   const [editingNoteValue, setEditingNoteValue] = useState(""); // Valor temporário da nota em edição
   const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [draggedTaskSourceKey, setDraggedTaskSourceKey] = useState(null);
   const [dragOverStatus, setDragOverStatus] = useState(null);
+  const [dragOverDayKey, setDragOverDayKey] = useState(null);
   const [expandedDays, setExpandedDays] = useState(() => readAgendaPrefs().expandedDays || {}); // Controle de expansão de tarefas por dia no calendário
   const [viewMode, setViewMode] = useState(() => readAgendaPrefs().viewMode || VIEW_MODE.month);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -227,6 +240,7 @@ export default function Agenda() {
       planejado: dayTasks.filter((t) => (t.status || "planejado") === "planejado"),
       andamento: dayTasks.filter((t) => (t.status || "planejado") === "andamento"),
       concluido: dayTasks.filter((t) => (t.status || "planejado") === "concluido"),
+      cancelado: dayTasks.filter((t) => (t.status || "planejado") === "cancelado"),
     };
   }, [dayTasks]);
 
@@ -368,23 +382,54 @@ export default function Agenda() {
     }
   };
 
-  const handleTaskDragStart = (taskId, event) => {
+  const handleTaskDragStart = (taskId, sourceKey, event) => {
     setDraggedTaskId(taskId);
+    setDraggedTaskSourceKey(sourceKey);
 
     if (event?.dataTransfer) {
       event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", String(taskId));
+      event.dataTransfer.setData("text/plain", JSON.stringify({ taskId, sourceKey }));
     }
   };
 
   const handleTaskDragEnd = () => {
     setDraggedTaskId(null);
+    setDraggedTaskSourceKey(null);
     setDragOverStatus(null);
+    setDragOverDayKey(null);
+  };
+
+  const moveTaskToDay = async (taskId, fromKey, toDay) => {
+    const toKey = getLocalDateKey(toDay);
+    if (fromKey === toKey) return;
+
+    const task = (tasks[fromKey] || []).find((t) => t.id === taskId);
+    if (!task) return;
+
+    const newDate = new Date(toDay.getFullYear(), toDay.getMonth(), toDay.getDate()).toISOString();
+
+    try {
+      await api.put(`/schedules/${taskId}`, { data: newDate });
+      setTasks((prev) => {
+        const from = (prev[fromKey] || []).filter((t) => t.id !== taskId);
+        const to = [...(prev[toKey] || []), { ...task }];
+        const next = { ...prev, [fromKey]: from, [toKey]: to };
+        if (next[fromKey].length === 0) delete next[fromKey];
+        return next;
+      });
+      setSelectedDate(toDay);
+      setCurrentDate(toDay);
+      setApiError("");
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+      setApiError(`Não foi possível mover a tarefa.${message ? ` (${message})` : ""}`);
+    }
   };
 
   const handleStatusDrop = (statusKey, event) => {
-    const fromTransfer = event?.dataTransfer?.getData("text/plain");
-    const candidateTaskId = fromTransfer ? Number(fromTransfer) : draggedTaskId;
+    const raw = event?.dataTransfer?.getData("text/plain");
+    let candidateTaskId = draggedTaskId;
+    try { candidateTaskId = JSON.parse(raw).taskId; } catch { candidateTaskId = Number(raw) || draggedTaskId; }
     if (!candidateTaskId) return;
 
     moveTaskStatus(candidateTaskId, statusKey);
@@ -490,29 +535,53 @@ export default function Agenda() {
         onDoubleClick={() => handleEnterDayView(day)}
         onContextMenu={(event) => openTaskModal(day, event)}
         title="Duplo clique para abrir o dia"
+        onDragOver={(e) => { if (draggedTaskId) { e.preventDefault(); setDragOverDayKey(key); } }}
+        onDragEnter={(e) => { if (draggedTaskId) { e.preventDefault(); setDragOverDayKey(key); } }}
+        onDragLeave={() => setDragOverDayKey((cur) => cur === key ? null : cur)}
+        onDrop={(e) => {
+          e.preventDefault();
+          const raw = e.dataTransfer?.getData("text/plain");
+          let taskId = draggedTaskId;
+          let sourceKey = draggedTaskSourceKey;
+          try { const p = JSON.parse(raw); taskId = p.taskId; sourceKey = p.sourceKey; } catch {}
+          if (taskId && sourceKey) moveTaskToDay(taskId, sourceKey, day);
+          setDragOverDayKey(null);
+        }}
         style={{
-          minHeight: viewMode === VIEW_MODE.day ? "340px" : "152px",
+          minHeight: viewMode === VIEW_MODE.day ? "340px" : "120px",
           borderRight:
-            viewMode === VIEW_MODE.month && idx % 7 !== 6 ? "1px solid #eee8ff" :
-            viewMode === VIEW_MODE.week && idx !== 6 ? "1px solid #eee8ff" :
+            viewMode === VIEW_MODE.month && idx % 7 !== 6 ? "1px solid #f0ebff" :
+            viewMode === VIEW_MODE.week && idx !== 6 ? "1px solid #f0ebff" :
             "none",
-          borderBottom: viewMode === VIEW_MODE.month ? "1px solid #eee8ff" : "none",
-          background: isSelected ? "#efeaff" : "#fff",
-          cursor: "pointer",
-          padding: "8px",
+          borderBottom: viewMode === VIEW_MODE.month ? "1px solid #f0ebff" : "none",
+          background: dragOverDayKey === key ? "#ede8ff" : isSelected ? "#f0ebff" : isToday(day) ? "#fdfcff" : "#fff",
+          outline: dragOverDayKey === key ? "2px solid #7a4dff" : "none",
+          outlineOffset: "-2px",
+          cursor: draggedTaskId ? "copy" : "pointer",
+          padding: "7px 8px",
           display: "flex",
           flexDirection: "column",
-          gap: 6,
+          gap: 4,
           position: "relative",
+          transition: "background 120ms ease, outline 120ms ease",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#24334f" }}>
+          <span style={{
+            fontSize: 12, fontWeight: 700,
+            color: isToday(day) ? "#fff" : isSelected ? "#4c1d95" : "#24334f",
+            background: isToday(day) ? "linear-gradient(135deg,#7a4dff,#9d4edd)" : "transparent",
+            borderRadius: isToday(day) ? "50%" : 0,
+            width: isToday(day) ? 22 : "auto",
+            height: isToday(day) ? 22 : "auto",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: isToday(day) ? "0 2px 6px rgba(124,77,255,0.4)" : "none",
+          }}>
             {viewMode === VIEW_MODE.day
               ? day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
               : day.getDate()}
           </span>
-          {dayTaskCount > 0 && <span style={{ fontSize: 10, color: "#5b6f95", fontWeight: 700 }}>{dayTaskCount}</span>}
+          {dayTaskCount > 0 && <span style={{ fontSize: 10, color: "#9580c8", fontWeight: 700, background: "#ede8ff", borderRadius: 999, padding: "1px 5px" }}>{dayTaskCount}</span>}
         </div>
 
         {viewMode === VIEW_MODE.day ? (
@@ -607,63 +676,68 @@ export default function Agenda() {
     );
   };
 
+  const today = new Date();
+  const isToday = (d) => isSameDay(d, today);
+
+  const inputStyle = {
+    padding: "9px 12px",
+    border: "1px solid #ddd6ff",
+    borderRadius: "9px",
+    outline: "none",
+    fontSize: 13,
+    background: "#faf8ff",
+    color: "#1f2b46",
+    fontFamily: "inherit",
+    width: "100%",
+    boxSizing: "border-box",
+    transition: "border-color 160ms ease",
+  };
+
   // Renderização do componente
   return (
-    <div style={{ padding: "20px 22px", background: "#f2efff", minHeight: "94vh", color: "#1f2b46" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, color: "#1f2b46", fontSize: "24px", fontWeight: 700 }}>Calendário</h2>
-          <span style={{ fontSize: 12, color: "#7c879f", fontWeight: 600 }}>NVX</span>
+    <div style={{ padding: "16px 20px", background: "#f2efff", minHeight: "94vh", color: "#1f2b46", display: "flex", flexDirection: "column", gap: 12 }}>
+
+      {/* ── Cabeçalho ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div>
+            <h2 style={{ margin: 0, color: "#1f2b46", fontSize: "22px", fontWeight: 700, lineHeight: 1.1 }}>
+              Calendário <span style={{ fontSize: 12, color: "#9580c8", fontWeight: 600, letterSpacing: "0.4px" }}>NVX</span>
+            </h2>
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "#7c6fb7", fontWeight: 500 }}>{headerLabel}</p>
+          </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Legenda de status */}
+          <div style={{ display: "flex", gap: 5, marginRight: 4 }}>
+            {Object.entries(TASK_STATUS).map(([statusKey, statusLabel]) => (
+              <span key={statusKey} style={{ fontSize: 11, fontWeight: 700, color: TASK_STATUS_COLORS[statusKey].chipText, background: TASK_STATUS_COLORS[statusKey].chipBg, border: `1px solid ${TASK_STATUS_COLORS[statusKey].taskBorder}`, borderRadius: 999, padding: "3px 8px", whiteSpace: "nowrap" }}>
+                {statusLabel}
+              </span>
+            ))}
+          </div>
+
+          {/* Botão Hoje */}
           <button
-            onClick={() => {
-              const now = new Date();
-                setCurrentDate(now);
-              setSelectedDate(now);
-            }}
-            style={{ padding: "8px 12px", background: "#6c3bff", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 700, fontSize: 12 }}
+            onClick={() => { const now = new Date(); setCurrentDate(now); setSelectedDate(now); }}
+            style={{ padding: "7px 14px", background: "linear-gradient(135deg, #7a4dff, #9d4edd)", color: "#fff", border: "none", borderRadius: "9px", cursor: "pointer", fontWeight: 700, fontSize: 12, boxShadow: "0 3px 10px rgba(124,77,255,0.35)", letterSpacing: "0.2px" }}
           >
             Hoje
           </button>
-          <div style={{ display: "inline-flex", border: "1px solid #d8cffb", borderRadius: "8px", overflow: "hidden", background: "#fff" }}>
-            <button
-              onClick={handlePrevious}
-              style={{ padding: "8px 10px", border: "none", borderRight: "1px solid #d8cffb", background: "#fff", cursor: "pointer", color: "#5d4d9f", fontWeight: 700 }}
-            >
-              ◀
-            </button>
-            <button
-              onClick={handleNext}
-              style={{ padding: "8px 10px", border: "none", background: "#fff", cursor: "pointer", color: "#5d4d9f", fontWeight: 700 }}
-            >
-              ▶
-            </button>
+
+          {/* Nav prev/next */}
+          <div style={{ display: "inline-flex", border: "1px solid #ddd6ff", borderRadius: "9px", overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(76,29,149,0.07)" }}>
+            <button onClick={handlePrevious} style={{ padding: "7px 11px", border: "none", borderRight: "1px solid #ddd6ff", background: "#fff", cursor: "pointer", color: "#5d4d9f", fontWeight: 700, fontSize: 13 }}>‹</button>
+            <button onClick={handleNext}     style={{ padding: "7px 11px", border: "none", background: "#fff", cursor: "pointer", color: "#5d4d9f", fontWeight: 700, fontSize: 13 }}>›</button>
           </div>
-          <div style={{ display: "inline-flex", gap: 2, border: "1px solid #d8cffb", borderRadius: 8, padding: 2, background: "#fff" }}>
-            {[
-              { key: VIEW_MODE.month, label: "Mês" },
-              { key: VIEW_MODE.week, label: "Semana" },
-              { key: VIEW_MODE.day, label: "Dia" },
-            ].map((mode) => {
+
+          {/* Seletor de view */}
+          <div style={{ display: "inline-flex", gap: 2, border: "1px solid #ddd6ff", borderRadius: 9, padding: 2, background: "#fff", boxShadow: "0 1px 3px rgba(76,29,149,0.07)" }}>
+            {[{ key: VIEW_MODE.month, label: "Mês" }, { key: VIEW_MODE.week, label: "Semana" }, { key: VIEW_MODE.day, label: "Dia" }].map((mode) => {
               const isActive = viewMode === mode.key;
               return (
-                <button
-                  key={mode.key}
-                  type="button"
-                  onClick={() => setViewMode(mode.key)}
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    borderRadius: 6,
-                    border: "none",
-                    cursor: "pointer",
-                    background: isActive ? "#efe9ff" : "transparent",
-                    color: isActive ? "#5a3cb8" : "#8a96ad",
-                  }}
-                >
+                <button key={mode.key} type="button" onClick={() => setViewMode(mode.key)} style={{ padding: "5px 11px", fontSize: 12, fontWeight: 700, borderRadius: 7, border: "none", cursor: "pointer", background: isActive ? "linear-gradient(135deg, #7a4dff, #9d4edd)" : "transparent", color: isActive ? "#fff" : "#8a96ad", transition: "background 150ms ease, color 150ms ease", boxShadow: isActive ? "0 2px 6px rgba(124,77,255,0.3)" : "none" }}>
                   {mode.label}
                 </button>
               );
@@ -672,42 +746,25 @@ export default function Agenda() {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <h3 style={{ margin: 0, color: "#23314f", fontSize: 22, fontWeight: 700 }}>
-          {headerLabel}
-        </h3>
-        <div style={{ display: "flex", gap: 8 }}>
-          {Object.entries(TASK_STATUS).map(([statusKey, statusLabel]) => (
-            <span key={statusKey} style={{ fontSize: 11, fontWeight: 700, color: TASK_STATUS_COLORS[statusKey].chipText, background: TASK_STATUS_COLORS[statusKey].chipBg, border: `1px solid ${TASK_STATUS_COLORS[statusKey].taskBorder}`, borderRadius: 999, padding: "4px 8px" }}>
-              {statusLabel}
-            </span>
-          ))}
-        </div>
-      </div>
-
+      {/* Erros e loading */}
       {apiError && (
-        <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #f3b3b3", background: "#ffe9e9", color: "#9b1f1f", fontSize: 13, fontWeight: 600 }}>
+        <div style={{ padding: "10px 14px", borderRadius: 9, border: "1px solid #fecaca", background: "#fff5f5", color: "#b91c1c", fontSize: 13, fontWeight: 600 }}>
           {apiError}
         </div>
       )}
-
       {isLoadingTasks && (
-        <div style={{ marginBottom: 10, color: "#6b7a95", fontSize: 13, fontWeight: 600 }}>
-          Carregando tarefas da API...
-        </div>
+        <div style={{ color: "#7c6fb7", fontSize: 13, fontWeight: 500 }}>Carregando tarefas…</div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: "14px",
-        }}
-      >
-        <div style={{ background: "#fff", border: "1px solid #d8cffb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #ece6ff", background: "#faf8ff" }}>
+      {/* ── Layout principal: calendário + painel lateral ── */}
+      <div style={{ display: "flex", gap: 14, flex: 1, minHeight: 0, alignItems: "flex-start" }}>
+
+        {/* Calendário */}
+        <div style={{ flex: 1, minWidth: 0, background: "#fff", border: "1px solid #ddd6ff", borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 10px rgba(76,29,149,0.07)" }}>
+          {/* Dias da semana */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "2px solid #ede8ff", background: "linear-gradient(180deg, #faf8ff, #f5f1ff)" }}>
             {WEEKDAY_NAMES.map((d) => (
-              <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#6d61a8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", padding: "10px 4px" }}>
+              <div key={d} style={{ textAlign: "center", fontSize: 11, color: "#7c6fb7", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", padding: "10px 4px" }}>
                 {d}
               </div>
             ))}
@@ -716,29 +773,17 @@ export default function Agenda() {
           {viewMode === VIEW_MODE.month && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
               {days.map((day, idx) =>
-                day ? (
-                  renderDayCard(day, idx)
-                ) : (
-                  <div
-                    key={`${idx}-empty`}
-                    style={{
-                      minHeight: "152px",
-                      borderRight: idx % 7 !== 6 ? "1px solid #eee8ff" : "none",
-                      borderBottom: "1px solid #eee8ff",
-                      background: "#faf8ff",
-                    }}
-                  />
+                day ? renderDayCard(day, idx) : (
+                  <div key={`${idx}-empty`} style={{ minHeight: "120px", borderRight: idx % 7 !== 6 ? "1px solid #f0ebff" : "none", borderBottom: "1px solid #f0ebff", background: "#faf8ff" }} />
                 )
               )}
             </div>
           )}
-
           {viewMode === VIEW_MODE.week && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
               {weekDays.map((day, idx) => renderDayCard(day, idx))}
             </div>
           )}
-
           {viewMode === VIEW_MODE.day && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr" }}>
               {renderDayCard(selectedDate, 0)}
@@ -746,199 +791,147 @@ export default function Agenda() {
           )}
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid #d8cffb", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <h4 style={{ margin: "0 0 2px", color: "#1f2b46", fontSize: 15, fontWeight: 700 }}>
-              {selectedDate.toLocaleDateString("pt-BR")}
-            </h4>
-            <span style={{ color: "#6b7a95", fontSize: 12 }}>Tarefas do dia selecionado</span>
+        {/* ── Painel lateral de tarefas ── */}
+        <div style={{ width: 300, flexShrink: 0, background: "#fff", border: "1px solid #ddd6ff", borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 10px rgba(76,29,149,0.07)", display: "flex", flexDirection: "column" }}>
+          {/* Cabeçalho do painel */}
+          <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid #ede8ff", background: "linear-gradient(180deg, #faf8ff, #f5f1ff)" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#1f2b46" }}>
+              {selectedDate.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+            </div>
+            <div style={{ fontSize: 12, color: "#9580c8", marginTop: 2 }}>
+              {dayTasks.length === 0 ? "Nenhuma tarefa" : `${dayTasks.length} tarefa${dayTasks.length !== 1 ? "s" : ""}`}
+            </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", paddingRight: 2 }}>
+          {/* Colunas de status */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
             {dayTasks.length === 0 ? (
-              <p style={{ color: "#7f8ba1", fontSize: 13 }}>Nenhuma tarefa para este dia. Clique com o botão direito no dia para criar.</p>
+              <div style={{ textAlign: "center", padding: "28px 12px", color: "#9580c8", fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📋</div>
+                Nenhuma tarefa para este dia.<br />
+                <span style={{ fontSize: 12, opacity: 0.7 }}>Clique com o botão direito no dia para criar.</span>
+              </div>
             ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {Object.entries(TASK_STATUS).map(([statusKey, statusLabel]) => (
+              Object.entries(TASK_STATUS).map(([statusKey, statusLabel]) => {
+                const palette = TASK_STATUS_COLORS[statusKey];
+                const isDropTarget = dragOverStatus === statusKey;
+                return (
                   <div
                     key={statusKey}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                    }}
-                    onDragEnter={() => {
-                      if (dragOverStatus !== statusKey) {
-                        setDragOverStatus(statusKey);
-                      }
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      handleStatusDrop(statusKey, event);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverStatus === statusKey) {
-                        setDragOverStatus(null);
-                      }
-                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDragEnter={() => dragOverStatus !== statusKey && setDragOverStatus(statusKey)}
+                    onDrop={(e) => { e.preventDefault(); handleStatusDrop(statusKey, e); }}
+                    onDragLeave={() => dragOverStatus === statusKey && setDragOverStatus(null)}
                     style={{
-                      background: TASK_STATUS_COLORS[statusKey].panelBg,
-                      border: `1px solid ${dragOverStatus === statusKey ? TASK_STATUS_COLORS[statusKey].panelTitle : TASK_STATUS_COLORS[statusKey].panelBorder}`,
-                      borderRadius: 8,
-                      padding: 8,
-                      boxShadow: dragOverStatus === statusKey ? "inset 0 0 0 1px rgba(72, 52, 158, 0.25)" : "none",
-                      transition: "all 0.16s ease",
+                      background: isDropTarget ? palette.panelBg : "#fdfcff",
+                      border: `1px solid ${isDropTarget ? palette.panelTitle : palette.panelBorder}`,
+                      borderLeft: `3px solid ${palette.panelTitle}`,
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      transition: "border-color 150ms ease, background 150ms ease",
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <strong style={{ fontSize: 11, color: TASK_STATUS_COLORS[statusKey].panelTitle, textTransform: "uppercase", letterSpacing: "0.4px" }}>{statusLabel}</strong>
-                      <span style={{ fontSize: 11, color: "#6f7c95", fontWeight: 700 }}>{groupedDayTasks[statusKey].length}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: palette.panelTitle, textTransform: "uppercase", letterSpacing: "0.5px" }}>{statusLabel}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: palette.chipText, background: palette.chipBg, borderRadius: 999, padding: "1px 7px", border: `1px solid ${palette.taskBorder}` }}>{groupedDayTasks[statusKey].length}</span>
                     </div>
 
-                    <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       {groupedDayTasks[statusKey].length === 0 && (
-                        <div style={{ fontSize: 12, color: "#8b95a9", padding: "6px 4px" }}>Sem tarefas</div>
+                        <div style={{ fontSize: 12, color: "#b0b8cc", padding: "4px 2px", fontStyle: "italic" }}>Sem tarefas</div>
                       )}
-
                       {groupedDayTasks[statusKey].map((task) => (
                         <div
                           key={task.id}
                           draggable
-                          onDragStart={(event) => handleTaskDragStart(task.id, event)}
+                          onDragStart={(e) => handleTaskDragStart(task.id, selectedKey, e)}
                           onDragEnd={handleTaskDragEnd}
-                          style={{
-                            border: `1px solid ${TASK_STATUS_COLORS[statusKey].taskBorder}`,
-                            borderRadius: 8,
-                            padding: "8px",
-                            background: "#ffffff",
-                            position: "relative",
-                            cursor: "grab",
-                            opacity: draggedTaskId === task.id ? 0.7 : 1,
-                            userSelect: "none",
-                          }}
+                          style={{ border: `1px solid ${palette.taskBorder}`, borderRadius: 8, padding: "8px 10px", background: "#fff", position: "relative", cursor: "grab", opacity: draggedTaskId === task.id ? 0.55 : 1, userSelect: "none", boxShadow: "0 1px 3px rgba(76,29,149,0.05)", transition: "opacity 150ms ease" }}
                         >
-                          <strong style={{ display: "block", color: "#2a3a56", fontSize: 15, lineHeight: 1.25 }}>{task.title}</strong>
-                          <span style={{ color: "#687690", fontSize: "12px", fontWeight: 600 }}>{task.time}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, paddingRight: 18 }}>
+                            <strong style={{ display: "block", color: "#2a3a56", fontSize: 13.5, lineHeight: 1.3, fontWeight: 600 }}>{task.title}</strong>
+                          </div>
+                          {task.time && task.time !== "--" && (
+                            <span style={{ display: "inline-block", marginTop: 3, color: palette.chipText, fontSize: 11, fontWeight: 700, background: palette.chipBg, borderRadius: 6, padding: "1px 6px" }}>⏰ {task.time}</span>
+                          )}
 
                           {editingNoteId === task.id ? (
                             <div style={{ marginTop: 6 }}>
-                              <textarea
-                                value={editingNoteValue}
-                                onChange={(e) => setEditingNoteValue(e.target.value)}
-                                style={{ width: "100%", minHeight: 52, borderRadius: 6, border: "1px solid #b9c6df", padding: 8, fontSize: 12, color: "#5f5a88" }}
-                                autoFocus
-                              />
-                              <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-                                <button type="button" onClick={() => saveEditNote(task)} style={{ background: "#6c3bff", color: "white", border: "none", borderRadius: 6, padding: "4px 10px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Salvar</button>
-                                <button type="button" onClick={cancelEditNote} style={{ background: "#f1ecff", color: "#5f529e", border: "none", borderRadius: 6, padding: "4px 10px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Cancelar</button>
+                              <textarea value={editingNoteValue} onChange={(e) => setEditingNoteValue(e.target.value)} style={{ ...inputStyle, minHeight: 48, resize: "vertical" }} autoFocus />
+                              <div style={{ display: "flex", gap: 5, marginTop: 5 }}>
+                                <button type="button" onClick={() => saveEditNote(task)} style={{ background: "linear-gradient(135deg,#7a4dff,#9d4edd)", color: "#fff", border: "none", borderRadius: 7, padding: "4px 12px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Salvar</button>
+                                <button type="button" onClick={cancelEditNote} style={{ background: "#f0ebff", color: "#5f529e", border: "none", borderRadius: 7, padding: "4px 10px", fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Cancelar</button>
                               </div>
                             </div>
                           ) : (
                             <>
-                              {task.notes && <p style={{ margin: "6px 0 0", fontSize: "13px", lineHeight: 1.35, color: "#5f6d86" }}>{task.notes}</p>}
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-                                <button
-                                  onClick={() => startEditNote(task)}
-                                  style={{ background: "transparent", color: "#6342cc", border: "none", fontSize: 12, cursor: "pointer", padding: 0, fontWeight: 600 }}
-                                  title="Editar nota"
-                                >
-                                  Editar
-                                </button>
-                                <span style={{ fontSize: 11, color: "#8c82b6", fontWeight: 600 }}>Arraste para mover</span>
+                              {task.notes && <p style={{ margin: "5px 0 0", fontSize: 12, lineHeight: 1.4, color: "#7a6ea8" }}>{task.notes}</p>}
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 5 }}>
+                                <button onClick={() => startEditNote(task)} style={{ background: "transparent", color: "#7a4dff", border: "none", fontSize: 11, cursor: "pointer", padding: 0, fontWeight: 600 }}>Editar nota</button>
+                                <span style={{ fontSize: 10, color: "#c4b5fd" }}>⠿ arrastar</span>
                               </div>
                             </>
                           )}
 
-                          <button
-                            onClick={() => removeTask(task.id)}
-                            style={{
-                              position: "absolute",
-                              top: "6px",
-                              right: "6px",
-                              background: "transparent",
-                              border: "none",
-                              color: "#8a7bb4",
-                              cursor: "pointer",
-                              fontWeight: "700",
-                              fontSize: 12,
-                            }}
-                          >
-                            ✕
-                          </button>
+                          <button onClick={() => removeTask(task.id)} style={{ position: "absolute", top: 6, right: 6, background: "transparent", border: "none", color: "#c4b5fd", cursor: "pointer", fontWeight: 700, fontSize: 11, lineHeight: 1, padding: 2 }}
+                            onMouseEnter={e => e.currentTarget.style.color = "#b91c1c"}
+                            onMouseLeave={e => e.currentTarget.style.color = "#c4b5fd"}
+                          >✕</button>
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })
             )}
           </div>
         </div>
       </div>
 
+      {/* ── Modal de nova tarefa ── */}
       {isTaskModalOpen && (
         <div
           ref={taskModalRef}
-          style={{
-            position: "fixed",
-            top: taskModalPosition.y,
-            left: taskModalPosition.x,
-            width: "min(340px, calc(100vw - 28px))",
-            background: "#ffffff",
-            border: "1px solid #d8cffb",
-            borderRadius: 12,
-            boxShadow: "0 16px 34px rgba(67, 40, 154, 0.22)",
-            padding: 12,
-            zIndex: 1200,
-          }}
+          style={{ position: "fixed", top: taskModalPosition.y, left: taskModalPosition.x, width: "min(320px, calc(100vw - 28px))", background: "#fff", border: "1px solid #ddd6ff", borderRadius: 14, boxShadow: "0 20px 48px rgba(67,40,154,0.2)", zIndex: 1200, overflow: "hidden" }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <strong style={{ color: "#2b1f6d", fontSize: 14 }}>Nova tarefa</strong>
-            <button
-              type="button"
-              onClick={() => setIsTaskModalOpen(false)}
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#7a6bb5", fontWeight: 700 }}
-            >
-              ✕
-            </button>
+          {/* Header do modal */}
+          <div style={{ padding: "14px 16px 10px", background: "linear-gradient(90deg, #3d1472, #4c1d95)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <strong style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>Nova tarefa</strong>
+              <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, marginTop: 1 }}>
+                {taskModalDate.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
+              </div>
+            </div>
+            <button type="button" onClick={() => setIsTaskModalOpen(false)} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 7, width: 28, height: 28, cursor: "pointer", color: "rgba(255,255,255,0.8)", fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+            >✕</button>
           </div>
 
-          <div style={{ color: "#6b7a95", fontSize: 12, marginBottom: 10 }}>
-            {taskModalDate.toLocaleDateString("pt-BR")}
-          </div>
-
-          <form onSubmit={(e) => addTask(e, taskModalDate)} style={{ display: "grid", gap: 8 }}>
-            <input
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              placeholder="Título da tarefa *"
-              style={{ padding: "10px 11px", border: "1px solid #d8cffb", borderRadius: "8px", outline: "none", fontSize: 13 }}
-              required
+          <form onSubmit={(e) => addTask(e, taskModalDate)} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px" }}>
+            <input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Título da tarefa *" style={inputStyle} required
+              onFocus={e => e.target.style.borderColor = "rgba(124,77,255,0.6)"}
+              onBlur={e => e.target.style.borderColor = "#ddd6ff"}
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <input
-                type="time"
-                value={taskTime}
-                onChange={(e) => setTaskTime(e.target.value)}
-                style={{ padding: "10px 11px", border: "1px solid #d8cffb", borderRadius: "8px", outline: "none", fontSize: 13 }}
+              <input type="time" value={taskTime} onChange={(e) => setTaskTime(e.target.value)} style={inputStyle}
+                onFocus={e => e.target.style.borderColor = "rgba(124,77,255,0.6)"}
+                onBlur={e => e.target.style.borderColor = "#ddd6ff"}
               />
-              <select
-                value={taskStatus}
-                onChange={(e) => setTaskStatus(e.target.value)}
-                style={{ padding: "10px 11px", border: "1px solid #d8cffb", borderRadius: "8px", outline: "none", color: "#5f529e", fontWeight: 600, fontSize: 13 }}
-              >
+              <select value={taskStatus} onChange={(e) => setTaskStatus(e.target.value)} style={{ ...inputStyle, fontWeight: 600, color: TASK_STATUS_COLORS[taskStatus]?.chipText || "#5f529e" }}>
                 <option value="planejado">Planejado</option>
                 <option value="andamento">Em andamento</option>
                 <option value="concluido">Concluído</option>
+                <option value="cancelado">Cancelado</option>
               </select>
             </div>
-            <textarea
-              value={taskNotes}
-              onChange={(e) => setTaskNotes(e.target.value)}
-              placeholder="Notas"
-              style={{ padding: "10px 11px", border: "1px solid #d8cffb", borderRadius: "8px", outline: "none", minHeight: "74px", fontSize: 13, resize: "vertical" }}
+            <textarea value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)} placeholder="Notas (opcional)" style={{ ...inputStyle, minHeight: 68, resize: "vertical" }}
+              onFocus={e => e.target.style.borderColor = "rgba(124,77,255,0.6)"}
+              onBlur={e => e.target.style.borderColor = "#ddd6ff"}
             />
-            <button
-              type="submit"
-              style={{ background: "#6c3bff", color: "white", padding: "10px 12px", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}
+            <button type="submit" style={{ background: "linear-gradient(135deg,#7a4dff,#9d4edd)", color: "#fff", padding: "10px", border: "none", borderRadius: "9px", cursor: "pointer", fontWeight: 700, fontSize: 13, boxShadow: "0 3px 10px rgba(124,77,255,0.35)", transition: "transform 150ms ease" }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
             >
               Adicionar tarefa
             </button>

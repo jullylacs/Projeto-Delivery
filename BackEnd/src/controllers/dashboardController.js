@@ -1,7 +1,7 @@
 const { sequelize } = require("../models");
 const { QueryTypes } = require("sequelize");
 
-const VALID_BOARDS = ["delivery", "comercial"];
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;

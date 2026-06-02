@@ -1,31 +1,40 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
-const PERFIS = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin"];
+// Cargos disponíveis para atribuição no painel.
+// Valores legados (gestor, operacional, etc.) são mantidos fora da lista
+// para não quebrar usuários existentes — aparecem apenas na exibição.
+const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc"];
 
-// Mapeia o valor do enum para um rótulo amigável exibido nos selects.
+// Mapeia o valor do enum para um rótulo amigável exibido nos selects e badges.
 const PERFIL_LABELS = {
+  admin: "Admin",
   convidado: "Convidado",
+  bko: "BKO",
+  delivery: "Delivery",
   comercial: "Comercial",
+  noc: "NOC",
+  // legados — exibição somente
   operacional: "Operacional",
   tecnico: "Técnico",
-  delivery: "Delivery",
   gestor_delivery: "Gestora de Delivery",
   gestor: "Gestor",
-  admin: "Admin",
 };
 const PAGE_SIZE_OPTIONS = [8, 12, 20, 50];
 const STORAGE_KEY = "adminUsersTableState";
 
 const ROLE_STYLES = {
-  admin: { bg: "#ffe9d6", fg: "#913400", label: "Admin" },
-  gestor: { bg: "#e8ecff", fg: "#2f3d99", label: "Gestor" },
-  gestor_delivery: { bg: "#ffe7f3", fg: "#9b1b5a", label: "Gestora de Delivery" },
-  tecnico: { bg: "#dff5ff", fg: "#0e5a7a", label: "Tecnico" },
-  operacional: { bg: "#e9f8eb", fg: "#1c6d30", label: "Operacional" },
-  delivery: { bg: "#fff0f6", fg: "#9b1b5a", label: "Delivery" },
-  comercial: { bg: "#f6ecff", fg: "#6b2cb3", label: "Comercial" },
-  convidado: { bg: "#fff4d9", fg: "#7a5b00", label: "Convidado" },
+  admin:          { bg: "#ffe9d6", fg: "#913400",  label: "Admin" },
+  convidado:      { bg: "#fff4d9", fg: "#7a5b00",  label: "Convidado" },
+  bko:            { bg: "#edf4ff", fg: "#1a56aa",  label: "BKO" },
+  delivery:       { bg: "#fff0f6", fg: "#9b1b5a",  label: "Delivery" },
+  comercial:      { bg: "#f6ecff", fg: "#6b2cb3",  label: "Comercial" },
+  noc:            { bg: "#e8fff0", fg: "#0e6b3a",  label: "NOC" },
+  // legados — exibição somente
+  gestor:         { bg: "#e8ecff", fg: "#2f3d99",  label: "Gestor" },
+  gestor_delivery:{ bg: "#ffe7f3", fg: "#9b1b5a",  label: "Gestora de Delivery" },
+  tecnico:        { bg: "#dff5ff", fg: "#0e5a7a",  label: "Técnico" },
+  operacional:    { bg: "#e9f8eb", fg: "#1c6d30",  label: "Operacional" },
 };
 
 const APPROVAL_STYLES = {
@@ -347,6 +356,7 @@ export default function AdminUsers() {
     perfil: "convidado",
     acesso_kanban_delivery: false,
     acesso_kanban_comercial: false,
+    acesso_kanban_bko: false,
   });
 
   const totalFiltered = total;
@@ -506,6 +516,7 @@ export default function AdminUsers() {
       perfil: user.perfil || "convidado",
       acesso_kanban_delivery: Boolean(user.acesso_kanban_delivery),
       acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
+      acesso_kanban_bko: Boolean(user.acesso_kanban_bko),
     });
   };
 
@@ -518,6 +529,7 @@ export default function AdminUsers() {
       perfil: "convidado",
       acesso_kanban_delivery: false,
       acesso_kanban_comercial: false,
+      acesso_kanban_bko: false,
     });
   };
 
@@ -718,77 +730,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* Seção para criar/editar/excluir cargos */}
-      <div style={{ margin: "18px auto 24px auto", padding: "16px", background: "#f8f5ff", borderRadius: "12px", border: "1px solid #e2d9ff", maxWidth: 500, display: "block" }}>
-        <h3 style={{ margin: 0, color: "#5f2ca0", fontSize: 16 }}>Gerenciar cargos</h3>
-        {/* Lista de cargos */}
-        <div style={{ marginTop: 10, marginBottom: 10 }}>
-          {roles.map((role) => (
-            <div key={role.id || role.nome} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              {editingRoleId === role.id ? (
-                <>
-                  <input
-                    value={editingRoleName}
-                    onChange={e => setEditingRoleName(e.target.value)}
-                    placeholder="Nome do cargo"
-                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
-                    disabled={loadingRoles}
-                  />
-                  <input
-                    value={editingRoleDesc}
-                    onChange={e => setEditingRoleDesc(e.target.value)}
-                    placeholder="Descrição (opcional)"
-                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
-                    disabled={loadingRoles}
-                  />
-                  <button onClick={saveEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#2f8a42", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Salvar</button>
-                  <button onClick={cancelEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#aaa", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Cancelar</button>
-                </>
-              ) : (
-                <>
-                  <span style={{ minWidth: 90, fontWeight: 600 }}>
-                    {PERFIL_LABELS[role.nome] || role.nome}
-                  </span>
-                  {PERFIS.includes(role.nome) && (
-                    <span style={{ color: "#9388b8", fontSize: 11, fontStyle: "italic" }}>
-                      (perfil do sistema)
-                    </span>
-                  )}
-                  {role.descricao && <span style={{ color: "#7a73a1", fontSize: 12 }}>({role.descricao})</span>}
-                  {!PERFIS.includes(role.nome) && (
-                    <>
-                      <button onClick={() => startEditRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#5f2ca0", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Editar</button>
-                      <button onClick={() => deleteRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#a4001d", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Excluir</button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-        {/* Adicionar novo cargo */}
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <input
-            value={newRole}
-            onChange={e => setNewRole(e.target.value)}
-            placeholder="Nome do novo cargo"
-            style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #d9d0f9", fontSize: 13 }}
-            disabled={loadingRoles}
-          />
-          <button
-            onClick={handleAddRole}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "linear-gradient(90deg, #8b64ff, #5a30ff)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }}
-            disabled={loadingRoles}
-          >
-            {loadingRoles ? "Adicionando..." : "Adicionar"}
-          </button>
-        </div>
-        {roleError && <div style={{ color: "#a4001d", marginTop: 8, fontSize: 13 }}>{roleError}</div>}
-        <div style={{ marginTop: 10, color: "#7a73a1", fontSize: 12 }}>
-          Cargos customizados aqui são apenas rótulos auxiliares — só os perfis do sistema
-          podem ser atribuídos a usuários no momento.
-        </div>
-      </div>
 
       <div style={styles.tableWrap}>
         <table style={styles.table}>
@@ -814,7 +755,7 @@ export default function AdminUsers() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => {
+            {users.filter((user) => PERFIS.includes(user.perfil)).map((user) => {
               const editing = editingId === user.id;
               const roleStyle = getRoleStyle(user.perfil);
               const approvalStyle = user.aprovado ? APPROVAL_STYLES.approved : APPROVAL_STYLES.pending;
@@ -907,6 +848,16 @@ export default function AdminUsers() {
                           />
                           Comercial
                         </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_bko}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_bko: e.target.checked }))
+                            }
+                          />
+                          BKO
+                        </label>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -916,7 +867,10 @@ export default function AdminUsers() {
                         {user.acesso_kanban_comercial && (
                           <span style={{ ...styles.badge, background: "#f6ecff", color: "#6b2cb3" }}>Comercial</span>
                         )}
-                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && (
+                        {user.acesso_kanban_bko && (
+                          <span style={{ ...styles.badge, background: "#edf4ff", color: "#1a56aa" }}>BKO</span>
+                        )}
+                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && (
                           <span style={{ color: "#7a73a1", fontSize: 13 }}>—</span>
                         )}
                       </div>

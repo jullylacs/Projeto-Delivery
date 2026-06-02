@@ -45,7 +45,7 @@ const Schedule = sequelize.define("Schedule", {
 
   // Status do agendamento com valores controlados
   status: {
-    type: DataTypes.ENUM("pendente", "confirmado", "reagendado", "em_execucao", "finalizado"),
+    type: DataTypes.ENUM("pendente", "confirmado", "reagendado", "em_execucao", "finalizado", "cancelado"),
     defaultValue: "pendente"
   },
 

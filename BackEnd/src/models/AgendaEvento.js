@@ -57,6 +57,12 @@ const AgendaEvento = sequelize.define(
       type: DataTypes.STRING(20),
       allowNull: true,
     },
+
+    mencoes: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
+    },
   },
   {
     tableName: "agenda_eventos",
