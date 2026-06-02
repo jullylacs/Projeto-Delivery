@@ -153,7 +153,7 @@ export default function Sidebar({ isOpen = true }) {
           letterSpacing: "0.4px",
         }}
       >
-        © 2026 Delivery System
+        © 2026 Delivery System - By Júlia and Eduardo
       </div>
     </div>
   );
