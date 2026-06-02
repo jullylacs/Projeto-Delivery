@@ -34,9 +34,12 @@ export default function CommentInput({
   placeholder,
   mentionUsers = [],
   initialValue = "",
+  initialAttachments = [],
 }) {
   const [value, setValue] = useState(initialValue);
-  const [attachments, setAttachments] = useState([]);
+  const [attachments, setAttachments] = useState(
+    Array.isArray(initialAttachments) ? initialAttachments : []
+  );
   const [focused, setFocused] = useState(false);
   const textAreaRef = useRef();
   const [mentionState, setMentionState] = useState({

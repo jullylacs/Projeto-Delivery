@@ -669,6 +669,7 @@ exports.editComment = async (req, res) => {
     const cardId = parseCardId(req.params.id);
     const commentId = String(req.params.commentId || "");
     const text = String(req.body?.text || "").trim();
+    const attachments = req.body?.attachments; // undefined = manter existentes
     if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
     if (!text) return res.status(400).json({ error: "Texto vazio" });
 
@@ -677,7 +678,10 @@ exports.editComment = async (req, res) => {
       return comments.map((c) => {
         if (String(c.id) !== commentId) return c;
         found = true;
-        return { ...c, text, updatedAt: new Date().toISOString() };
+        const update = { ...c, text, editedAt: new Date().toISOString() };
+        // Só sobrescreve anexos se enviados explicitamente
+        if (Array.isArray(attachments)) update.attachments = attachments;
+        return update;
       });
     });
 

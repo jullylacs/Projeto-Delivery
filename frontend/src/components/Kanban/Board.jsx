@@ -2726,10 +2726,10 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     try {
       let res;
       if (editingCommentId) {
-        // Edição por ID — backend faz find-by-id atômico, sem depender de índice.
+        // Edição por ID — envia texto e anexos (atualizados pelo usuário)
         res = await api.patch(
           `/cards/${getCardKey(selectedCard)}/comments/${editingCommentId}`,
-          { text: normalizedText }
+          { text: normalizedText, attachments }
         );
       } else {
         res = await api.post(`/cards/${getCardKey(selectedCard)}/comments`, {
@@ -5220,6 +5220,11 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                         editingCommentId
                           ? (selectedCard?.comments?.find((c) => String(c.id) === String(editingCommentId))?.text || "")
                           : ""
+                      }
+                      initialAttachments={
+                        editingCommentId
+                          ? (selectedCard?.comments?.find((c) => String(c.id) === String(editingCommentId))?.attachments || [])
+                          : []
                       }
                     />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
