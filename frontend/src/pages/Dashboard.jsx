@@ -11,8 +11,8 @@ const COLOR_LIST = [
 ];
 
 const loadingStyles = {
-  container: { padding: "24px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "90vh" },
-  card: { background: "#fff", border: "1px solid rgba(108,59,255,0.12)", borderRadius: "14px", padding: "18px", boxShadow: "0 8px 18px rgba(62,44,158,0.08)", marginBottom: "16px" },
+  container: { padding: "24px", background: "var(--bg)", minHeight: "90vh" },
+  card: { background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", padding: "18px", boxShadow: "0 8px 18px rgba(62,44,158,0.08)", marginBottom: "16px" },
   line: { height: "14px", borderRadius: "8px", background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)", backgroundSize: "200% 100%", animation: "dashPulse 1.4s ease-in-out infinite", marginBottom: "10px" },
   title: { height: "28px", width: "260px", borderRadius: "10px", background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)", backgroundSize: "200% 100%", animation: "dashPulse 1.4s ease-in-out infinite", marginBottom: "10px" },
   subtitle: { height: "14px", width: "420px", maxWidth: "100%", borderRadius: "8px", background: "linear-gradient(90deg, #f1ecff 25%, #e8ddff 50%, #f1ecff 75%)", backgroundSize: "200% 100%", animation: "dashPulse 1.4s ease-in-out infinite", marginBottom: "18px" },
@@ -20,23 +20,23 @@ const loadingStyles = {
 };
 
 const styles = {
-  container: { padding: "24px", background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)", minHeight: "90vh", color: "#1f2b46" },
+  container: { padding: "24px", background: "var(--bg)", minHeight: "90vh", color: "var(--text)" },
   header: { marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 },
-  title: { margin: 0, color: "#3c2f9f", fontSize: "24px", fontWeight: "800" },
-  subtitle: { color: "#5f5a88", fontSize: "14px", marginTop: "4px" },
+  title: { margin: 0, color: "var(--text)", fontSize: "24px", fontWeight: "800" },
+  subtitle: { color: "var(--text-label)", fontSize: "14px", marginTop: "4px" },
   refreshingBadge: { fontSize: 12, color: "#8b64ff", fontWeight: 700, opacity: 0.8 },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px", marginBottom: "24px" },
-  card: { background: "#fff", border: "1px solid rgba(108,59,255,0.12)", borderRadius: "14px", padding: "18px", boxShadow: "0 8px 18px rgba(62,44,158,0.08)" },
-  cardTitle: { fontSize: "13px", fontWeight: "700", color: "#6c65a7", textTransform: "uppercase", marginBottom: "12px", letterSpacing: "0.5px" },
-  cardValue: { fontSize: "32px", fontWeight: "800", color: "#3c2f9f", marginBottom: "8px" },
+  card: { background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "14px", padding: "18px", boxShadow: "0 8px 18px rgba(62,44,158,0.08)" },
+  cardTitle: { fontSize: "13px", fontWeight: "700", color: "var(--text-label)", textTransform: "uppercase", marginBottom: "12px", letterSpacing: "0.5px" },
+  cardValue: { fontSize: "32px", fontWeight: "800", color: "var(--text)", marginBottom: "8px" },
   alertBox: { padding: "12px", borderRadius: "8px", marginBottom: "8px", fontSize: "13px", fontWeight: "500" },
   alertRed: { backgroundColor: "#ffebee", borderLeft: "4px solid #d32f2f", color: "#c62828", paddingLeft: "12px" },
   alertOrange: { backgroundColor: "#f3edff", borderLeft: "4px solid #7b54e8", color: "#5f3fb8", paddingLeft: "12px" },
   chartRow: { display: "flex", flexWrap: "nowrap", alignItems: "flex-end", gap: "8px", padding: "16px 0", height: "220px", justifyContent: "space-between", overflowX: "hidden", width: "100%", maxWidth: "100%" },
   chartBar: { flex: "1 1 0%", minWidth: 0, maxWidth: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", background: "none" },
   barFill: { width: "100%", borderRadius: "12px 12px 0 0", transition: "height 0.3s ease", minHeight: "4px" },
-  barLabel: { marginTop: "8px", fontSize: "11px", color: "#6c65a7", textAlign: "center", fontWeight: "500" },
-  progressBar: { width: "100%", height: "8px", background: "#ebeaff", borderRadius: "4px", overflow: "hidden", marginTop: "8px" },
+  barLabel: { marginTop: "8px", fontSize: "11px", color: "var(--text-label)", textAlign: "center", fontWeight: "500" },
+  progressBar: { width: "100%", height: "8px", background: "var(--bg-input)", borderRadius: "4px", overflow: "hidden", marginTop: "8px" },
   progressFill: { height: "100%", background: "linear-gradient(90deg, #8b64ff, #5a30ff)", transition: "width 0.3s ease" },
 };
 
@@ -225,9 +225,9 @@ export default function Dashboard() {
           <div style={styles.cardTitle}>👥 Performance por Cargo</div>
           <div style={{ display: "grid", gap: "18px" }}>
             {roleStats.map((role) => (
-              <div key={role.role} style={{ padding: "14px 12px", backgroundColor: "#fafbff", borderRadius: "10px", borderLeft: "4px solid #8b64ff" }}>
+              <div key={role.role} style={{ padding: "14px 12px", backgroundColor: "var(--bg-input)", borderRadius: "10px", borderLeft: "4px solid #8b64ff" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <div style={{ fontWeight: "700", color: "#3c2f9f", fontSize: 15 }}>{role.role}</div>
+                  <div style={{ fontWeight: "700", color: "var(--text)", fontSize: 15 }}>{role.role}</div>
                   <div style={{ fontSize: "13px", fontWeight: "700", color: "#8b64ff" }}>
                     {role.totalCompleted}/{role.totalCards} ({role.ratio.toFixed(0)}%)
                   </div>
@@ -235,12 +235,12 @@ export default function Dashboard() {
                 <div style={styles.progressBar}>
                   <div style={{ ...styles.progressFill, width: `${role.ratio}%` }} />
                 </div>
-                <div style={{ marginTop: 10, fontSize: 13, color: "#5f5a88" }}>
+                <div style={{ marginTop: 10, fontSize: 13, color: "var(--text-label)" }}>
                   <b>Equipe:</b>
                   <ul style={{ margin: "6px 0 0 0", padding: 0, listStyle: "none", display: "flex", flexWrap: "wrap", gap: 12 }}>
                     {role.users.map((u) => (
                       <li key={u.id} style={{ minWidth: 180 }}>
-                        <span style={{ fontWeight: 600, color: "#3c2f9f" }}>{u.nome}</span>
+                        <span style={{ fontWeight: 600, color: "var(--text)" }}>{u.nome}</span>
                         <span style={{ marginLeft: 8, color: "#8b64ff", fontWeight: 600 }}>
                           {u.completed}/{u.total} ({u.ratio.toFixed(0)}%)
                         </span>

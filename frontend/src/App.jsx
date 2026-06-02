@@ -1,5 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; 
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+
+// Aplica o tema salvo antes de qualquer render
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
 // Importa componentes do React Router para controle de rotas
 
 import Sidebar from "./components/Layout/Sidebar"; // Barra lateral do layout
@@ -95,6 +99,7 @@ function MainLayout() {
         <Header onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
 
         <div
+          className="content-area"
           style={{
             padding: "20px",
             overflowY: "auto",

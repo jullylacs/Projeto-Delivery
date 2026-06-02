@@ -746,7 +746,7 @@ export default function AgendaDelivery() {
   // ===========================================================================
 
   return (
-    <div style={{ padding: "22px 24px", background: "linear-gradient(160deg, #f0ecff 0%, #eaf0ff 100%)", minHeight: "94vh", color: "#1a1535" }}>
+    <div style={{ padding: "22px 24px", background: "var(--bg)", minHeight: "94vh", color: "var(--text)" }}>
       {/* Cabeçalho */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -832,7 +832,7 @@ export default function AgendaDelivery() {
       )}
 
       {/* Calendário */}
-      <div style={{ background: "#fff", border: "1px solid #ddd5fc", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 24px rgba(90, 60, 180, 0.09), 0 1px 4px rgba(90, 60, 180, 0.05)" }}>
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 24px rgba(90, 60, 180, 0.09), 0 1px 4px rgba(90, 60, 180, 0.05)" }}>
         {viewMode !== VIEW_MODE.day && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderBottom: "1px solid #ece6ff", background: "linear-gradient(90deg, #f5f1ff 0%, #eff3ff 100%)" }}>
             {WEEKDAY_NAMES.map((d) => (
@@ -965,7 +965,7 @@ function EventModal({
         style={{
           width: "min(560px, 100%)",
           maxHeight: "90vh",
-          background: "#fff",
+          background: "var(--bg-card)",
           borderRadius: 18,
           boxShadow: "0 32px 64px rgba(40, 20, 90, 0.32), 0 8px 20px rgba(40, 20, 90, 0.12)",
           overflow: "hidden",
@@ -1277,12 +1277,12 @@ const labelStyle = {
 const inputStyle = {
   width: "100%",
   padding: "10px 12px",
-  border: "1.5px solid #ddd5fc",
+  border: "1.5px solid var(--border)",
   borderRadius: 10,
   outline: "none",
   fontSize: 13,
-  background: "#faf7ff",
-  color: "#2f2758",
+  background: "var(--bg-input)",
+  color: "var(--text)",
   boxSizing: "border-box",
 };
 
@@ -1302,7 +1302,7 @@ const primaryBtn = {
 const navBtn = {
   padding: "6px 16px",
   border: "none",
-  background: "#fff",
+  background: "var(--bg-card)",
   cursor: "pointer",
   color: "#5d4d9f",
   fontWeight: 800,

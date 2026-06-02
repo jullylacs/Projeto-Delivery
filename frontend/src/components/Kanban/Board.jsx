@@ -2,6 +2,16 @@
 import api from "../../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+// Injeta o nome do usuário logado em cards que não têm atualizado_por_nome
+function enrichCardWithUpdater(card) {
+  if (!card || card.atualizado_por_nome) return card;
+  try {
+    const me = JSON.parse(localStorage.getItem("user") || "{}");
+    const nome = me?.nome || me?.email;
+    return nome ? { ...card, atualizado_por_nome: nome } : card;
+  } catch { return card; }
+}
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   CalendarDays,
@@ -315,8 +325,8 @@ function MentionToken({ mentionText, profile }) {
           bottom: "calc(100% + 8px)",
           minWidth: 210,
           maxWidth: 280,
-          background: "#ffffff",
-          border: "1px solid #d9cdfd",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           padding: "10px 12px",
           boxShadow: "0 12px 26px rgba(63, 47, 140, 0.2)",
@@ -451,49 +461,30 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        p: ({ children }) => <p style={{ margin: "0 0 6px", lineHeight: 1.55 }}>{children}</p>,
-        ul: ({ children }) => <ul style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ul>,
-        ol: ({ children }) => <ol style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ol>,
-        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+        // Sem margem extra entre parágrafos — texto flui naturalmente
+        p: ({ children }) => <span style={{ display: "block", lineHeight: 1.55 }}>{children}</span>,
+        ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ol>,
+        li: ({ children }) => <li style={{ marginBottom: 2, lineHeight: 1.5 }}>{children}</li>,
         strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
         em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
         blockquote: ({ children }) => (
-          <blockquote
-            style={{
-              margin: "8px 0",
-              padding: "4px 10px",
-              borderLeft: "3px solid #c4b2ff",
-              color: "#5a4a9d",
-              background: "#f5efff",
-              borderRadius: 6,
-            }}
-          >
+          <blockquote style={{ margin: "6px 0", padding: "3px 10px", borderLeft: "3px solid #c4b2ff", color: "#5a4a9d", background: "#f5efff", borderRadius: 6 }}>
             {children}
           </blockquote>
         ),
         code: ({ children }) => (
-          <code
-            style={{
-              background: "#ece5ff",
-              border: "1px solid #dacdff",
-              borderRadius: 6,
-              padding: "1px 5px",
-              fontSize: 12,
-              color: "#4a379b",
-            }}
-          >
+          <code style={{ background: "#ece5ff", border: "1px solid #dacdff", borderRadius: 6, padding: "1px 5px", fontSize: 12, color: "#4a379b" }}>
             {children}
           </code>
         ),
         a: ({ href, children }) => {
-          if (href && href.startsWith("/__mention__/")) {
+          if (href?.startsWith("/__mention__/")) {
             const normalizedName = decodeURIComponent(href.replace("/__mention__/", ""));
             const profile = mentionLookup.get(normalizedName);
             const mentionText = Array.isArray(children) ? children.join("") : String(children || "@");
-
             return <MentionToken mentionText={mentionText} profile={profile} />;
           }
-
           return <span>{children}</span>;
         },
       }}
@@ -506,7 +497,7 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
     detailsModalCard: {
-      background: '#ffffff',
+      background: 'var(--bg-card)',
       borderRadius: '20px',
       boxShadow: '0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)',
       padding: '0',
@@ -514,7 +505,7 @@ const styles = {
       maxHeight: '92vh',
       margin: '0 auto',
       position: 'relative',
-      border: '1px solid #e4dcff',
+      border: '1px solid var(--border)',
       minHeight: '620px',
       fontFamily: 'inherit',
       display: 'flex',
@@ -533,8 +524,8 @@ const styles = {
     detailsMain: {
       display: 'flex',
       flexDirection: 'column',
-      background: '#faf8ff',
-      borderRight: '1px solid #ede8ff',
+      background: 'var(--bg-card)',
+      borderRight: '1px solid var(--border)',
       padding: '20px',
       minHeight: 0,
       overflowY: 'auto',
@@ -567,7 +558,7 @@ const styles = {
     detailsSection: {
       marginBottom: '14px',
       paddingBottom: '14px',
-      borderBottom: '1px solid #f0ebff',
+      borderBottom: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
@@ -578,14 +569,14 @@ const styles = {
       alignItems: 'flex-start',
       gap: '3px',
       padding: '10px 12px',
-      background: '#ffffff',
-      border: '1px solid #ede8ff',
+      background: 'var(--bg-input)',
+      border: '1px solid var(--border)',
       borderRadius: '10px',
       transition: 'border-color 150ms ease',
     },
     detailsLabel: {
       minWidth: 'unset',
-      color: '#9580c8',
+      color: 'var(--text-label)',
       fontWeight: 700,
       fontSize: '10.5px',
       display: 'flex',
@@ -595,7 +586,7 @@ const styles = {
       letterSpacing: '0.6px',
     },
     detailsValue: {
-      color: '#2d225a',
+      color: 'var(--text)',
       fontWeight: 600,
       fontSize: '14px',
       lineHeight: 1.4,
@@ -610,26 +601,26 @@ const styles = {
     detailsActions: {
       margin: '16px 0 0 0',
       paddingTop: '14px',
-      borderTop: '1px solid #ede8ff',
+      borderTop: '1px solid var(--border)',
       display: 'flex',
       gap: '8px',
       flexWrap: 'wrap',
       justifyContent: 'flex-start',
     },
     detailsObservacoes: {
-      background: '#f5f1ff',
+      background: 'var(--bg-input)',
       padding: '12px 14px',
-      color: '#4b3b9a',
+      color: 'var(--text)',
       fontSize: '13.5px',
       marginTop: '4px',
       marginBottom: '8px',
-      border: '1px solid #e4daff',
+      border: '1px solid var(--border)',
       borderRadius: '10px',
       lineHeight: 1.55,
     },
     detailsComments: {
       marginTop: 0,
-      background: '#ffffff',
+      background: 'var(--bg-card)',
       padding: '20px',
       minWidth: 0,
       minHeight: '540px',
@@ -645,7 +636,7 @@ const styles = {
       justifyContent: 'space-between',
       marginBottom: '14px',
       paddingBottom: '12px',
-      borderBottom: '1px solid #ede8ff',
+      borderBottom: '1px solid var(--border)',
     },
     detailsCommentsList: {
       flex: 1,
@@ -657,30 +648,30 @@ const styles = {
     detailsComposer: {
       marginTop: '12px',
       paddingTop: '12px',
-      borderTop: '1px solid #ede8ff',
-      background: '#ffffff',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--bg-card)',
     },
     detailsCommentItem: {
       padding: '12px 14px',
-      background: '#fdfcff',
+      background: 'var(--bg-input)',
       borderRadius: '10px',
       marginBottom: '8px',
-      border: '1px solid #ede8ff',
+      border: '1px solid var(--border)',
     },
     detailsCommentAuthor: {
       margin: 0,
-      color: '#6d5bb5',
+      color: 'var(--text)',
       fontWeight: 600,
       fontSize: '13px',
     },
     detailsCommentText: {
       margin: '6px 0 0',
-      color: '#7a6ea8',
+      color: 'var(--text-muted, var(--text))',
       fontSize: '13.5px',
       lineHeight: 1.55,
     },
     detailsCommentDate: {
-      color: '#9b90c8',
+      color: 'var(--text-label)',
       fontSize: '11px',
       marginTop: '8px',
       display: 'block',
@@ -704,7 +695,7 @@ const styles = {
   container: {
     padding: "20px",
     minHeight: "80vh",
-    background: "#f2efff",
+    background: "var(--bg)",
     width: "100%",
     minWidth: 0,
     boxSizing: "border-box",
@@ -765,16 +756,16 @@ const styles = {
     tableLayout: "auto",
   },
   th: {
-    background: "linear-gradient(160deg, #ffffff 0%, #faf8ff 100%)",
-    color: "#3c2f9f",
+    background: "var(--bg-card)",
+    color: "var(--text)",
     padding: "12px 14px",
     textAlign: "left",
     fontSize: "12.5px",
     fontWeight: "700",
     letterSpacing: "0.3px",
     borderRadius: "14px 14px 0 0",
-    border: "1px solid #ddd6ff",
-    borderBottom: "2px solid #c4b5fd",
+    border: "1px solid var(--border)",
+    borderBottom: "2px solid var(--border)",
     minWidth: "360px",
     boxShadow: "0 -2px 8px rgba(76,29,149,0.05)",
   },
@@ -788,7 +779,7 @@ const styles = {
     width: "360px",
   },
   cardItem: {
-    background: "#ffffff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "16px 14px",
     marginBottom: "8px",
@@ -797,9 +788,9 @@ const styles = {
     cursor: "grab",
     borderWidth: "1px",
     borderStyle: "solid",
-    borderTopColor: "#e8e2ff",
-    borderRightColor: "#e8e2ff",
-    borderBottomColor: "#e8e2ff",
+    borderTopColor: "var(--border)",
+    borderRightColor: "var(--border)",
+    borderBottomColor: "var(--border)",
     borderLeftColor: "#7c5cff",
     borderLeftWidth: "3px",
     position: "relative",
@@ -817,7 +808,7 @@ const styles = {
   cardTitle: {
     fontSize: "15px",
     fontWeight: "600",
-    color: "#3c2f9f",
+    color: "var(--text)",
     marginBottom: "4px",
     lineHeight: "1.3",
     wordBreak: "break-word",
@@ -828,7 +819,7 @@ const styles = {
     textOverflow: "ellipsis",
   },
   infoText: {
-    color: "#5f5a88",
+    color: "var(--text-muted, var(--text))",
     flex: 1,
     wordBreak: "break-word",
     overflowWrap: "break-word",
@@ -867,8 +858,8 @@ const styles = {
     lineHeight: "1.3",
   },
   cardBadge: {
-    background: "#faf9ff",
-    color: "#3c2f9f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     padding: "4px 10px",
     borderRadius: "8px",
     fontSize: "11px",
@@ -888,14 +879,14 @@ const styles = {
     alignItems: "center",
     gap: "8px",
     fontSize: "12px",
-    color: "#5a5a6e",
+    color: "var(--text-muted, var(--text))",
   },
   infoIcon: {
     fontSize: "14px",
     minWidth: "20px",
   },
   infoText: {
-    color: "#4a4a5e",
+    color: "var(--text-muted, var(--text))",
     flex: 1,
   },
   cardFooter: {
@@ -903,7 +894,7 @@ const styles = {
     justifyContent: "space-between",
     alignItems: "center",
     paddingTop: "10px",
-    borderTop: "1px solid #f0ebff",
+    borderTop: "1px solid var(--border)",
     marginTop: "4px",
   },
   vendorInfo: {
@@ -911,7 +902,7 @@ const styles = {
     alignItems: "center",
     gap: "6px",
     fontSize: "11px",
-    color: "#8b8aa2",
+    color: "var(--text-label)",
   },
   footerMeta: {
     display: "flex",
@@ -920,13 +911,13 @@ const styles = {
   },
   updatedInfo: {
     fontSize: "10px",
-    color: "#8f86b8",
+    color: "var(--text-label)",
     lineHeight: 1.2,
   },
   detailButton: {
-    background: "#ede6ff",
-    border: "1px solid #d8ccff",
-    color: "#5b3ad1",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border)",
+    color: "var(--text)",
     fontSize: "11.5px",
     fontWeight: "600",
     cursor: "pointer",
@@ -972,16 +963,16 @@ const styles = {
     zIndex: 4000,
   },
   modal: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "16px",
     padding: "24px",
     width: "100%",
     maxWidth: "540px",
     boxShadow: "0 24px 48px rgba(30,10,80,0.2), 0 4px 12px rgba(0,0,0,0.06)",
-    border: "1px solid #e4dcff",
+    border: "1px solid var(--border)",
   },
   createModal: {
-    background: "#ffffff",
+    background: "var(--bg-card)",
     borderRadius: "20px",
     padding: "0",
     width: "min(940px, calc(100vw - 28px))",
@@ -989,12 +980,12 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     boxShadow: "0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)",
-    border: "1px solid #e4dcff",
+    border: "1px solid var(--border)",
     overflow: "hidden",
   },
   modalTitle: {
     marginBottom: "20px",
-    color: "#4c3393",
+    color: "var(--text)",
     fontSize: "24px",
     fontWeight: "600",
   },
@@ -1075,14 +1066,14 @@ const styles = {
     display: "grid",
     gap: "0",
     padding: "20px 24px",
-    background: "#faf8ff",
+    background: "var(--bg)",
     overflowY: "auto",
     flex: 1,
     minHeight: 0,
   },
   createSection: {
-    background: "#ffffff",
-    border: "1px solid #ede8ff",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
     borderRadius: "14px",
     padding: "16px",
     marginBottom: "12px",
@@ -1097,7 +1088,7 @@ const styles = {
   },
   createSectionTitle: {
     margin: 0,
-    color: "#3c2f9f",
+    color: "var(--text)",
     fontSize: "13px",
     fontWeight: "700",
     display: "flex",
@@ -1108,9 +1099,9 @@ const styles = {
   createSectionChip: {
     fontSize: "10.5px",
     fontWeight: "700",
-    color: "#6d59b4",
-    background: "#ede8ff",
-    border: "1px solid #d8ccff",
+    color: "var(--text-label)",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border)",
     borderRadius: "999px",
     padding: "3px 9px",
     letterSpacing: "0.3px",
@@ -1129,7 +1120,7 @@ const styles = {
     gap: "6px",
   },
   createLabel: {
-    color: "#6853b0",
+    color: "var(--text-label)",
     fontSize: "11px",
     fontWeight: "700",
     letterSpacing: "0.5px",
@@ -1145,11 +1136,11 @@ const styles = {
   },
   createInput: {
     width: "100%",
-    border: "1px solid #ddd6ff",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "10px 13px",
-    background: "#faf8ff",
-    color: "#201b5f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13.5px",
     outline: "none",
     transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
@@ -1158,11 +1149,11 @@ const styles = {
   },
   createTextArea: {
     width: "100%",
-    border: "1px solid #ddd6ff",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "10px 13px",
-    background: "#faf8ff",
-    color: "#201b5f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13.5px",
     minHeight: "100px",
     outline: "none",
@@ -1173,7 +1164,7 @@ const styles = {
   },
   createFooterNote: {
     margin: "2px 0 0",
-    color: "#7d6bb8",
+    color: "var(--text-label)",
     fontSize: "12px",
   },
   formGrid: {
@@ -1182,11 +1173,11 @@ const styles = {
   },
   modalInput: {
     width: "100%",
-    border: "1px solid #ddd6ff",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "10px 12px",
-    background: "#faf8ff",
-    color: "#1e1a61",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13.5px",
     outline: "none",
     transition: "border-color 160ms ease, box-shadow 160ms ease",
@@ -1195,11 +1186,11 @@ const styles = {
   },
   modalTextArea: {
     width: "100%",
-    border: "1px solid #ddd6ff",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "10px 12px",
-    background: "#faf8ff",
-    color: "#1e1a61",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13.5px",
     minHeight: "80px",
     outline: "none",
@@ -1215,9 +1206,9 @@ const styles = {
     marginTop: "20px",
   },
   cancelBtn: {
-    border: "1px solid #ddd6ff",
-    background: "#ffffff",
-    color: "#5b4eaa",
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
     padding: "9px 18px",
     borderRadius: "9px",
     cursor: "pointer",
@@ -1253,9 +1244,9 @@ const styles = {
     gap: "10px",
     marginBottom: "16px",
     padding: "12px 14px",
-    backgroundColor: "#ffffff",
+    backgroundColor: "var(--bg-card)",
     borderRadius: "12px",
-    border: "1px solid #e4dcff",
+    border: "1px solid var(--border)",
     boxShadow: "0 1px 4px rgba(76,29,149,0.06)",
   },
   densityGroup: {
@@ -1294,9 +1285,9 @@ const DroppableColumn = memo(function DroppableColumn({ id, children, minHeight,
       ref={setNodeRef}
       style={{
         minHeight: minHeight || "540px",
-        background: isOver ? "#ede8ff" : "#f5f2ff",
+        background: isOver ? "var(--bg-input)" : "var(--bg-surface2, var(--bg-input))",
         borderRadius: "0 0 14px 14px",
-        border: isOver ? "1px solid #c4b5fd" : "1px solid #ddd6ff",
+        border: isOver ? "1px solid var(--purple-400, #7a4dff)" : "1px solid var(--border)",
         borderTop: "none",
         transition: "background 160ms ease, border-color 160ms ease",
         padding: padding || "10px",
@@ -1401,13 +1392,13 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
     const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
 
     if (diffMinutes < 1) return `Atualizado ${quem}agora`;
-    if (diffMinutes < 60) return `Atualizado ${quem}há ${diffMinutes} min`;
+    if (diffMinutes < 60) return `Atualizado ${quem}a ${diffMinutes} min`;
 
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `Atualizado ${quem}há ${diffHours} h`;
+    if (diffHours < 24) return `Atualizado ${quem}a ${diffHours} h`;
 
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `Atualizado ${quem}há ${diffDays} d`;
+    if (diffDays < 7) return `Atualizado ${quem}a ${diffDays} d`;
 
     return `Atualizado ${quem}em ${date.toLocaleDateString("pt-BR")}`;
   };
@@ -2795,7 +2786,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       const response = await api.put(`/cards/${getCardKey(selectedCard)}`, payload);
       const updatedCard = response.data;
       promoteUpdatedCardToTop(updatedCard);
-      setSelectedCard(updatedCard);
+      setSelectedCard(enrichCardWithUpdater(updatedCard));
     } catch (err) {
       console.error("Erro ao salvar alterações do card", err);
       setError("Erro ao salvar alterações");
@@ -3328,18 +3319,19 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   );
 
   const promoteUpdatedCardToTop = (updatedCard) => {
-    const updatedId = getCardKey(updatedCard);
+    const enriched = enrichCardWithUpdater(updatedCard);
+    const updatedId = getCardKey(enriched);
     setCards((prev) => {
       const previous = prev.find((card) => getCardKey(card) === updatedId);
       if (previous) {
         const prevCol = getCardColumnId(previous);
-        const newCol = getCardColumnId(updatedCard);
+        const newCol = getCardColumnId(enriched);
         if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
           adjustColumnTotal(prevCol, -1);
           adjustColumnTotal(newCol, +1);
         }
       }
-      return [updatedCard, ...prev.filter((card) => getCardKey(card) !== updatedId)];
+      return [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)];
     });
     setPromotedCardId(updatedId);
     setTimeout(() => {
@@ -3516,8 +3508,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   top: "calc(100% + 8px)",
                   right: 0,
                   minWidth: "190px",
-                  background: "#fff",
-                  border: "1px solid #d8cffb",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
                   borderRadius: 10,
                   boxShadow: "0 14px 28px rgba(56, 36, 138, 0.2)",
                   padding: 8,
@@ -4489,18 +4481,15 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 <span style={styles.detailsLabel}><MapPin size={14} /> Coordenadas:</span>
                 <span style={styles.detailsValue}>
                   {(() => {
-                    let lat = '--', lng = '--';
-                    if (selectedCard?.coordenadas) {
-                      if (typeof selectedCard.coordenadas === 'string' && selectedCard.coordenadas.includes(',')) {
-                        const [latStr, lngStr] = selectedCard.coordenadas.split(',').map(s => s.trim());
-                        lat = latStr || '--';
-                        lng = lngStr || '--';
-                      } else if (typeof selectedCard.coordenadas === 'object' && selectedCard.coordenadas !== null) {
-                        lat = selectedCard.coordenadas.lat || selectedCard.coordenadas[0] || '--';
-                        lng = selectedCard.coordenadas.lng || selectedCard.coordenadas[1] || '--';
-                      }
+                    const c = selectedCard?.coordenadas;
+                    if (!c) return '--';
+                    if (typeof c === 'string' && c.includes(',')) return c;
+                    if (typeof c === 'object') {
+                      const lat = c.lat || '--';
+                      const lng = c.lng || '--';
+                      return `${lat}, ${lng}`;
                     }
-                    return `${lat}, ${lng}`;
+                    return '--';
                   })()}
                 </span>
               </div>
@@ -4714,7 +4703,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           </button>
                         </div>
                       </div>
-                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-line' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-wrap' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
                           const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
@@ -4745,8 +4734,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                 type="button"
                                 onClick={() => handleToggleReaction(comment.id, emoji)}
                                 style={{
-                                  border: reactedByMe ? '1px solid #8f7cff' : '1px solid #e1d8ff',
-                                  background: reactedByMe ? '#efe9ff' : '#fff',
+                                  border: reactedByMe ? '1px solid #8f7cff' : '1px solid var(--border)',
+                                  background: reactedByMe ? '#efe9ff' : 'var(--bg-card)',
                                   color: '#4b3b9a',
                                   borderRadius: 999,
                                   fontSize: 12,
@@ -4765,8 +4754,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                     bottom: 'calc(100% + 8px)',
                                     left: '50%',
                                     transform: 'translateX(-50%)',
-                                    background: '#ffffff',
-                                    border: '1px solid #e3d9ff',
+                                    background: 'var(--bg-card)',
+                                    border: '1px solid var(--border)',
                                     boxShadow: '0 8px 22px rgba(75, 59, 154, 0.2)',
                                     borderRadius: 10,
                                     padding: '7px 9px',
@@ -4803,9 +4792,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           type="button"
                           onClick={() => setActiveReplyCommentId((prev) => (String(prev) === String(comment.id) ? null : comment.id))}
                           style={{
-                            border: '1px solid #d8cdfd',
-                            background: '#fff',
-                            color: '#4b3b9a',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
+                            color: 'var(--text)',
                             borderRadius: 999,
                             fontSize: 12,
                             fontWeight: 700,
@@ -4830,9 +4819,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               const isEditingThisReply = editingReplyKey === replyEditKey;
 
                               return (
-                                <div key={reply.id} style={{ background: '#faf8ff', border: '1px solid #ece6ff', borderRadius: 10, padding: '8px 10px' }}>
+                                <div key={reply.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                    <div style={{ fontSize: 12, color: '#5c4ca8', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
                                     <div style={{ display: 'flex', gap: 8 }}>
                                       <button
                                         type="button"
@@ -4862,9 +4851,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                         placeholder="Edite a resposta..."
                                         style={{
                                           flex: 1,
-                                          border: '1px solid #d8cdfd',
-                                          background: '#fff',
-                                          color: '#3f3292',
+                                          border: '1px solid var(--border)',
+                                          background: 'var(--bg-input)',
+                                          color: 'var(--text)',
                                           borderRadius: 8,
                                           fontSize: 12,
                                           padding: '7px 9px',
@@ -4890,9 +4879,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                         type="button"
                                         onClick={handleCancelEditReply}
                                         style={{
-                                          border: '1px solid #d8cdfd',
-                                          background: '#fff',
-                                          color: '#4b3b9a',
+                                          border: '1px solid var(--border)',
+                                          background: 'var(--bg-card)',
+                                          color: 'var(--text)',
                                           borderRadius: 8,
                                           fontSize: 12,
                                           fontWeight: 700,
@@ -4904,7 +4893,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                       </button>
                                     </div>
                                   ) : (
-                                    <div style={{ fontSize: 13, color: '#4f3dab', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
                                   )}
 
                                   <small style={{ color: '#8d83b3', fontSize: 10 }}>
@@ -4944,9 +4933,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               placeholder="Escreva uma resposta... use @ para mencionar"
                               style={{
                                 width: '100%',
-                                border: '1px solid #d8cdfd',
-                                background: '#fff',
-                                color: '#3f3292',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-input)',
+                                color: 'var(--text)',
                                 borderRadius: 8,
                                 fontSize: 12,
                                 padding: '8px 10px',
@@ -5013,7 +5002,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       {Array.isArray(comment.attachments) && comment.attachments.length > 0 ? (
                         <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           {comment.attachments.map((att, idx) => (
-                            <div key={idx} style={{ minWidth: 120, maxWidth: 220, background: '#f8f5ff', border: '1px solid #ded2ff', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px #f3f0ff' }}>
+                            <div key={idx} style={{ minWidth: 120, maxWidth: 220, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                               {att.type && att.type.startsWith('image/') ? (
                                 <button
                                   type="button"
@@ -5127,9 +5116,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                     type="button"
                     onClick={() => setIsCommentComposerOpen(true)}
                     style={{
-                      border: "1px solid #d8cdfd",
-                      background: "#ffffff",
-                      color: "#4b3b9a",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-card)",
+                      color: "var(--text)",
                       borderRadius: "8px",
                       padding: "8px 12px",
                       fontSize: "12px",
@@ -5360,7 +5349,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 ✕
               </button>
             </div>
-            <div style={{ padding: "20px", overflowY: "auto", flex: 1, background: "#faf8ff" }}>
+            <div style={{ padding: "20px", overflowY: "auto", flex: 1, background: "var(--bg)" }}>
             
             {/* Componente CardModal reutilizável para edição */}
             <CardModal 
@@ -5375,7 +5364,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   }
                   delete payload.vendedorId;
                   const response = await api.put(`/cards/${getCardKey(editingCard)}`, payload);
-                  const savedCard = response.data;
+                  const savedCard = enrichCardWithUpdater(response.data);
 
                   // Detecta mudança de coluna para manter columnTotals consistente.
                   const previousColId = getCardColumnId(editingCard);
@@ -5436,17 +5425,17 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
             style={{
               width: "100%",
               maxWidth: 460,
-              background: "#fff",
+              background: "var(--bg-card)",
               borderRadius: 16,
               boxShadow: "0 20px 50px rgba(45, 18, 87, 0.35)",
               padding: 24,
-              border: "1px solid #e2d9ff",
+              border: "1px solid var(--border)",
             }}
           >
-            <h2 style={{ margin: 0, color: "#2f1e70", fontSize: 20 }}>
+            <h2 style={{ margin: 0, color: "var(--text)", fontSize: 20 }}>
               Transferir para {BOARD_LABELS[transferDialog.toBoard] || transferDialog.toBoard}
             </h2>
-            <p style={{ margin: "8px 0 16px 0", color: "#5f4e8f", fontSize: 14 }}>
+            <p style={{ margin: "8px 0 16px 0", color: "var(--text-label)", fontSize: 14 }}>
               Card atual:{" "}
               <strong style={{ color: "#2f1e70" }}>
                 {transferDialog.card?.titulo || transferDialog.card?.cliente || `#${getCardKey(transferDialog.card)}`}
@@ -5477,10 +5466,10 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   style={{
                     padding: "10px 12px",
                     borderRadius: 10,
-                    border: "1px solid #d7cafc",
-                    background: "#faf7ff",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-input)",
                     fontSize: 14,
-                    color: "#2f2758",
+                    color: "var(--text)",
                   }}
                 >
                   {transferDialog.columns.map((col) => (

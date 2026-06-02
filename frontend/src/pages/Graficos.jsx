@@ -123,9 +123,6 @@ export default function Graficos() {
 
   const { total, concluido, restante, ratio, slaViolations, slaWarnings, columnBreakdown, roleStats } = data;
 
-  // DEBUG — remover após confirmar o nome da coluna B2B
-  console.log("[Graficos] columnBreakdown:", columnBreakdown.map((c) => `"${c.nome}" (${c.count})`).join(", "));
-
   // Cards que voltaram para B2B (colunas com "B2B" no nome)
   const b2bCount = columnBreakdown
     .filter((c) => c.nome.toUpperCase().includes("B2B"))
@@ -238,14 +235,14 @@ export default function Graficos() {
 // ===========================================================================
 const pg = {
   padding: "22px 24px",
-  background: "linear-gradient(160deg, #f0ecff 0%, #eaf0ff 100%)",
+  background: "var(--bg)",
   minHeight: "94vh",
-  color: "#1a1535",
+  color: "var(--text)",
 };
 
 const card = {
-  background: "#fff",
-  border: "1px solid #ddd5fc",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: 16,
   padding: "18px 20px",
   boxShadow: "0 4px 20px rgba(90,60,180,0.08)",
@@ -264,7 +261,7 @@ const selectSt = {
   padding: "9px 14px",
   border: "1.5px solid #d0c4f8",
   borderRadius: 10,
-  background: "rgba(255,255,255,0.9)",
+  background: "var(--bg-card)",
   color: "#2f2758",
   fontWeight: 700,
   fontSize: 13,

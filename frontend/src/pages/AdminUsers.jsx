@@ -46,7 +46,8 @@ const styles = {
   container: {
     minHeight: "100%",
     padding: "24px",
-    background: "radial-gradient(circle at 10% 10%, #f4edff 0%, #efe8ff 35%, #f8f5ff 100%)",
+    background: "var(--bg)",
+    color: "var(--text)",
   },
   hero: {
     borderRadius: "18px",
@@ -76,8 +77,8 @@ const styles = {
   metricValue: { fontSize: "22px", fontWeight: 700, marginTop: "4px" },
   panel: {
     borderRadius: "16px",
-    border: "1px solid #e2d9ff",
-    background: "#ffffff",
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
     boxShadow: "0 8px 24px rgba(59, 18, 107, 0.08)",
     overflow: "hidden",
   },
@@ -87,18 +88,19 @@ const styles = {
     alignItems: "center",
     flexWrap: "wrap",
     padding: "14px",
-    background: "linear-gradient(180deg, #fcfbff 0%, #f8f5ff 100%)",
-    borderBottom: "1px solid #eee8ff",
+    background: "var(--bg-card)",
+    borderBottom: "1px solid var(--border)",
   },
   searchInput: {
     width: "340px",
     maxWidth: "100%",
     padding: "10px 12px",
     borderRadius: "10px",
-    border: "1px solid #d7cafc",
+    border: "1px solid var(--border)",
     outline: "none",
     fontSize: "14px",
-    background: "#fff",
+    background: "var(--bg-input)",
+    color: "var(--text)",
   },
   pill: {
     borderRadius: "999px",
@@ -115,17 +117,17 @@ const styles = {
     textAlign: "left",
     fontSize: "12px",
     fontWeight: 700,
-    color: "#5f4e8f",
-    background: "#f8f5ff",
-    borderBottom: "1px solid #ece4ff",
+    color: "var(--text-label)",
+    background: "var(--bg-surface2, var(--bg-input))",
+    borderBottom: "1px solid var(--border)",
     userSelect: "none",
     whiteSpace: "nowrap",
   },
   td: {
     padding: "12px",
-    borderBottom: "1px solid #f1ecff",
+    borderBottom: "1px solid var(--border)",
     fontSize: "14px",
-    color: "#2f2758",
+    color: "var(--text)",
     verticalAlign: "middle",
   },
   nameCell: { display: "flex", alignItems: "center", gap: "10px" },
@@ -350,6 +352,7 @@ export default function AdminUsers() {
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
+  const [showPasswordIds, setShowPasswordIds] = useState(new Set()); // IDs com senha visível
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -357,6 +360,7 @@ export default function AdminUsers() {
     acesso_kanban_delivery: false,
     acesso_kanban_comercial: false,
     acesso_kanban_bko: false,
+    nova_senha: "",
   });
 
   const totalFiltered = total;
@@ -517,6 +521,7 @@ export default function AdminUsers() {
       acesso_kanban_delivery: Boolean(user.acesso_kanban_delivery),
       acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
       acesso_kanban_bko: Boolean(user.acesso_kanban_bko),
+      nova_senha: "",
     });
   };
 
@@ -530,13 +535,28 @@ export default function AdminUsers() {
       acesso_kanban_delivery: false,
       acesso_kanban_comercial: false,
       acesso_kanban_bko: false,
+      nova_senha: "",
+    });
+  };
+
+  const isBcryptHash = (s) => typeof s === "string" && s.startsWith("$2b$");
+
+  const toggleShowPassword = (id) => {
+    setShowPasswordIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   };
 
   // Envia as alterações do formulário para a API e recarrega a tabela
   const saveEdit = async (id) => {
     try {
-      await api.put(`/users/admin/${id}`, form);
+      const payload = { ...form };
+      if (!payload.nova_senha || !payload.nova_senha.trim()) {
+        delete payload.nova_senha; // não envia se vazio
+      }
+      await api.put(`/users/admin/${id}`, payload);
       await loadUsers();
       cancelEdit();
     } catch (err) {
@@ -744,6 +764,7 @@ export default function AdminUsers() {
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("email")}>
                 Email{sortIndicator("email")}
               </th>
+              <th style={styles.th}>Senha</th>
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("perfil")}>
                 Perfil{sortIndicator("perfil")}
               </th>
@@ -799,6 +820,44 @@ export default function AdminUsers() {
                       <span style={{ color: "#5d5890", fontWeight: 600 }}>{user.email}</span>
                     )}
                   </td>
+
+                  {/* Coluna de senha */}
+                  <td style={styles.td}>
+                    {editing ? (
+                      <input
+                        type="text"
+                        value={form.nova_senha}
+                        onChange={(e) => setForm((p) => ({ ...p, nova_senha: e.target.value }))}
+                        placeholder="Nova senha (mín. 6 chars)"
+                        style={{ ...styles.input, minWidth: 160 }}
+                        autoComplete="new-password"
+                      />
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {isBcryptHash(user.senha) ? (
+                          <span style={{ color: "#7a73a1", fontSize: 13 }}>••••••••</span>
+                        ) : (
+                          <span style={{ fontFamily: "monospace", fontSize: 13, color: "#2f2758" }}>
+                            {showPasswordIds.has(user.id) ? (user.senha || "—") : "••••••••"}
+                          </span>
+                        )}
+                        {!isBcryptHash(user.senha) && user.senha && (
+                          <button
+                            type="button"
+                            onClick={() => toggleShowPassword(user.id)}
+                            title={showPasswordIds.has(user.id) ? "Ocultar" : "Mostrar"}
+                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#7264a8", padding: 0 }}
+                          >
+                            {showPasswordIds.has(user.id) ? "🙈" : "👁"}
+                          </button>
+                        )}
+                        {isBcryptHash(user.senha) && (
+                          <span style={{ fontSize: 10, color: "#9b8fd8", fontStyle: "italic" }}>hash</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+
                   <td style={styles.td}>
                     {editing ? (
                       <select

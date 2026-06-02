@@ -407,6 +407,26 @@ const styles = `
   }
   .empty-state-icon { font-size: 36px; margin-bottom: 12px; }
   .empty-state-text { font-size: 15px; font-style: italic; }
+
+  /* ── Tema escuro ── */
+  html[data-theme="dark"] .mural-root {
+    --ink: #ede8ff;
+    --ink-soft: #c4b8f5;
+    --ink-faint: #7b6faa;
+    --bg: #0f0b1a;
+    --surface: #17142b;
+    --surface2: #1e1a3a;
+    --border: rgba(120, 100, 200, 0.3);
+    --shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+    --shadow-hover: 0 8px 40px rgba(0, 0, 0, 0.5);
+  }
+  html[data-theme="dark"] .post-actions {
+    background: rgba(30, 26, 58, 0.7) !important;
+  }
+  html[data-theme="dark"] .compose-textarea,
+  html[data-theme="dark"] .modal-textarea {
+    color: #ede8ff !important;
+  }
 `;
 
 export default function MuralPage() {

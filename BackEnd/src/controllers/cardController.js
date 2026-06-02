@@ -524,6 +524,12 @@ exports.updateCard = async (req, res) => {
     // Detecta mudanças relevantes para comentário do sistema
     let systemComment = null;
     const userName = await resolveAuthorName(req);
+    // Busca o nome diretamente no banco como fonte definitiva (bypass de quirks do JWT)
+    const [_userRow] = await sequelize.query(
+      "SELECT nome, email FROM users WHERE id = :id LIMIT 1",
+      { replacements: { id: Number(req.userId) || 0 }, type: QueryTypes.SELECT }
+    );
+    const atualizadoPorNome = _userRow?.nome || _userRow?.email || userName || null;
     // Mudança de coluna
     if (existing.coluna_id !== payload.coluna_id) {
       const ColumnModel = require("../models/Column");
@@ -553,14 +559,15 @@ exports.updateCard = async (req, res) => {
     // os endpoints REST atômicos /cards/:id/comments. Isso evita race condition
     // (last-write-wins) que estava perdendo comentários adicionados em paralelo.
     delete payload.comments;
+    // Remove do payload do ORM para não sobrescrever com null antes do nosso SQL
+    delete payload.atualizado_por_nome;
 
     await Card.update(payload, { where: { id: targetId } });
 
-    // Salva o nome do atualizador via SQL direto (garante independência do model em memória)
-    console.log(`[ATUALIZADO_POR] card=${targetId} nome="${userName}"`);
+    // Salva o nome do atualizador via SQL direto
     await sequelize.query(
       `UPDATE cards SET atualizado_por_nome = :nome WHERE id = :id`,
-      { replacements: { nome: userName, id: Number(targetId) }, type: QueryTypes.UPDATE }
+      { replacements: { nome: atualizadoPorNome, id: Number(targetId) }, type: QueryTypes.UPDATE }
     );
 
     // Se houver comentário do sistema, faz append atômico (SELECT FOR UPDATE).
@@ -577,8 +584,7 @@ exports.updateCard = async (req, res) => {
     });
 
     const normalized = normalizeCard(card);
-    // Injeta diretamente para não depender do model em memória
-    normalized.atualizado_por_nome = userName;
+    normalized.atualizado_por_nome = atualizadoPorNome;
     res.json(normalized);
   } catch (err) {
     // Log detalhado para depuração

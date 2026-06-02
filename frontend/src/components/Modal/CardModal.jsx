@@ -11,8 +11,8 @@ const styles = {
     justifyContent: "flex-start",
   },
   sectionCard: {
-    background: "#f7f5ff",
-    border: "1px solid #ddd4ff",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
     borderRadius: "14px",
     padding: "14px",
     boxShadow: "0 3px 12px rgba(73, 42, 173, 0.08)",
@@ -26,18 +26,18 @@ const styles = {
   sectionTitle: {
     fontSize: "14px",
     fontWeight: "700",
-    color: "#3e2b9d",
+    color: "var(--text)",
     margin: 0,
     letterSpacing: "0.2px",
   },
   sectionCaption: {
     fontSize: "11px",
     fontWeight: "700",
-    color: "#6e5fb0",
-    background: "#ebe5ff",
+    color: "var(--text-label)",
+    background: "var(--bg-input)",
     borderRadius: "999px",
     padding: "3px 8px",
-    border: "1px solid #d7cbff",
+    border: "1px solid var(--border)",
   },
   formGroup: {
     display: "flex",
@@ -47,17 +47,17 @@ const styles = {
   label: {
     fontSize: "11px",
     fontWeight: "600",
-    color: "#5f4ca8",
+    color: "var(--text-label)",
     letterSpacing: "0.4px",
     textTransform: "uppercase",
   },
   input: {
     width: "100%",
-    border: "1px solid #d9d0f9",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "11px 12px",
-    background: "#ffffff",
-    color: "#201b5f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13px",
     outline: "none",
     transition: "all 0.2s ease",
@@ -66,11 +66,11 @@ const styles = {
   },
   textarea: {
     width: "100%",
-    border: "1px solid #d9d0f9",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
     padding: "11px 12px",
-    background: "#ffffff",
-    color: "#201b5f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     fontSize: "13px",
     minHeight: "92px",
     outline: "none",
@@ -93,12 +93,12 @@ const styles = {
     gap: "12px",
     marginTop: "4px",
     paddingTop: "10px",
-    borderTop: "1px solid #e6ddff",
+    borderTop: "1px solid var(--border)",
   },
   cancelBtn: {
-    border: "1px solid #d9d0f9",
-    background: "#ffffff",
-    color: "#4f4199",
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
     padding: "10px 16px",
     borderRadius: "10px",
     cursor: "pointer",
@@ -322,7 +322,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
                 placeholder="Longitude (opcional)"
               />
             </div>
-            <span style={{ color: "#7a73a1", fontSize: 12 }}>
+            <span style={{ color: "var(--text-label)", fontSize: 12 }}>
               Preencha endereço, coordenadas ou ambos. Nenhum campo é obrigatório.
             </span>
           </div>
@@ -392,7 +392,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
           <div style={styles.formGroup}>
             <label style={styles.label}>Vendedor Responsável</label>
             <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#4f4199" }}>Selecionado:</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-label)" }}>Selecionado:</span>
               <span style={{ ...getProfileBadgeStyle(selectedVendor?.perfil), borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
                 {selectedVendor?.perfil ? `${selectedVendor.perfil} - ` : ""}
                 {selectedVendor?.label || "Manter vendedor atual"}
@@ -426,41 +426,6 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
         </div>
       </div>
 
-      {/* Seção de Localização */}
-      <div style={styles.sectionCard}>
-        <div style={styles.sectionHeader}>
-          <h3 style={styles.sectionTitle}>Localização</h3>
-          <span style={styles.sectionCaption}>Geo</span>
-        </div>
-        <div style={styles.row}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Latitude</label>
-            <input
-              style={styles.input}
-              value={formData.coordenadas.lat}
-              onChange={(e) => handleChange("lat", e.target.value)}
-              onFocus={handleFieldFocus}
-              onBlur={handleFieldBlur}
-              data-error="false"
-              placeholder="-23.5505"
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Longitude</label>
-            <input
-              style={styles.input}
-              value={formData.coordenadas.lng}
-              onChange={(e) => handleChange("lng", e.target.value)}
-              onFocus={handleFieldFocus}
-              onBlur={handleFieldBlur}
-              data-error="false"
-              placeholder="-46.6333"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Seção de SLA e Tempo Contratual (Prazo removido) */}
       <div style={styles.sectionCard}>
         <div style={styles.sectionHeader}>
@@ -480,7 +445,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
               data-error="false"
               placeholder="0"
             />
-            <span style={{ fontSize: '11px', color: '#6e5fb0', marginTop: '2px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-label)', marginTop: '2px' }}>
               {formData.sla ? `${formData.sla} horas` : 'Informe o SLA em horas'}
             </span>
           </div>
@@ -524,8 +489,8 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
         <button
           style={styles.cancelBtn}
           onClick={onClose}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f3ff"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#ffffff"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-input)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg-card)"; }}
         >
           Cancelar
         </button>

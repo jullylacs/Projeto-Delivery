@@ -19,10 +19,20 @@ const normalizeAvatar = (value) => {
 
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
 export default function Header({ onToggleSidebar, isSidebarOpen }) {
-  const navigate = useNavigate(); // Hook para redirecionamento de rotas
+  const navigate = useNavigate();
   const location = useLocation();
-  const [showMenu, setShowMenu] = useState(false); // Controla visibilidade do menu dropdown
+  const [showMenu, setShowMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.dataset.theme === "dark"
+  );
+
+  const toggleTheme = () => {
+    const next = isDark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem("theme", next);
+    setIsDark(!isDark);
+  };
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState("");
@@ -217,7 +227,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
           width: "400px",
           maxWidth: "100vw",
           height: "100vh",
-          background: "#fff",
+          background: "var(--bg-card)",
           boxShadow: "-4px 0 28px rgba(76,29,149,0.18)",
           zIndex: 3100,
           display: "flex",
@@ -231,8 +241,8 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
         <div
           style={{
             padding: "16px 16px 12px",
-            borderBottom: "1px solid #efe8ff",
-            background: "#f8f5ff",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--bg-input)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -316,8 +326,8 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
               <div
                 key={item.id}
                 style={{
-                  background: item.readAt ? "#fff" : "#f6f1ff",
-                  borderBottom: "1px solid #f0ebff",
+                  background: item.readAt ? "var(--bg-card)" : "var(--bg-surface2, var(--bg-input))",
+                  borderBottom: "1px solid var(--border)",
                   padding: "12px 16px",
                   opacity: item.readAt ? 0.82 : 1,
                 }}
@@ -456,6 +466,27 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
 
       {/* Área direita contendo notificações e menu do usuário */}
       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+
+        {/* Toggle tema claro/escuro */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+          style={{
+            width: 36, height: 36, borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "rgba(255,255,255,0.1)",
+            color: "#fff", cursor: "pointer",
+            fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "background 0.2s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+        >
+          {isDark ? "☀️" : "🌙"}
+        </button>
+
         {/* Ícone de Notificação */}
         <div
           onClick={() => {
@@ -571,9 +602,9 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
             <div
               style={{
                 position: "absolute",
-                top: "50px", // Abaixo do botão
+                top: "50px",
                 right: "0",
-                background: "#fff",
+                background: "var(--bg-card)",
                 borderRadius: "10px",
                 boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
                 minWidth: "200px",
