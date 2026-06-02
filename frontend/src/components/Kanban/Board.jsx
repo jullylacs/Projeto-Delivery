@@ -1661,6 +1661,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const [cards, setCards] = useState([]);           // Lista de todos os cards
   const [selectedCard, setSelectedCard] = useState(null); // Card selecionado para detalhes
   const [statusEdit, setStatusEdit] = useState("");    // Coluna temporária para edição (id em string)
+  const [successToast, setSuccessToast] = useState("");
   // Remover o estado global do comentário para evitar re-renderizações pesadas
   // O estado do texto do comentário será controlado apenas dentro do CommentInput
   const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false);
@@ -2769,7 +2770,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     const explicitColumnId = updates?.colunaId ?? updates?.coluna_id;
 
     if (explicitColumnId !== undefined && explicitColumnId !== null && String(explicitColumnId).trim() !== "") {
-      payload.colunaId = Number(explicitColumnId);
+      payload.coluna_id = Number(explicitColumnId);
+      delete payload.colunaId; // garante snake_case para o backend sobrescrever corretamente
     } else {
       const requestedColumnName = String(updates?.status || updates?.coluna || "").trim();
       if (requestedColumnName) {
@@ -2849,7 +2851,11 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   // Altera status do card
   const handleChangeStatus = async (newColumnId) => {
     if (!selectedCard) return;
-    await handleSaveCardChanges({ colunaId: Number(newColumnId) });
+    const col = orderedColumnDefs.find(c => String(c.id) === String(newColumnId));
+    await handleSaveCardChanges({ coluna_id: Number(newColumnId) });
+    const label = col?.nome || "novo status";
+    setSuccessToast(`✓ Status atualizado para "${label}"`);
+    setTimeout(() => setSuccessToast(""), 3000);
   };
 
   // Cria novo card com validação de campos obrigatórios
@@ -4069,6 +4075,30 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           </div>
         )}
       </DndContext>
+
+      {/* Toast de sucesso */}
+      {successToast && (
+        <div style={{
+          position: "fixed",
+          bottom: 28,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 9999,
+          background: "linear-gradient(135deg, #1f7a3f, #2db05a)",
+          color: "#fff",
+          padding: "12px 22px",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          pointerEvents: "none",
+          animation: "slideUpFade 0.25s ease",
+          whiteSpace: "nowrap",
+        }}>
+          {successToast}
+        </div>
+      )}
+      <style>{`@keyframes slideUpFade { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
 
       {/* Modal de criação de card */}
       {isModalOpen && (
