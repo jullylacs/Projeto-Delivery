@@ -262,6 +262,30 @@ html[data-theme="dark"] .ramal-row:hover             { background-color: #1e1a3a
 html[data-theme="dark"] .ramal-btn-edit:hover        { background: #2d2850 !important; }
 html[data-theme="dark"] .ramal-btn-del:hover         { background: #3a1a28 !important; }
 
+/* Comentário fixado — tema claro */
+.comment-pinned {
+  background: linear-gradient(90deg, #fefae8 0%, #fff8d6 100%) !important;
+  border-left: 4px solid #f59e0b !important;
+}
+
+/* Comentário fixado — tema escuro */
+html[data-theme="dark"] .comment-pinned {
+  background: linear-gradient(90deg, #2d2410 0%, #332a12 100%) !important;
+  border-left: 4px solid #d97706 !important;
+}
+
+/* Badge "Fixado" */
+.badge-pinned {
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+html[data-theme="dark"] .badge-pinned {
+  color: #fbbf24;
+  background: #3d2e0a;
+  border: 1px solid #78400a;
+}
+
 /* Ramais — hover states */
 .ramal-row:hover {
   background-color: #faf7ff !important;

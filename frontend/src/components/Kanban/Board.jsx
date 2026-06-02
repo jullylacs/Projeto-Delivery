@@ -4653,16 +4653,18 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                     const isSystem = comment.isSystem;
                     const isPinned = !!comment.pinned;
                     return (
-                    <div key={comment.id} style={{
-                      ...styles.detailsCommentItem,
-                      background: isPinned
-                        ? 'linear-gradient(90deg, #fefae8 0%, #fff8d6 100%)'
-                        : isSystem ? 'linear-gradient(90deg, var(--bg-input) 80%, var(--bg-card) 100%)' : 'var(--bg-input)',
-                      borderLeft: isPinned
-                        ? '4px solid #f59e0b'
-                        : isSystem ? '4px solid #7c6fb7' : undefined,
-                      opacity: isSystem ? 0.92 : 1,
-                    }}>
+                    <div key={comment.id}
+                      className={isPinned ? 'comment-pinned' : undefined}
+                      style={{
+                        ...styles.detailsCommentItem,
+                        background: isPinned
+                          ? undefined
+                          : isSystem ? 'linear-gradient(90deg, var(--bg-input) 80%, var(--bg-card) 100%)' : 'var(--bg-input)',
+                        borderLeft: isPinned
+                          ? undefined
+                          : isSystem ? '4px solid #7c6fb7' : undefined,
+                        opacity: isSystem ? 0.92 : 1,
+                      }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {comment.authorAvatar ? (
@@ -4706,7 +4708,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                             margin: 0,
                           }}>{isSystem ? 'Sistema' : (comment.author || 'Usuário')}:</p>
                           {isPinned && (
-                            <span style={{ fontSize: 10, fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 999, padding: '1px 7px', letterSpacing: '0.3px' }}>
+                            <span className="badge-pinned" style={{ fontSize: 10, fontWeight: 800, borderRadius: 999, padding: '1px 7px', letterSpacing: '0.3px' }}>
                               📌 Fixado
                             </span>
                           )}
