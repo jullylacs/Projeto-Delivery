@@ -72,6 +72,8 @@ const roleRoutes = require("./routes/roleRoutes");
 const scheduleRoutes = require("./routes/scheduleRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
 const muralRoutes = require("./routes/muralRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const agendaEventoRoutes = require("./routes/agendaEventoRoutes");
 const auth = require("./controllers/middleware/auth");
 
 // 🔹 Rotas versionadas da aplicação
@@ -100,6 +102,8 @@ app.use(`${apiBasePath}/roles`, roleRoutes);
 app.use(`${apiBasePath}/schedules`, scheduleRoutes);
 app.use(`${apiBasePath}/technicians`, technicianRoutes);
 app.use(`${apiBasePath}/mural`, muralRoutes);
+app.use(`${apiBasePath}/dashboard`, dashboardRoutes);
+app.use(`${apiBasePath}/agenda-eventos`, agendaEventoRoutes);
 // Ramais
 const ramalRoutes = require("./routes/ramalRoutes");
 app.use(`${apiBasePath}/ramais`, ramalRoutes);
@@ -163,6 +167,7 @@ if (legacyRoutesEnabled) {
   app.use("/notifications", notificationRoutes);
   app.use("/schedules", scheduleRoutes);
   app.use("/technicians", technicianRoutes);
+  app.use("/agenda-eventos", agendaEventoRoutes);
 }
 
 app.use((err, req, res, next) => {

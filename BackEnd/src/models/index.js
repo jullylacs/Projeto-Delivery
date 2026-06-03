@@ -10,6 +10,7 @@ const Technician = require("./Technician");
 const Notification = require("./Notification");
 const RefreshToken = require("./RefreshToken");
 const Role = require("./Role");
+const AgendaEvento = require("./AgendaEvento");
 
 // ─────────────────────────────────────────────
 // 🔗 Associações (equivalente aos ref: do Mongoose)
@@ -50,7 +51,11 @@ Card.hasMany(Notification,   { foreignKey: "card_id", as: "notifications" });
 RefreshToken.belongsTo(User, { foreignKey: "usuario_id", as: "user" });
 User.hasMany(RefreshToken,   { foreignKey: "usuario_id", as: "refreshTokens" });
 
+// AgendaEvento pertence a um User
+AgendaEvento.belongsTo(User, { foreignKey: "usuario_id", as: "usuario" });
+User.hasMany(AgendaEvento,   { foreignKey: "usuario_id", as: "agendaEventos" });
+
 // ─────────────────────────────────────────────
 // 📤 Exporta tudo
 // ─────────────────────────────────────────────
-module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken, Role };
+module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken, Role, AgendaEvento };

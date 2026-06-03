@@ -69,7 +69,7 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 // Detecta se a senha já é um hash bcrypt (evita re-hash acidental)
 const isBcryptHash = (value) => typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
 // Perfis válidos aceitos pelo sistema
-const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"];
+const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin", "bko", "noc"];
 // Aceita avatar como data URL de imagem ou URL http/https
 const sanitizeAvatar = (value) => {
   if (typeof value !== "string") return undefined;
@@ -117,6 +117,9 @@ exports.register = async (req, res) => {
       aprovado: false,
       aprovado_por: null,
       aprovado_em: null,
+      acesso_kanban_delivery: false,
+      acesso_kanban_comercial: false,
+      acesso_kanban_bko: false,
     };
 
     const user = await User.create(userData);
@@ -343,7 +346,7 @@ exports.updateUserProfile = async (req, res) => {
       return res.status(403).json({ message: "Acesso negado" });
     }
 
-    const { nome, email, telefone, departamento, avatar } = req.body;
+    const { nome, email, telefone, departamento, avatar, senhaAtual, novaSenha } = req.body;
 
     if (email && !isValidEmail(email)) {
       return res.status(400).json({ message: "Email inválido" });
@@ -362,8 +365,26 @@ exports.updateUserProfile = async (req, res) => {
       avatar: safeAvatar
     };
 
+    // Troca de senha: verifica senha atual antes de aceitar a nova
+    if (novaSenha) {
+      if (!senhaAtual) {
+        return res.status(400).json({ message: "Informe a senha atual para alterá-la." });
+      }
+      if (novaSenha.length < 6) {
+        return res.status(400).json({ message: "A nova senha deve ter no mínimo 6 caracteres." });
+      }
+      const userComSenha = await User.findByPk(userId);
+      const senhaValida = isBcryptHash(userComSenha.senha)
+        ? await bcrypt.compare(senhaAtual, userComSenha.senha)
+        : senhaAtual === userComSenha.senha;
+      if (!senhaValida) {
+        return res.status(400).json({ message: "Senha atual incorreta." });
+      }
+      updateData.senha = await bcrypt.hash(novaSenha, 12);
+    }
+
     // Remove campos undefined antes de enviar ao banco (Sequelize ignora undefined com update)
-    Object.keys(updateData).forEach(key => 
+    Object.keys(updateData).forEach(key =>
       updateData[key] === undefined && delete updateData[key]
     );
 
@@ -415,10 +436,10 @@ exports.getAll = async (req, res) => {
 
     const result = await User.findAndCountAll({
       where,
-      attributes: { exclude: ["senha"] },
       order: [[sortBy, sortOrder]],
       offset,
       limit,
+      attributes: { exclude: ["senha"] },
     });
 
     const total = result.count;
@@ -447,7 +468,19 @@ exports.getAll = async (req, res) => {
 exports.adminUpdateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { nome, email, perfil, telefone, departamento, avatar, aprovado } = req.body;
+    const {
+      nome,
+      email,
+      perfil,
+      telefone,
+      departamento,
+      avatar,
+      aprovado,
+      acesso_kanban_delivery,
+      acesso_kanban_comercial,
+      acesso_kanban_bko,
+      nova_senha,
+    } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "ID inválido" });
@@ -475,6 +508,27 @@ exports.adminUpdateUser = async (req, res) => {
       avatar: safeAvatar,
     };
 
+    if (acesso_kanban_delivery !== undefined) {
+      if (typeof acesso_kanban_delivery !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_delivery' inválido" });
+      }
+      updateData.acesso_kanban_delivery = acesso_kanban_delivery;
+    }
+
+    if (acesso_kanban_comercial !== undefined) {
+      if (typeof acesso_kanban_comercial !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_comercial' inválido" });
+      }
+      updateData.acesso_kanban_comercial = acesso_kanban_comercial;
+    }
+
+    if (acesso_kanban_bko !== undefined) {
+      if (typeof acesso_kanban_bko !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_bko' inválido" });
+      }
+      updateData.acesso_kanban_bko = acesso_kanban_bko;
+    }
+
     if (aprovado !== undefined) {
       if (typeof aprovado !== "boolean") {
         return res.status(400).json({ message: "Campo 'aprovado' inválido" });
@@ -488,6 +542,11 @@ exports.adminUpdateUser = async (req, res) => {
         updateData.aprovado_por = null;
         updateData.aprovado_em = null;
       }
+    }
+
+    // Nova senha: admin pode redefinir a senha de qualquer usuário
+    if (nova_senha && typeof nova_senha === "string" && nova_senha.trim().length >= 6) {
+      updateData.senha = await bcrypt.hash(nova_senha.trim(), 12);
     }
 
     Object.keys(updateData).forEach((key) => {

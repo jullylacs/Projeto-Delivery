@@ -1,12 +1,18 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"; 
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+
+// Aplica o tema salvo antes de qualquer render
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) document.documentElement.dataset.theme = savedTheme;
 // Importa componentes do React Router para controle de rotas
 
 import Sidebar from "./components/Layout/Sidebar"; // Barra lateral do layout
 import Header from "./components/Layout/Header";   // Cabeçalho do layout
 import Dashboard from "./pages/Dashboard";        // Página Dashboard
+import Graficos from "./pages/Graficos";           // Página Gráficos
 import Kanban from "./pages/Kanban";              // Página Kanban
 import Agenda from "./pages/Agenda";              // Página Agenda
+import AgendaDelivery from "./pages/AgendaDelivery"; // Página Agenda Delivery
 import Profile from "./pages/Profile";            // Página Profile
 import RamaisPage from "./pages/Ramais";
 import MuralPage from "./pages/Mural";
@@ -17,13 +23,26 @@ import Register from "./pages/Register";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/kanban", "/agenda", "/profile", "/admin/users"];
+const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   if (!user || !["admin", "gestor"].includes(user.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+// Libera a rota apenas para quem pode acessar a Agenda Delivery.
+function DeliveryAgendaRoute({ children }) {
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  const allowed = ["delivery", "admin", "noc"];
+
+  if (!user || !allowed.includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -80,11 +99,12 @@ function MainLayout() {
         <Header onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
 
         <div
+          className="content-area"
           style={{
             padding: "20px",
             overflowY: "auto",
             overflowX: "hidden",
-            height: "calc(100vh - 70px)",
+            height: "calc(100vh - 62px)",
             background: "#f2efff",
             minWidth: 0,
           }}
@@ -92,8 +112,13 @@ function MainLayout() {
           {/* Sub-rotas dentro do layout principal */}
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/graficos" element={<Graficos />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/agenda" element={<Agenda />} />
+            <Route
+              path="/agenda-delivery"
+              element={<DeliveryAgendaRoute><AgendaDelivery /></DeliveryAgendaRoute>}
+            />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/ramais" element={<RamaisPage />} />

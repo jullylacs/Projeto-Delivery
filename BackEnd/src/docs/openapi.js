@@ -128,6 +128,100 @@ module.exports = function buildOpenApiSpec(req) {
           responses: { "200": { description: "Notificacoes sincronizadas" } },
         },
       },
+      "/agenda-eventos": {
+        get: {
+          summary: "Lista eventos da Agenda de Delivery",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: "escopo",
+              in: "query",
+              required: false,
+              schema: { type: "string", enum: ["individual", "geral"] },
+            },
+            {
+              name: "inicio",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "date-time" },
+            },
+            {
+              name: "fim",
+              in: "query",
+              required: false,
+              schema: { type: "string", format: "date-time" },
+            },
+            {
+              name: "usuario_id",
+              in: "query",
+              required: false,
+              description:
+                "Apenas admin: lista eventos individuais de outro usuário.",
+              schema: { type: "integer" },
+            },
+          ],
+          responses: { "200": { description: "Lista de eventos" } },
+        },
+        post: {
+          summary: "Cria evento na Agenda de Delivery",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["titulo", "inicio", "escopo"],
+                  properties: {
+                    titulo: { type: "string" },
+                    descricao_html: { type: "string" },
+                    inicio: { type: "string", format: "date-time" },
+                    fim: { type: "string", format: "date-time", nullable: true },
+                    all_day: { type: "boolean" },
+                    escopo: { type: "string", enum: ["individual", "geral"] },
+                    tipo: {
+                      type: "string",
+                      enum: ["tarefa", "aviso", "programacao"],
+                    },
+                    cor: { type: "string", nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            "201": { description: "Evento criado" },
+            "400": { description: "Payload inválido" },
+            "403": { description: "Sem permissão" },
+          },
+        },
+      },
+      "/agenda-eventos/{id}": {
+        put: {
+          summary: "Atualiza evento da Agenda de Delivery",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: {
+            "200": { description: "Evento atualizado" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Evento não encontrado" },
+          },
+        },
+        delete: {
+          summary: "Remove evento da Agenda de Delivery",
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          ],
+          responses: {
+            "200": { description: "Evento removido" },
+            "403": { description: "Sem permissão" },
+            "404": { description: "Evento não encontrado" },
+          },
+        },
+      },
     },
   };
 };

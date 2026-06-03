@@ -38,17 +38,83 @@ api.interceptors.request.use(
   }
 );
 
+// Controle de refresh em andamento (evita múltiplas chamadas simultâneas)
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
+const doLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  window.location.href = "/login";
+};
+
 // Interceptor de resposta: executa após receber uma resposta
 api.interceptors.response.use(
-  (response) => response, // Se a resposta for ok, retorna normalmente
-  (error) => {
-    if (error.response?.status === 401) {
-      // Se a resposta for 401 (não autorizado), significa token inválido ou expirado
-      localStorage.removeItem("token"); // Remove token do localStorage
-      localStorage.removeItem("user");  // Remove dados do usuário
-      window.location.href = "/login";  // Redireciona para a página de login
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Ignora erros na própria rota de refresh (evita loop infinito)
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/users/refresh") &&
+      !originalRequest.url?.includes("/users/login")
+    ) {
+      const refreshToken = localStorage.getItem("refreshToken");
+
+      if (!refreshToken) {
+        doLogout();
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Enfileira requests que chegaram enquanto o refresh já está em andamento
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const res = await api.post("/users/refresh", { refreshToken });
+        const newToken = res.data.token;
+        const newRefresh = res.data.refreshToken;
+
+        localStorage.setItem("token", newToken);
+        if (newRefresh) localStorage.setItem("refreshToken", newRefresh);
+
+        api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+        processQueue(null, newToken);
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        doLogout();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
-    return Promise.reject(error); // Rejeita a Promise com o erro
+
+    return Promise.reject(error);
   }
 );
 

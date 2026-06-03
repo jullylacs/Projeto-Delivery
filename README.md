@@ -1,56 +1,48 @@
-# NVX Fibra LTDA - Plataforma Operacional
+# NVX Fibra LTDA — Plataforma Operacional
 
-Plataforma web para operacao de campo com Kanban, Agenda e colaboracao em cards.
+Plataforma web para gestão operacional e comercial com Kanban multi-board, Agenda, Mural, Ramais, Gráficos e colaboração em tempo real.
 
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-4c1d95)
-![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20Vite-2563eb)
-![Backend](https://img.shields.io/badge/backend-Node%20%2B%20Express-0f766e)
+![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2B%20Vite-2563eb)
+![Backend](https://img.shields.io/badge/backend-Node%20%2B%20Express%205-0f766e)
 ![Database](https://img.shields.io/badge/database-PostgreSQL-1d4ed8)
-![Auth](https://img.shields.io/badge/auth-JWT-9333ea)
+![Auth](https://img.shields.io/badge/auth-JWT%20%2B%20Refresh-9333ea)
 
 ---
 
-## Sumario
+## Sumário
 
-- [Visao geral](#visao-geral)
-- [Arquitetura](#arquitetura)
+- [Visão geral](#visão-geral)
 - [Stack](#stack)
-- [Funcionalidades entregues](#funcionalidades-entregues)
-- [Melhorias recentes](#melhorias-recentes)
+- [Funcionalidades](#funcionalidades)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Como rodar localmente](#como-rodar-localmente)
-- [Configuracao de ambiente](#configuracao-de-ambiente)
-- [API e autenticacao](#api-e-autenticacao)
-- [Documentacao OpenAPI](#documentacao-openapi)
-- [Scripts uteis](#scripts-uteis)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Migrations](#migrations)
+- [API — Rotas principais](#api--rotas-principais)
+- [Autenticação](#autenticação)
+- [Perfis de acesso](#perfis-de-acesso)
+- [Documentação OpenAPI](#documentação-openapi)
+- [Scripts úteis](#scripts-úteis)
 - [Deploy](#deploy)
-- [Roadmap tecnico](#roadmap-tecnico)
-- [Observacoes](#observacoes)
+- [Troubleshooting](#troubleshooting)
+- [Segurança e boas práticas](#segurança-e-boas-práticas)
 
 ---
 
-## Visao geral
+## Visão geral
 
-O sistema centraliza o fluxo operacional da empresa em tres frentes:
+Sistema que centraliza o fluxo operacional da empresa em múltiplas frentes:
 
-1. Kanban para ciclo de vida de cards operacionais/comerciais.
-2. Agenda para organizacao de tarefas por dia, semana e mes.
-3. Colaboracao em comentarios com mencoes, anexos e historico.
-
-Objetivo pratico: reduzir retrabalho, acelerar resposta operacional e melhorar a visibilidade da execucao.
-
----
-
-## Arquitetura
-
-```mermaid
-flowchart LR
-	U[Usuario] --> F[Frontend React/Vite]
-	F --> A[API Node/Express]
-	A --> D[(PostgreSQL)]
-	F --> L[(LocalStorage)]
-	A --> S[Socket.io Infra]
-```
+- **Kanban multi-board** — ciclo de vida de cards por área (Delivery, Comercial, BKO) com transferência entre boards.
+- **Agenda de Delivery** — calendário colaborativo com escopo individual e geral, menções, notificações.
+- **Agenda Operacional** — agendamento de instalações com técnicos.
+- **Dashboard** — métricas de performance, SLA, atividade por cargo.
+- **Gráficos** — charts de status, colunas, cargos e usuários.
+- **Mural Interno** — comunicados com formatação Markdown, publicados por gestores.
+- **Ramais** — diretório de ramais e responsáveis.
+- **Notificações** — sistema de alertas por menção e atividade em cards.
+- **Colaboração** — comentários com Markdown, @menções, anexos, respostas, reações e fixação.
 
 ---
 
@@ -58,84 +50,105 @@ flowchart LR
 
 | Camada | Tecnologias |
 |---|---|
-| Frontend | React, Vite, React Router, Axios, DnD Kit, React Markdown, remark-gfm |
-| Backend | Node.js, Express, Sequelize, JWT, Socket.io |
-| Banco | PostgreSQL |
-| Persistencia local | LocalStorage (preferencias, estado de tela, agenda e configuracoes) |
+| Frontend | React 19, Vite, React Router 7, Axios, DnD Kit, React Markdown, TipTap |
+| Backend | Node.js, Express 5, Sequelize 6, JWT (access + refresh), Socket.io |
+| Banco | PostgreSQL (JSONB para comments/coords/menções) |
+| Persistência local | LocalStorage (preferências, tema, agenda, última rota, filtros de Kanban) |
+| Deploy | PM2 (backend), nginx (reverse proxy + SSL), build estático (frontend) |
 
 ---
 
-## Funcionalidades entregues
+## Funcionalidades
 
-### Autenticacao e usuarios
-- Login e cadastro com validacoes alinhadas entre frontend e backend.
-- Perfis de acesso aplicados (convidado, comercial, operacional, tecnico, delivery, gestor, admin).
-- Painel administrativo com paginacao server-side.
-- Persistencia de filtros/ordenacao/paginacao da tela administrativa.
-- Access token + refresh token (rotacao via endpoint de refresh).
+### Autenticação e usuários
+- Login e cadastro com validação completa.
+- Perfis de acesso granulares (ver seção [Perfis de acesso](#perfis-de-acesso)).
+- Painel administrativo com paginação server-side, busca e ordenação.
+- Gerenciamento de senhas via painel admin (visualizar plain-text/hash, redefinir).
+- Access token (8h) + refresh token (7d) com rotação automática no frontend.
+- Refresh transparente: ao receber 401, tenta renovar o token sem deslogar o usuário.
 
 ### Kanban
-- Criacao, edicao, duplicacao, exclusao e movimentacao de cards.
-- Colunas dinamicas (adicionar, editar, excluir).
-- Acao de excluir todos os cards de uma coluna.
-- Promocao visual de card atualizado para topo da coluna.
-- Densidade visual configuravel (compacto, medio, confortavel).
-- Importacao via JSON e importacao direta do Trello.
-- Exportacao CSV e Excel.
+- **3 boards independentes:** Delivery, Comercial e BKO (acesso por perfil de usuário).
+- Criação, edição, duplicação, exclusão e movimentação de cards (drag-and-drop).
+- Colunas dinâmicas: adicionar, editar, excluir, reordenar.
+- Transferência de cards entre boards com seleção de coluna de destino.
+- **Zones de drop** visíveis durante drag para transferência entre boards.
+- Densidade visual configurável: compacta, média, confortável.
+- "Atualizado por [nome] a X min" no rodapé de cada card.
+- Status rápido inline com toast de confirmação.
+- Importação via JSON e Trello; exportação CSV e Excel.
+- Busca server-side com filtros de vendedor e status.
+- Seleção múltipla de cards com ações em lote.
+- Ação "Excluir todos os cards da coluna".
+- Deep-link para card por ID (URL hash e localStorage).
+- Abertura automática do card correto ao clicar em notificação (mesmo em outro board).
 
-### Comentarios e colaboracao
-- Mencoes com notificacao e navegação ate o card mencionado.
-- Hover em mencao com cartao de usuario (foto, nome, cargo).
-- Comentarios com formatacao rica:
-	- negrito
-	- italico
-	- listas
-	- citacao
-	- codigo
-- Anexos com fluxo pendente (so envia ao clicar em Enviar).
-- Imagens sem forcar nome como texto.
-- PDF com abrir, baixar e imprimir.
+### Comentários e colaboração
+- Formatação rica: **negrito**, *itálico*, listas, citação, código.
+- @Menções com autocomplete, notificação ao mencionado e popup de perfil no hover.
+- Respostas aninhadas com @menção via dropdown.
+- Reações com emoji (👍❤️😂😮👏).
+- **Fixar comentários** no topo da lista (accent amarelo, badge "📌 Fixado").
+- Excluir comentários do sistema bloqueado (apenas comentários de usuário podem ser editados/excluídos).
+- Anexos em comentários: imagens, vídeos, PDFs e outros arquivos.
+  - Gerenciamento interno no `CommentInput` (sem race condition com FileReader).
+  - Exclusão individual de anexos antes de enviar.
+  - Preservação de anexos ao editar comentário.
+- Histórico de comentários de sistema (movimentos, edições) — não editáveis/excluíveis.
 
-- Modos de visualizacao: mes, semana e dia.
-- Criacao de tarefa por clique direito no dia.
-- Entrada rapida no dia por duplo clique.
-- Modo dia com mini-cards de tarefa (titulo, horario, observacoes).
-- Drag-and-drop entre status (planejado, andamento, concluido).
-- Persistencia robusta de tarefas e preferencias.
+### Agenda Delivery (AgendaEvento)
+- Calendário multi-escopo: **Individual** e **Geral**.
+- Visualizações: mês, semana e dia.
+- Menção de usuários em eventos — notificação em tempo real ao mencionado.
+- Drag-and-drop e criação por duplo clique no dia.
+- Persistência de preferências (escopo, visão, data atual) em localStorage.
+
+### Agenda Operacional (Schedule)
+- Agendamento de instalações vinculadas a cards e técnicos.
+
+### Dashboard
+- Métricas: total de cards, taxa de conclusão, violações/avisos de SLA.
+- Gráfico de barras por coluna.
+- Atividade por cargo: cards atribuídos + cards atualizados (proxy de usabilidade).
+- Filtro por board (Delivery / Comercial / BKO / Todos).
+- Refresh automático silencioso a cada 3 minutos.
+
+### Gráficos
+- Donut de status geral (Concluído, Em andamento, Retorno B2B, Retorno Comercial, SLA alerta/vencido).
+- Barras verticais por coluna.
+- Filtro por board.
+
+### Mural Interno
+- Comunicados com formatação Markdown (negrito, itálico, listas, citação, código).
+- Toolbar de formatação na caixa de composição.
+- Apenas gestores e admins podem publicar/editar/excluir.
+- Todos os perfis autorizados podem visualizar.
+- Modal de edição e confirmação de exclusão.
+
+### Ramais
+- Diretório de ramais com link SIP (`sip:ramal`).
+- Avatar colorido com iniciais por nome.
+- Busca em tempo real por ramal ou responsável.
+- CRUD completo para gestores e admins.
+
+### Notificações
+- Painel lateral com hero em gradiente, tempo relativo e badges por tipo.
+- Tipos: Menção (`💬`), Urgente (`⚠️`), Info (`ℹ️`).
+- Indicador de ponto com glow para não lidas.
+- Ações: marcar uma lida, marcar todas lidas, limpar lidas, **excluir notificação individual**.
+- Soft-delete: notificações nunca são deletadas, apenas marcadas com `limpa: true`.
+
+### Tema escuro / claro
+- Toggle 🌙/☀️ no header.
+- Persistência em localStorage.
+- Paleta escura elegante com tintes azul-roxo profundos, sombras corretas para fundo escuro e glow em elementos interativos.
 
 ### UX geral
+- Sidebar recolhível com toggle no header.
 - Skeleton loading nas telas principais.
-- Melhorias de microinteracao e animacao.
-- Ajustes de camadas e sobreposicao de menus.
-- Branding atualizado para NVX Fibra LTDA no cabecalho.
-
----
-
-## Melhorias recentes
-
-### Backend (Últimas correções e otimizações)
-- **Limite de payload** configuravel para uploads maiores.
-- **Tratamento amigavel** de erro 413.
-- **Correcao de persistencia** de comentarios nos cards.
-- **Ajuste de associacao** Sequelize para evitar conflito de nomes.
-- **Rate limiting global** parametrizavel para evitar bloqueios indevidos em dev.
-- **Rotas protegidas** em cards, schedules, technicians e columns.
-- **Prefixo de API** versionada em /api/v1 com health endpoints organizados.
-- **OpenAPI JSON** + Swagger UI embutido (CSP + CORS configurados para unpkg.com CDN).
-- **Soft-delete notifications** — sistema de notificacoes com campo `limpa` (booleano) para preservar historico.
-- **Helmet CSP** otimizado para permitir recursos externos (Swagger UI).
-
-### Frontend (Últimas correções e otimizações)
-- **Menus de dados** agrupados em popover.
-- **Importacao Trello** com persistencia local de configuracoes.
-- **Melhorias de drag-and-drop** na Agenda e Kanban para arraste mais confortavel.
-- **Drag-and-drop de cards** corrigido — cards persistem coluna corretamente (envio de `coluna_id` snake_case).
-- **Scrollbar dupla** eliminada — viewport constrangida com height 100vh e overflow hidden.
-- **Sidebar toggle** integrado no Header (botao arredondado no canto superior esquerdo).
-- **Notificacoes** migradas para drawer fixed-position (400px de largura) com deslizamento suave.
-- **Vendor field** atualizado corretamente (envio de `vendedor_id` snake_case).
-- **CSS transform errors** removidos — dnd-kit transforms validados contra NaN antes de renderizar.
-- **UI responsiva** e melhorias de microinteracao.
+- Toast de sucesso ao atualizar status de card.
+- Toasts e feedbacks em todas as ações críticas.
 
 ---
 
@@ -143,18 +156,37 @@ flowchart LR
 
 ```text
 Projeto-Delivery/
-	BackEnd/
-		src/
-			controllers/
-			models/
-			routes/
-			middleware/
-			database/
-	frontend/
-		src/
-			components/
-			pages/
-			services/
+├── BackEnd/
+│   ├── src/
+│   │   ├── controllers/       # lógica de negócio
+│   │   │   └── middleware/    # auth, requireAdmin, requireManagerOrAdmin
+│   │   ├── models/            # Sequelize (User, Card, Column, Comment, Notification, AgendaEvento…)
+│   │   ├── routes/            # Express routers versionados
+│   │   ├── database/
+│   │   │   ├── migrations/    # ALTER/CREATE TABLE (histórico completo)
+│   │   │   └── seeders/
+│   │   ├── utils/             # sanitizeHtml, etc.
+│   │   ├── app.js             # Express + CORS + Helmet + Rate Limiter
+│   │   └── server.js          # HTTP + Socket.io
+│   ├── .env                   # variáveis locais (não versionado)
+│   └── .sequelizerc
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Kanban/        # Board.jsx (~5600 linhas), CommentInput.jsx, CardModal.jsx
+│   │   │   ├── Layout/        # Header.jsx, Sidebar.jsx
+│   │   │   ├── Modal/
+│   │   │   └── UI/            # RichTextEditor.jsx
+│   │   ├── pages/             # Dashboard, Kanban, Agenda, AgendaDelivery, Graficos, Mural, Ramais, Profile, AdminUsers…
+│   │   ├── services/
+│   │   │   └── api.js         # Axios + interceptor de refresh automático
+│   │   └── main.jsx
+│   ├── .env                   # variáveis locais (não versionado)
+│   └── vite.config.js
+├── docker/                    # Docker Compose de referência (staging)
+├── deploy/
+│   └── pm2/                   # ecosystem.config.cjs
+└── package.json               # concurrently para rodar tudo junto
 ```
 
 ---
@@ -163,408 +195,412 @@ Projeto-Delivery/
 
 ### Requisitos
 - Node.js 18+
-- PostgreSQL em execucao
+- PostgreSQL em execução
+- Arquivo `BackEnd/.env` configurado (ver abaixo)
 
-### Backend
+### Instalar dependências e subir tudo
+
 ```bash
-API padrao: http://localhost:3000
-
-App padrao: http://localhost:5173
-
-npm run dev
+# Na raiz do projeto
+npm install
+npm run dev          # sobe backend (nodemon) + frontend (Vite) em paralelo
 ```
 
-Criar arquivo `BackEnd/.env` com as variaveis abaixo. Exemplo com valores padrao para desenvolvimento:
-# Database  
+Ou separado:
+```bash
+npm run dev:backend   # apenas backend
+npm run dev:frontend  # apenas frontend
+```
+
+### Acesso padrão
+- **Frontend:** http://localhost:5173
+- **Backend API:** http://localhost:3003/api/v1
+- **Swagger UI:** http://localhost:3003/api/v1/docs
+
+---
+
+## Variáveis de ambiente
+
+### Backend — `BackEnd/.env`
+
+```env
+# ── Servidor ──────────────────────────────
+NODE_ENV=development
+HOST=0.0.0.0          # use o IP da máquina se precisar acesso externo
+PORT=3003
+
+# ── Banco de dados ─────────────────────────
 DB_DIALECT=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=delivery_sys
+DB_USER=postgres
 DB_PASS=postgres
+DB_SSL=false
+DB_SSL_REJECT_UNAUTHORIZED=true
 
-# Frontend (usado em CORS)
-FRONTEND_URL=http://localhost:5173
-JWT_REFRESH_SECRET=outra_chave_muito_fraca
-JWT_ACCESS_EXPIRES_IN=24h
+# ── JWT ────────────────────────────────────
+JWT_SECRET=sua_chave_forte_aqui
+JWT_REFRESH_SECRET=outra_chave_forte_aqui
+JWT_ACCESS_EXPIRES_IN=8h
+JWT_REFRESH_EXPIRES_IN=7d
+
+# ── API ────────────────────────────────────
 API_BASE_PATH=/api/v1
-ENABLE_LEGACY_ROUTES=true
+ENABLE_LEGACY_ROUTES=true          # false em produção
+
+# ── CORS ───────────────────────────────────
+FRONTEND_URL=http://localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://10.x.x.x:5173
+
+# ── Upload / Rate limit ────────────────────
+REQUEST_BODY_LIMIT=5mb
+GLOBAL_RATE_LIMIT_WINDOW_MS=900000
+GLOBAL_RATE_LIMIT_MAX=5000         # reduzir em produção (ex: 1000)
+
+# ── Token de sistema (opcional) ────────────
+# SYSTEM_API_TOKEN=token_fixo_para_integrações_máquina_a_máquina
 ```
 
-**Descritive das variaveis principais:**
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `JWT_SECRET` | — | **Obrigatório.** Chave para assinar access tokens. |
+| `JWT_REFRESH_SECRET` | — | **Obrigatório.** Chave para assinar refresh tokens. |
+| `JWT_ACCESS_EXPIRES_IN` | `8h` | Duração do access token. |
+| `JWT_REFRESH_EXPIRES_IN` | `7d` | Duração do refresh token. |
+| `HOST` | `localhost` | IP de bind do servidor. Use `0.0.0.0` para todas interfaces. |
+| `CORS_ALLOWED_ORIGINS` | — | Lista CSV de origens permitidas (ex: `http://localhost:5173,https://app.exemplo.com`). |
+| `ENABLE_LEGACY_ROUTES` | `true` | Expõe rotas sem prefixo `/api/v1` (desativar em produção). |
+| `REQUEST_BODY_LIMIT` | `5mb` | Limite de payload; aumentar se houver uploads de avatar em base64. |
+| `SYSTEM_API_TOKEN` | — | Token fixo para integrações M2M. Injeta `req.user = { id: 0, isSystem: true }`. |
 
-| Variavel | Padrao | Descricao |
-|----------|--------|-----------|
-| NODE_ENV | development | Ambiente (development, production, test) |
-| PORT | 3000 | Porta que o servidor ouvirá |
-| DB_DIALECT | postgres | Driver do banco (postgres) |
-| DB_NAME | delivery_sys | Nome do banco de dados |
-| FRONTEND_URL | http://localhost:5173 | URL do frontend (usado em CORS) |
-| JWT_SECRET | - | Chave para assinar JWT; **DEVE SER FORTE EM PRODUCAO** |
-| JWT_ACCESS_EXPIRES_IN | 24h | Tempo de expiracao do access token |
-| API_BASE_PATH | /api/v1 | Prefixo de versionamento da API |
-| ENABLE_LEGACY_ROUTES | true | Se true, habilita rotas sem versao (compat) |
-
-### Frontend (.env)
-
-Criar arquivo `frontend/.env` com:
+### Frontend — `frontend/.env`
 
 ```env
-VITE_API_URL=http://localhost:3000/api/v1
+# Opção 1: URL completa (tem precedência)
+VITE_API_URL=http://localhost:3003/api/v1
+
+# Opção 2: Composição por partes
+# VITE_API_PROTOCOL=http
+# VITE_API_HOST=localhost
+# VITE_API_PORT=3003
+# VITE_API_BASE_PATH=/api/v1
 ```
 
-Em producao:
-```env
-VITE_API_URL=https://seu-dominio.com.br/api/v1
-```
+---
 
-### Criar banco de dados PostgreSQL
+## Migrations
 
-```bash
-# SSH no servidor ou use pgAdmin
-createdb delivery_sys
-```
+As migrations estão em `BackEnd/src/database/migrations/` e devem ser executadas na ordem do timestamp do nome do arquivo.
 
-Apos criar o banco, executar migrations do backend:
 ```bash
 cd BackEnd
-npm run db:migrate
+npm run db:migrate        # aplica todas as pendentes
+npm run db:undo           # reverte a última
+npm run db:undo:all       # reverte todas
 ```
 
----
-
-## API e autenticacao
-
-### Base path principal
-Todas as rotas versionadas usam prefixo: `/api/v1`
-
-### Fluxo de autenticacao (JWT)
-
-1. **Login:**
-   ```
-   POST /api/v1/users/login
-   Body: { email, password }
-   Response: { accessToken, refreshToken, user: { id, name, email, role, ... } }
-   ```
-
-2. **Usar em rotas protegidas:**
-   ```
-   GET /api/v1/cards
-   Header: Authorization: Bearer <accessToken>
-   ```
-
-3. **Refresh token (quando accessToken expirar):**
-   ```
-   POST /api/v1/users/refresh
-   Body: { refreshToken }
-   Response: { accessToken, refreshToken }
-   ```
-
-4. **Logout (limpa sessao):**
-   ```
-   POST /api/v1/users/logout
-   Header: Authorization: Bearer <accessToken>
-   ```
-
-### Rotas principais (todos requerem auth exceto /users/login e /users/register)
-
-**Usuarios (Admin)**
-- `POST /api/v1/users/login` — login
-- `POST /api/v1/users/register` — registro (requireAdmin)
-- `GET /api/v1/users` — listar usuarios (paginado, requireAdmin)
-- `GET /api/v1/users/:id` — detalhes do usuario
-- `PUT /api/v1/users/:id` — editar usuario
-- `DELETE /api/v1/users/:id` — excluir usuario (requireAdmin)
-
-**Cards (Kanban)**
-- `GET /api/v1/cards` — listar cards
-- `POST /api/v1/cards` — criar card
-- `GET /api/v1/cards/:id` — detalhes do card
-- `PUT /api/v1/cards/:id` — editar card
-- `DELETE /api/v1/cards/:id` — excluir card
-- `POST /api/v1/cards/:id/duplicate` — duplicar card
-
-**Colunas**
-- `GET /api/v1/columns` — listar colunas (requer auth)
-- `POST /api/v1/columns` — criar coluna (requireAdmin)
-- `PUT /api/v1/columns/:id` — editar coluna (requireAdmin)
-- `DELETE /api/v1/columns/:id` — excluir coluna (requireAdmin)
-
-**Comentarios**
-- `GET /api/v1/cards/:cardId/comments` — listar comentarios do card
-- `POST /api/v1/cards/:cardId/comments` — criar comentario
-- `PUT /api/v1/comments/:id` — editar comentario
-- `DELETE /api/v1/comments/:id` — excluir comentario
-
-**Notificacoes**
-- `GET /api/v1/notifications` — listar somilhar quando PATCH /clear-read
-- `GET /api/v1/notifications/mine` — notificacoes do usuario logado
-- `PATCH /api/v1/notifications/clear-read` — marcar notificacoes como limpa (soft-delete)
-
-**Agenda (Schedules)**
-- `GET /api/v1/schedules` — listar agendas
-- `POST /api/v1/schedules` — criar agenda
-- `PUT /api/v1/schedules/:id` — editar agenda
-- `DELETE /api/v1/schedules/:id` — excluir agenda
-
-**Health Check**
-- `GET /api/v1/health/db` — verificar conexao com banco (sem auth)
-
-### Observacoes importantes
-
-- **JWT_SECRET:** Nao e o token usado em requests; e a CHAVE PRIVADA que assina os JWTs. Cada JWT assinado contem informacoes do usuario.
-- **Refresh Token:** Persiste em banco e pode expirar. Se ambos expirem, usuario precisa fazer login novamente.
-- **Soft-delete Notifications:** Notificacoes nao sao deletadas; apenas marcadas com `limpa: true`. Historico e preservado.
-- **Rotas legadas:** Se ENABLE_LEGACY_ROUTES=true, rotas sem /api/v1 sao acessiveis (ex: GET /cards equivale a GET /api/v1/cards).
+**Principais migrations:**
+| Arquivo | O que faz |
+|---|---|
+| `20240002-create-columns.js` | Cria tabela `columns` com colunas padrão |
+| `20240004-create-cards.js` | Cria tabela `cards` com JSONB para comments/coords |
+| `20240007-create-notifications.js` | Cria tabela `notifications` com soft-delete |
+| `20260518-alter-columns-add-board.js` | Adiciona campo `board` às colunas (multi-board) |
+| `20260519-create-agenda-eventos.js` | Tabela de eventos da Agenda Delivery |
+| `20260603-alter-agenda-eventos-add-mencoes.js` | Campo `mencoes` (JSONB) nos eventos |
+| `20260603-alter-cards-add-atualizado-por-nome.js` | Quem atualizou o card por último |
 
 ---
 
-## Documentacao OpenAPI
+## API — Rotas principais
+
+> Todas as rotas requerem `Authorization: Bearer <token>` exceto login, register e health.
+
+### Usuários
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/api/v1/users/login` | Login; retorna `{ token, refreshToken, user }` |
+| `POST` | `/api/v1/users/register` | Cadastro |
+| `POST` | `/api/v1/users/refresh` | Renova access token via refreshToken |
+| `POST` | `/api/v1/users/logout` | Revoga refresh token |
+| `GET` | `/api/v1/users/:id` | Perfil do usuário |
+| `PUT` | `/api/v1/users/:id` | Atualizar perfil (inclui `senhaAtual` + `novaSenha` para troca) |
+| `GET` | `/api/v1/users/admin` | Listar todos (paginado, gestor/admin; inclui campo `senha`) |
+| `PUT` | `/api/v1/users/admin/:id` | Editar qualquer usuário (inclui `nova_senha`) |
+| `PATCH` | `/api/v1/users/admin/:id/approve` | Aprovar usuário |
+| `GET` | `/api/v1/users/assignable` | Usuários disponíveis para menções/atribuição |
+
+### Cards (Kanban)
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/cards/board-summary` | Snapshot inicial do board (`?board=delivery|comercial|bko`) |
+| `GET` | `/api/v1/cards` | Listar cards com filtros/paginação |
+| `POST` | `/api/v1/cards` | Criar card |
+| `GET` | `/api/v1/cards/:id` | Buscar card por ID (incluindo board — usado para deep-link de notificação) |
+| `PUT` | `/api/v1/cards/:id` | Atualizar card (grava `atualizado_por_nome`) |
+| `DELETE` | `/api/v1/cards/:id` | Excluir card |
+| `POST` | `/api/v1/cards/:id/transfer` | Transferir card entre boards |
+
+### Comentários
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/api/v1/cards/:id/comments` | Adicionar comentário (com `attachments`) |
+| `PATCH` | `/api/v1/cards/:id/comments/:cid` | Editar comentário (com `attachments`) |
+| `DELETE` | `/api/v1/cards/:id/comments/:cid` | Excluir comentário |
+| `PATCH` | `/api/v1/cards/:id/comments/:cid/pin` | Fixar/desafixar comentário |
+| `POST` | `/api/v1/cards/:id/comments/:cid/reactions` | Toggle reação (emoji) |
+| `POST` | `/api/v1/cards/:id/comments/:cid/replies` | Adicionar resposta |
+| `PATCH` | `/api/v1/cards/:id/comments/:cid/replies/:rid` | Editar resposta |
+| `DELETE` | `/api/v1/cards/:id/comments/:cid/replies/:rid` | Excluir resposta |
+
+### Colunas
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/columns` | Listar colunas (`?board=`) |
+| `POST` | `/api/v1/columns` | Criar coluna |
+| `PUT` | `/api/v1/columns/:id` | Editar coluna |
+| `DELETE` | `/api/v1/columns/:id` | Excluir coluna (apenas se vazia) |
+
+### Notificações
+| Método | Rota | Descrição |
+|---|---|---|
+| `POST` | `/api/v1/notifications/sync` | Sincronizar notificações geradas pelo frontend |
+| `GET` | `/api/v1/notifications` | Listar notificações do usuário logado |
+| `PATCH` | `/api/v1/notifications/:id/read` | Marcar uma como lida |
+| `PATCH` | `/api/v1/notifications/read-all` | Marcar todas como lidas |
+| `PATCH` | `/api/v1/notifications/:id/clear` | Excluir notificação individual (soft-delete) |
+| `PATCH` | `/api/v1/notifications/clear-read` | Limpar todas as lidas (soft-delete) |
+
+### Agenda Delivery (AgendaEvento)
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/agenda-eventos` | Listar eventos (`?escopo=individual|geral&inicio=&fim=`) |
+| `POST` | `/api/v1/agenda-eventos` | Criar evento (com `mencoes`) |
+| `PUT` | `/api/v1/agenda-eventos/:id` | Editar evento |
+| `DELETE` | `/api/v1/agenda-eventos/:id` | Excluir evento |
+
+### Dashboard e Gráficos
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/dashboard/summary` | Métricas gerais (`?board=`) |
+
+### Mural
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/mural` | Listar posts |
+| `POST` | `/api/v1/mural` | Criar post (gestor/admin) |
+| `PUT` | `/api/v1/mural/:id` | Editar post |
+| `DELETE` | `/api/v1/mural/:id` | Excluir post |
+
+### Ramais
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/ramais` | Listar ramais |
+| `POST` | `/api/v1/ramais` | Criar ramal (gestor/admin) |
+| `PUT` | `/api/v1/ramais/:id` | Editar ramal |
+| `DELETE` | `/api/v1/ramais/:id` | Excluir ramal |
+
+### Agenda Operacional e Técnicos
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET/POST/PUT/DELETE` | `/api/v1/schedules` | CRUD de agendamentos |
+| `GET` | `/api/v1/technicians` | Listar técnicos |
+
+### Outros
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/health/db` | Health check do banco (sem auth) |
+| `GET` | `/api/v1/openapi.json` | Especificação OpenAPI |
+| `GET` | `/api/v1/docs` | Swagger UI |
+
+---
+
+## Autenticação
+
+### Fluxo completo
+
+```
+1. POST /api/v1/users/login  →  { token, refreshToken, user }
+2. Requests:  Authorization: Bearer <token>
+3. Token expira (8h)  →  interceptor automático chama POST /users/refresh
+4. POST /api/v1/users/refresh  { refreshToken }  →  { token, refreshToken }
+5. Retry da request original com novo token
+6. Se refresh também expirar  →  logout automático
+```
+
+O frontend gerencia o refresh **transparentemente**: o usuário não é deslogado enquanto o refresh token (7 dias) for válido.
+
+### Tokens de sistema
+
+Para integrações M2M, definir `SYSTEM_API_TOKEN` no `.env`. Requests com esse token recebem `req.user = { id: 0, isSystem: true }` e ignoram verificação JWT.
+
+---
+
+## Perfis de acesso
+
+| Perfil | Descrição |
+|---|---|
+| `admin` | Acesso total; aprova usuários, gerencia tudo |
+| `gestor` | Acesso amplo ao Kanban e gestão de usuários |
+| `gestor_delivery` | Cria/edita eventos gerais da Agenda Delivery |
+| `delivery` | Acesso ao Kanban Delivery e Agenda Delivery |
+| `comercial` | Acesso ao Kanban Comercial |
+| `operacional` | Acesso operacional |
+| `tecnico` | Acesso técnico |
+| `bko` | Acesso ao board BKO |
+| `noc` | Acesso ao Kanban Delivery e Agenda Delivery |
+| `convidado` | Acesso mínimo |
+
+O acesso a cada board Kanban é configurado por flags booleanas (`acesso_kanban_delivery`, `acesso_kanban_comercial`, `acesso_kanban_bko`) independentes do perfil.
+
+---
+
+## Documentação OpenAPI
 
 Com o backend rodando:
-- JSON OpenAPI: http://localhost:3000/api/v1/openapi.json
-- Swagger UI: http://localhost:3000/api/v1/docs
+- **JSON:** `http://localhost:3003/api/v1/openapi.json`
+- **Swagger UI:** `http://localhost:3003/api/v1/docs`
 
 ---
 
-## Scripts uteis
+## Scripts úteis
+
+### Raiz (roda tudo junto)
+```bash
+npm run dev                  # backend + frontend
+npm run dev:backend          # só backend (nodemon)
+npm run dev:frontend         # só frontend (Vite)
+npm run dev:frontend:host    # Vite exposto na rede
+```
 
 ### Backend
-- npm run dev
-- npm run db:migrate
-- npm run db:undo
-- npm run db:undo:all
+```bash
+cd BackEnd
+npm run dev           # nodemon
+npm start             # node (produção)
+npm run db:migrate    # aplica migrations pendentes
+npm run db:undo       # reverte última migration
+npm run db:undo:all   # reverte todas
+```
 
 ### Frontend
-- npm run dev
-- npm run build
-
-### Raiz
-- npm run dev
-- npm run dev:backend
-- npm run dev:frontend
-- npm run dev:frontend:host
+```bash
+cd frontend
+npm run dev           # servidor de desenvolvimento
+npm run build         # gera dist/
+npm run preview       # serve dist/ localmente
+npm run lint          # ESLint
+```
 
 ---
 
 ## Deploy
 
 ### Arquitetura de produção
-A aplicacao e deployada seguindo um modelo de reverse proxy com nginx externo:
 
 ```
 Internet
-   |
-   v
-[Nginx Externo no Servidor]  <-- Gerencia SSL/TLS, dominio, certificado
-   |
-   v
-[Aplicacao Node/Express]
-   |
-   v
+   │
+   ▼
+[Nginx — SSL/TLS + reverse proxy]
+   │
+   ▼
+[Node/Express — PM2]
+   │
+   ▼
 [PostgreSQL]
 ```
 
-### Setup de produção
+### Backend com PM2
 
-#### Nginx Externo (Reverse Proxy)
-- **Responsavel por:** gerenciamento de SSL/certificado, roteamento de dominio, balanceamento de carga
-- **Configuracao:** Adicionar dominio no nginx da infra e apontar para IP interno:porta da aplicacao
-- **Exemplo de uso:** dominio.com → http://IP_interno:3000
-- **Certificado:** Gerenciado pelo nginx externo (usualmente Let's Encrypt automatizado)
-
-**Nota:** Nao e necessario fazer deploy de configuracoes nginx adicionais junto com a aplicacao. Use os arquivos em `deploy/nginx/` apenas como referencia para setup local ou para entender a estrutura.
-
-#### Backend Deployment Options
-
-**Opcao 1: PM2 (recomendado)**
 ```bash
 cd BackEnd
-npm install
-npm run db:migrate  # executar migrations
-pm2 start ecosystem.config.cjs --env production
+npm install --production
+npm run db:migrate
+pm2 start deploy/pm2/ecosystem.config.cjs --env production
 pm2 save
+pm2 startup
 ```
 
-Arquivos de referencia:
-- `deploy/pm2/ecosystem.config.cjs` — configuracao do PM2
-- `deploy/pm2/delivery-backend.service` — integracao com systemd
+### Frontend (build estático)
 
-**Opcao 2: Docker (alternativa)**
-Se preferir containerizar, usar Docker Compose ou similar. Certificado e roteamento sao responsabilidade do nginx externo.
-
-#### Frontend Deployment
-
-**Static Hosting recomendado:**
 ```bash
 cd frontend
 npm install
 npm run build
-# Servir dist/ no servidor web (nginx, Apache, etc)
+# Servir frontend/dist/ via nginx ou Express static
 ```
 
-Ou fazer deploy junto com o backend e servir files estaticos via Express:
-```bash
-app.use(express.static('path/to/frontend/dist'));
-```
+### Checklist pré-deploy
 
-#### Variaveis de ambiente em produção
-
-**Backend (.env.production)**
-```env
-NODE_ENV=production
-HOST=0.0.0.0
-PORT=3000
-
-DB_DIALECT=postgres
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=delivery_sys_prod
-DB_USER=postgres
-DB_PASS=<senha_forte>
-
-FRONTEND_URL=https://seu-dominio.com.br
-
-JWT_SECRET=<chave_aleatoria_forte_32+chars>
-JWT_REFRESH_SECRET=<outra_chave_aleatoria_forte_32+chars>
-JWT_ACCESS_EXPIRES_IN=24h
-JWT_REFRESH_EXPIRES_IN=30d
-
-API_BASE_PATH=/api/v1
-ENABLE_LEGACY_ROUTES=false
-
-MAX_REQUEST_SIZE=50mb
-```
-
-**Frontend (.env.production)**
-```env
-VITE_API_URL=https://seu-dominio.com.br/api/v1
-```
-
-#### Checklist pre-deploy
-- [ ] .env configurado com variaveis de producao
-- [ ] JWT_SECRET e JWT_REFRESH_SECRET sao valores aleatorios fortes
-- [ ] Banco de dados PostgreSQL criado e acessivel
-- [ ] FRONTEND_URL aponta para dominio correto com https
-- [ ] Migrations executadas com sucesso: `npm run db:migrate`
-- [ ] Nginx externo configurado e roteando para IP:porta correta
-- [ ] SSL/certificado validado no nginx externo
-- [ ] PM2 ou Docker iniciando corretamente
-- [ ] Acessar endpoint de health: GET https://seu-dominio.com.br/api/v1/health/db
-
-#### Observacoes importantes
-- **Certificado SSL:** Gerenciado unicamente pelo nginx externo (nao incluso na aplicacao)
-- **Rate Limiting:** Verificar limites em producao se houver muita carga
-- **Logs:** Configurar rotacao de logs e monitoramento via PM2 ou Docker logs
-- **Backup:** Estabelecer rotina de backup do banco PostgreSQL
-- **Monitoramento:** Usar ferramentas como New Relic, DataDog ou similar para observabilidade
+- [ ] `JWT_SECRET` e `JWT_REFRESH_SECRET` com valores aleatórios fortes (≥ 32 chars)
+- [ ] `NODE_ENV=production`
+- [ ] `ENABLE_LEGACY_ROUTES=false`
+- [ ] `CORS_ALLOWED_ORIGINS` com o domínio correto em HTTPS
+- [ ] `FRONTEND_URL` com HTTPS
+- [ ] Banco criado e migrations aplicadas
+- [ ] PM2 ou Docker iniciando e reiniciando automaticamente
+- [ ] Nginx com SSL configurado e apontando para a porta correta
+- [ ] Health check: `GET https://dominio.com/api/v1/health/db`
 
 ---
 
 ## Troubleshooting
 
-### Backend
+### `EADDRINUSE: address already in use :::3003`
+A porta está em uso por um processo anterior (comum após crash do nodemon).
+```powershell
+Stop-Process -Name node -Force   # mata todos os processos node
+```
 
-**Problema: "Error: listen EADDRINUSE :::3000"**
-- Porta 3000 ja esta em uso
-- Solucao: Matar processo existente ou trocar PORT no .env
+### `EADDRNOTAVAIL: address not available <IP>:3003`
+O IP configurado em `HOST` não existe mais na máquina (IP de rede mudou, ex: Wi-Fi reconectado).
+- Verificar IP atual com `ipconfig`
+- Atualizar `HOST` e `CORS_ALLOWED_ORIGINS` no `BackEnd/.env`
+- Atualizar `VITE_API_URL` no `frontend/.env`
 
-**Problema: "Sequelize connection refused"**
-- PostgreSQL desligado ou credenciais incorretas
-- Solucao: Verificar .env (DB_HOST, DB_PORT, DB_USER, DB_PASS) e garantir que PostgreSQL esta rodando
+### `CORS blocked for origin`
+A origem do frontend não está na lista permitida.
+- Adicionar a origem em `CORS_ALLOWED_ORIGINS` (CSV): `http://10.2.1.140:5173,http://localhost:5173`
 
-**Problema: "Rate limit exceeded" em desenvolvimento**
-- Rate limiter default bloqueia apos X requisions em Y tempo
-- Solucao: Aumentar RATE_LIMIT_WINDOW_MS e RATE_LIMIT_MAX ou desligar em dev (verificar middleware/rateLimiter.js)
+### `Sequelize connection refused`
+PostgreSQL desligado ou credenciais incorretas.
+- Verificar `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` no `.env`
+- Confirmar que o PostgreSQL está rodando
 
-### Frontend
+### `JWT_SECRET não configurado — servidor retorna 500`
+O arquivo `.env` não tem `JWT_SECRET` ou `JWT_REFRESH_SECRET`.
+- Copiar `.env.example` para `.env` e preencher os valores.
 
-**Problema: "npm run dev nao inicia ou erro de port 5173"**
-- Porta 5173 ja em uso
-- Solucao: Usar `npm run dev -- --port 5174` ou matar processo na porta 5173
+### Cards não aparecem no Kanban
+- Verificar se o usuário tem as flags `acesso_kanban_*` corretas no banco.
+- Checar a aba Network do browser para ver o retorno de `/api/v1/cards/board-summary`.
 
-**Problema: "CORS error ao acessar API"**
-- FRONTEND_URL incorreta no backend .env
-- Solucao: Garantir que backend .env tem FRONTEND_URL=http://localhost:5173 (ou dominio correto)
+### Card de outro board não abre ao clicar em notificação
+- O sistema faz `GET /cards/:id` para descobrir o board antes de navegar.
+- Verificar se a migration `20260603-alter-cards-add-atualizado-por-nome.js` foi aplicada (o endpoint `/cards/:id` depende do model atualizado).
 
-**Problema: "Cards nao aparecem no Kanban"**
-- Verificar permissoes do usuario (deve ter acesso a cards)
-- Verificar se API esta retornando dados: GET /api/v1/cards
-- Solucao: Inspecionar network tab do browser para ver erro especifico
+### Tema escuro não persiste após recarregar
+- O tema é salvo em `localStorage` com a chave `"theme"`.
+- Se `localStorage` estiver bloqueado (modo privado em alguns browsers), o tema sempre começa claro.
 
-**Problema: "Dragging cards causa erros CSS"**
-- Ocorria quando dnd-kit retornava transform undefined/NaN
-- **Status:** Corrigido — transform é validado com Number.isFinite() antes de usar
-- Se ainda ocorrer: limpar cache (`npm run build`) e hard-reload do browser
-
-### Swagger Documentation
-
-**Problema: "GET /api/v1/docs retorna pagina branca"**
-- Helmet CSP bloqueava recursos de unpkg.com
-- Ou CORS nao permitia carregamento de scripts
-- **Status:** Corrigido — CSP whitelist e CORS headers adicionados
-- Se ainda ocorrer: 
-  - Abrir console do browser (F12)
-  - Procurar por erros CSP ou CORS
-  - Verificar se openapi.json carrega: GET /api/v1/openapi.json
-
-**Problema: "Swagger UI carrega mas nao mostra endpoints"**
-- openapi.json pode estar vazio ou malformado
-- Solucao: Acessar diretamente /api/v1/openapi.json e validar JSON
-
-### Notificacoes
-
-**Problema: "Notificacoes desaparecem apos F5"**
-- Migrado para soft-delete (coluna `limpa` = true em vez de DELETE)
-- **Status:** Corrigido — notificacoes sao preservadas com flag limpa
-- Limpar notificacoes agora e PATCH /api/v1/notifications/clear-read em vez de DELETE
+### Migrations com erro
+```bash
+cd BackEnd
+npm run db:undo:all   # reverte tudo
+npm run db:migrate    # reaplicar do zero
+```
 
 ---
 
-## Roadmap tecnico
+## Segurança e boas práticas
 
-### Curto prazo
-- Persistencia completa em banco para Agenda (hoje parte local).
-- Testes automatizados de fluxo principal (frontend e backend).
-- Auditoria de eventos por card e por usuario.
-
-### Medio prazo
-- WebSocket em producao para atualizacao em tempo real ponta a ponta.
-- Dashboard de metricas operacionais (tempo medio de resolucao, volume por tecnico).
-- Busca fulltext em cards e comentarios.
-- Permissoes granulares por recurso (definir permissoes pelo frontend).
-
-### Longo prazo
-- Mobile app nativa (React Native).
-- Integracao com sistemas externos (ERP, CRM, ticketing).
-- IA para sugestoes de roteamento e prioridades.
-- Analytics avancada com exportacao de relatorios.
-
----
-
-## Observacoes
-
-### Seguranca
-- **JWT:** Tokens sao assinados com JWT_SECRET; trocar este valor em producao para chave aleatoria forte.
-- **Helmet:** Content Security Policy (CSP) configurada para permitir apenas recursos confiveis (self + unpkg.com para Swagger).
-- **CORS:** CORS habilitado seletivamente — documentacao (docs, openapi.json) com access `*`, dados protegidos com restricoes de origem.
-- **Auth Middleware:** Rotas protegidas requerem Authorization header com token Bearer valido.
-- **Rate Limiting:** Global rate limiter em desenvolvimento parametrizavel; em producao, considerar aumentar limites ou usar rate limiter externo (nginx, CloudFlare).
-
-### Performance
-- **Database Queries:** Usar indexes nas colunas frequentemente filtradas (usuario_id, coluna_id, status).
-- **Pagination:** API implementa paginacao server-side para listas longas.
-- **LocalStorage:** Frontend usa localStorage para preferencias, estado de Agenda e configuracoes (reduz chamadas API).
-- **Drag-and-drop:** dnd-kit otimizado com transforms CSS; evita re-renders desnecessarios.
-
-### Desenvolvimento
-- **Ambiente Local:** ENABLE_LEGACY_ROUTES=true por padrao facilitando testes com rotas sem versao.
-- **Hot Reload:** Frontend tem HMR ativado por padrao (Vite); backend recarrega com nodemon.
-- **Migrations:** Usar `npm run db:migrate` antes de iniciar dev; reversoes com `npm run db:undo`.
-- **Branches:** Manter main, develop e feature branches separadas; merge apenas apos validacao.
-
-### Estrutura de código
-- **Modelos:** Sequelize em `src/models/`; relacionamentos definidos em index.js.
-- **Controllers:** Logica de negocio isolada em `src/controllers/`; middlewares de autorizacao em cada rota.
-- **Routes:** RESTful padroes com verbos HTTP (GET, POST, PUT, PATCH, DELETE).
-- **Middleware:** Auth, rate limiter e handlers de erro centralizados.
-- **Frontend:** Organizacao por feature (Kanban, Agenda, Admin); servicos de API centralizados em `src/services/api.js`.
-
-### Este README descreve o estado atual implementado.
-Algumas funcionalidades originalmente planejadas foram adaptadas para entregas iterativas. Para perguntas tecnicas ou bugs, consulte logs, console do browser e endpoints de health.
+- **JWT_SECRET** jamais deve ser commitado ou exposto. Use um valor aleatório forte (≥ 32 chars) em produção.
+- **Refresh tokens** são persistidos na tabela `refresh_tokens` e revogados no logout.
+- **`requireAdmin`** e **`requireManagerOrAdmin`** revalidam o perfil no banco a cada request (não confiam no payload do token).
+- **Soft-delete** em notificações: nunca `DELETE`, apenas `limpa = true`. Histórico preservado.
+- **Sanitização HTML**: `descricao_html` da Agenda é sanitizado via `sanitize-html` antes de salvar.
+- **Rate limiting**: configurável via `GLOBAL_RATE_LIMIT_*`; padrão 5000 req/15min em dev, reduzir em produção.
+- **Helmet**: CSP configurada para permitir apenas recursos confiáveis (`self` + `unpkg.com` para Swagger).
+- **CORS**: configurado seletivamente; documentação com `*`, dados protegidos com restrição de origem.

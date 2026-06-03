@@ -1,18 +1,40 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 
-const PERFIS = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "admin"];
+// Cargos disponíveis para atribuição no painel.
+// Valores legados (gestor, operacional, etc.) são mantidos fora da lista
+// para não quebrar usuários existentes — aparecem apenas na exibição.
+const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc"];
+
+// Mapeia o valor do enum para um rótulo amigável exibido nos selects e badges.
+const PERFIL_LABELS = {
+  admin: "Admin",
+  convidado: "Convidado",
+  bko: "BKO",
+  delivery: "Delivery",
+  comercial: "Comercial",
+  noc: "NOC",
+  // legados — exibição somente
+  operacional: "Operacional",
+  tecnico: "Técnico",
+  gestor_delivery: "Gestora de Delivery",
+  gestor: "Gestor",
+};
 const PAGE_SIZE_OPTIONS = [8, 12, 20, 50];
 const STORAGE_KEY = "adminUsersTableState";
 
 const ROLE_STYLES = {
-  admin: { bg: "#ffe9d6", fg: "#913400", label: "Admin" },
-  gestor: { bg: "#e8ecff", fg: "#2f3d99", label: "Gestor" },
-  tecnico: { bg: "#dff5ff", fg: "#0e5a7a", label: "Tecnico" },
-  operacional: { bg: "#e9f8eb", fg: "#1c6d30", label: "Operacional" },
-  delivery: { bg: "#fff0f6", fg: "#9b1b5a", label: "Delivery" },
-  comercial: { bg: "#f6ecff", fg: "#6b2cb3", label: "Comercial" },
-  convidado: { bg: "#fff4d9", fg: "#7a5b00", label: "Convidado" },
+  admin:          { bg: "#ffe9d6", fg: "#913400",  label: "Admin" },
+  convidado:      { bg: "#fff4d9", fg: "#7a5b00",  label: "Convidado" },
+  bko:            { bg: "#edf4ff", fg: "#1a56aa",  label: "BKO" },
+  delivery:       { bg: "#fff0f6", fg: "#9b1b5a",  label: "Delivery" },
+  comercial:      { bg: "#f6ecff", fg: "#6b2cb3",  label: "Comercial" },
+  noc:            { bg: "#e8fff0", fg: "#0e6b3a",  label: "NOC" },
+  // legados — exibição somente
+  gestor:         { bg: "#e8ecff", fg: "#2f3d99",  label: "Gestor" },
+  gestor_delivery:{ bg: "#ffe7f3", fg: "#9b1b5a",  label: "Gestora de Delivery" },
+  tecnico:        { bg: "#dff5ff", fg: "#0e5a7a",  label: "Técnico" },
+  operacional:    { bg: "#e9f8eb", fg: "#1c6d30",  label: "Operacional" },
 };
 
 const APPROVAL_STYLES = {
@@ -24,7 +46,8 @@ const styles = {
   container: {
     minHeight: "100%",
     padding: "24px",
-    background: "radial-gradient(circle at 10% 10%, #f4edff 0%, #efe8ff 35%, #f8f5ff 100%)",
+    background: "var(--bg)",
+    color: "var(--text)",
   },
   hero: {
     borderRadius: "18px",
@@ -54,8 +77,8 @@ const styles = {
   metricValue: { fontSize: "22px", fontWeight: 700, marginTop: "4px" },
   panel: {
     borderRadius: "16px",
-    border: "1px solid #e2d9ff",
-    background: "#ffffff",
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
     boxShadow: "0 8px 24px rgba(59, 18, 107, 0.08)",
     overflow: "hidden",
   },
@@ -65,18 +88,19 @@ const styles = {
     alignItems: "center",
     flexWrap: "wrap",
     padding: "14px",
-    background: "linear-gradient(180deg, #fcfbff 0%, #f8f5ff 100%)",
-    borderBottom: "1px solid #eee8ff",
+    background: "var(--bg-card)",
+    borderBottom: "1px solid var(--border)",
   },
   searchInput: {
     width: "340px",
     maxWidth: "100%",
     padding: "10px 12px",
     borderRadius: "10px",
-    border: "1px solid #d7cafc",
+    border: "1px solid var(--border)",
     outline: "none",
     fontSize: "14px",
-    background: "#fff",
+    background: "var(--bg-input)",
+    color: "var(--text)",
   },
   pill: {
     borderRadius: "999px",
@@ -93,17 +117,17 @@ const styles = {
     textAlign: "left",
     fontSize: "12px",
     fontWeight: 700,
-    color: "#5f4e8f",
-    background: "#f8f5ff",
-    borderBottom: "1px solid #ece4ff",
+    color: "var(--text-label)",
+    background: "var(--bg-surface2, var(--bg-input))",
+    borderBottom: "1px solid var(--border)",
     userSelect: "none",
     whiteSpace: "nowrap",
   },
   td: {
     padding: "12px",
-    borderBottom: "1px solid #f1ecff",
+    borderBottom: "1px solid var(--border)",
     fontSize: "14px",
-    color: "#2f2758",
+    color: "var(--text)",
     verticalAlign: "middle",
   },
   nameCell: { display: "flex", alignItems: "center", gap: "10px" },
@@ -223,7 +247,7 @@ const styles = {
 export default function AdminUsers() {
     // Estado para novo cargo
     const [newRole, setNewRole] = useState("");
-    const [roles, setRoles] = useState(PERFIS);
+    const [roles, setRoles] = useState(PERFIS.map(n => ({ nome: n, id: n })));
     const [editingRoleId, setEditingRoleId] = useState(null);
     const [editingRoleName, setEditingRoleName] = useState("");
     const [editingRoleDesc, setEditingRoleDesc] = useState("");
@@ -328,7 +352,15 @@ export default function AdminUsers() {
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
-  const [form, setForm] = useState({ nome: "", email: "", perfil: "convidado" });
+  const [form, setForm] = useState({
+    nome: "",
+    email: "",
+    perfil: "convidado",
+    acesso_kanban_delivery: false,
+    acesso_kanban_comercial: false,
+    acesso_kanban_bko: false,
+    nova_senha: "",
+  });
 
   const totalFiltered = total;
 
@@ -356,10 +388,12 @@ export default function AdminUsers() {
         setUsers(res.data);
         setTotal(res.data.length);
         setTotalPages(1);
+        console.log("[AdminUsers] usuários (array):", res.data.length);
       } else {
         const rows = res.data.data || [];
         const serverTotalPages = res.data.pagination?.totalPages || 1;
         setUsers(rows);
+        console.log("[AdminUsers] usuários (paginado):", rows.length, "total:", res.data.pagination?.total);
         setTotal(res.data.pagination?.total || 0);
         setTotalPages(serverTotalPages);
 
@@ -485,19 +519,35 @@ export default function AdminUsers() {
       nome: user.nome || "",
       email: user.email || "",
       perfil: user.perfil || "convidado",
+      acesso_kanban_delivery: Boolean(user.acesso_kanban_delivery),
+      acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
+      acesso_kanban_bko: Boolean(user.acesso_kanban_bko),
+      nova_senha: "",
     });
   };
 
   // Cancela a edição e limpa o formulário
   const cancelEdit = () => {
     setEditingId(null);
-    setForm({ nome: "", email: "", perfil: "convidado" });
+    setForm({
+      nome: "",
+      email: "",
+      perfil: "convidado",
+      acesso_kanban_delivery: false,
+      acesso_kanban_comercial: false,
+      acesso_kanban_bko: false,
+      nova_senha: "",
+    });
   };
 
   // Envia as alterações do formulário para a API e recarrega a tabela
   const saveEdit = async (id) => {
     try {
-      await api.put(`/users/admin/${id}`, form);
+      const payload = { ...form };
+      if (!payload.nova_senha || !payload.nova_senha.trim()) {
+        delete payload.nova_senha; // não envia se vazio
+      }
+      await api.put(`/users/admin/${id}`, payload);
       await loadUsers();
       cancelEdit();
     } catch (err) {
@@ -691,69 +741,6 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* Seção para criar/editar/excluir cargos */}
-      <div style={{ margin: "18px auto 24px auto", padding: "16px", background: "#f8f5ff", borderRadius: "12px", border: "1px solid #e2d9ff", maxWidth: 500, display: "block" }}>
-        <h3 style={{ margin: 0, color: "#5f2ca0", fontSize: 16 }}>Gerenciar cargos</h3>
-        {/* Lista de cargos */}
-        <div style={{ marginTop: 10, marginBottom: 10 }}>
-          {roles.map((role) => (
-            <div key={role.id || role.nome} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              {editingRoleId === role.id ? (
-                <>
-                  <input
-                    value={editingRoleName}
-                    onChange={e => setEditingRoleName(e.target.value)}
-                    placeholder="Nome do cargo"
-                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
-                    disabled={loadingRoles}
-                  />
-                  <input
-                    value={editingRoleDesc}
-                    onChange={e => setEditingRoleDesc(e.target.value)}
-                    placeholder="Descrição (opcional)"
-                    style={{ flex: 1, padding: "6px 8px", borderRadius: 6, border: "1px solid #d9d0f9", fontSize: 13 }}
-                    disabled={loadingRoles}
-                  />
-                  <button onClick={saveEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#2f8a42", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Salvar</button>
-                  <button onClick={cancelEditRole} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#aaa", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Cancelar</button>
-                </>
-              ) : (
-                <>
-                  <span style={{ minWidth: 90, fontWeight: 600 }}>{role.nome}</span>
-                  {role.descricao && <span style={{ color: "#7a73a1", fontSize: 12 }}>({role.descricao})</span>}
-                  {!PERFIS.includes(role.nome) && (
-                    <>
-                      <button onClick={() => startEditRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#5f2ca0", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Editar</button>
-                      <button onClick={() => deleteRole(role)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: "#a4001d", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }} disabled={loadingRoles}>Excluir</button>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-        {/* Adicionar novo cargo */}
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <input
-            value={newRole}
-            onChange={e => setNewRole(e.target.value)}
-            placeholder="Nome do novo cargo"
-            style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: "1px solid #d9d0f9", fontSize: 13 }}
-            disabled={loadingRoles}
-          />
-          <button
-            onClick={handleAddRole}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "linear-gradient(90deg, #8b64ff, #5a30ff)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: loadingRoles ? "wait" : "pointer", opacity: loadingRoles ? 0.7 : 1 }}
-            disabled={loadingRoles}
-          >
-            {loadingRoles ? "Adicionando..." : "Adicionar"}
-          </button>
-        </div>
-        {roleError && <div style={{ color: "#a4001d", marginTop: 8, fontSize: 13 }}>{roleError}</div>}
-        <div style={{ marginTop: 10, color: "#7a73a1", fontSize: 12 }}>
-          Os cargos criados aqui ficam disponíveis para seleção ao editar usuários.
-        </div>
-      </div>
 
       <div style={styles.tableWrap}>
         <table style={styles.table}>
@@ -768,17 +755,20 @@ export default function AdminUsers() {
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("email")}>
                 Email{sortIndicator("email")}
               </th>
+              <th style={styles.th}>Senha</th>
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("perfil")}>
                 Perfil{sortIndicator("perfil")}
               </th>
               <th style={{ ...styles.th, cursor: "pointer" }} onClick={() => handleSort("aprovado")}>
                 Aprovacao{sortIndicator("aprovado")}
               </th>
+              <th style={styles.th}>Acesso Kanban</th>
               <th style={styles.th}>Acoes</th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => {
+              if (!user?.id) return null;
               const editing = editingId === user.id;
               const roleStyle = getRoleStyle(user.perfil);
               const approvalStyle = user.aprovado ? APPROVAL_STYLES.approved : APPROVAL_STYLES.pending;
@@ -822,6 +812,23 @@ export default function AdminUsers() {
                       <span style={{ color: "#5d5890", fontWeight: 600 }}>{user.email}</span>
                     )}
                   </td>
+
+                  {/* Coluna de senha */}
+                  <td style={styles.td}>
+                    {editing ? (
+                      <input
+                        type="text"
+                        value={form.nova_senha}
+                        onChange={(e) => setForm((p) => ({ ...p, nova_senha: e.target.value }))}
+                        placeholder="Nova senha (mín. 6 chars)"
+                        style={{ ...styles.input, minWidth: 160 }}
+                        autoComplete="new-password"
+                      />
+                    ) : (
+                      <span style={{ color: "#7a73a1", fontSize: 13 }}>••••••••</span>
+                    )}
+                  </td>
+
                   <td style={styles.td}>
                     {editing ? (
                       <select
@@ -830,10 +837,10 @@ export default function AdminUsers() {
                         style={styles.input}
                       >
                         {roles.map((perfil) => (
-                          <option key={perfil.id || perfil.nome} value={perfil.nome}>
-                            {perfil.nome}
-                          </option>
-                        ))}
+                            <option key={perfil.id || perfil.nome} value={perfil.nome}>
+                              {PERFIL_LABELS[perfil.nome] || perfil.nome}
+                            </option>
+                          ))}
                       </select>
                     ) : (
                       <span style={{ ...styles.badge, background: roleStyle.bg, color: roleStyle.fg }}>
@@ -845,6 +852,57 @@ export default function AdminUsers() {
                     <span style={{ ...styles.badge, background: approvalStyle.bg, color: approvalStyle.fg }}>
                       {approvalStyle.label}
                     </span>
+                  </td>
+                  <td style={styles.td}>
+                    {editing ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_delivery}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_delivery: e.target.checked }))
+                            }
+                          />
+                          Delivery
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_comercial}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_comercial: e.target.checked }))
+                            }
+                          />
+                          Comercial
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_bko}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_bko: e.target.checked }))
+                            }
+                          />
+                          BKO
+                        </label>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {user.acesso_kanban_delivery && (
+                          <span style={{ ...styles.badge, background: "#fff0f6", color: "#9b1b5a" }}>Delivery</span>
+                        )}
+                        {user.acesso_kanban_comercial && (
+                          <span style={{ ...styles.badge, background: "#f6ecff", color: "#6b2cb3" }}>Comercial</span>
+                        )}
+                        {user.acesso_kanban_bko && (
+                          <span style={{ ...styles.badge, background: "#edf4ff", color: "#1a56aa" }}>BKO</span>
+                        )}
+                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && (
+                          <span style={{ color: "#7a73a1", fontSize: 13 }}>—</span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -873,7 +931,7 @@ export default function AdminUsers() {
             })}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
+                <td colSpan={7} style={{ ...styles.td, textAlign: "center", color: "#6a6791" }}>
                   Nenhum usuário encontrado para a busca.
                 </td>
               </tr>

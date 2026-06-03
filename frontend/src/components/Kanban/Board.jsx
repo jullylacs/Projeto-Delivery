@@ -1,7 +1,17 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
+// Injeta o nome do usuário logado em cards que não têm atualizado_por_nome
+function enrichCardWithUpdater(card) {
+  if (!card || card.atualizado_por_nome) return card;
+  try {
+    const me = JSON.parse(localStorage.getItem("user") || "{}");
+    const nome = me?.nome || me?.email;
+    return nome ? { ...card, atualizado_por_nome: nome } : card;
+  } catch { return card; }
+}
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import {
   CalendarDays,
@@ -33,17 +43,28 @@ const KANBAN_PREFS_KEY = "kanbanPrefs";
 const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
+
+const VALID_BOARDS = ["delivery", "comercial", "bko"];
+
+const getKanbanPrefsKey = (board) => `${KANBAN_PREFS_KEY}:${board || "delivery"}`;
+
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO" };
+
 const normalizeColumnEntity = (item, index = 0) => ({
   id: Number(item?.id ?? item?._id ?? index + 1),
   nome: String(item?.nome || "").trim(),
   ordem: Number.isFinite(Number(item?.ordem)) ? Number(item.ordem) : index,
   limiteWip: item?.limiteWip ?? null,
+  board: VALID_BOARDS.includes(item?.board) ? item.board : "delivery",
 });
 
-const readKanbanPrefs = () => {
+const readKanbanPrefs = (board) => {
   try {
-    const raw = localStorage.getItem(KANBAN_PREFS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(getKanbanPrefsKey(board));
+    if (raw) return JSON.parse(raw);
+    // Fallback: respeita prefs antigas globais (pré-multi-board).
+    const legacy = localStorage.getItem(KANBAN_PREFS_KEY);
+    return legacy ? JSON.parse(legacy) : {};
   } catch {
     return {};
   }
@@ -304,8 +325,8 @@ function MentionToken({ mentionText, profile }) {
           bottom: "calc(100% + 8px)",
           minWidth: 210,
           maxWidth: 280,
-          background: "#ffffff",
-          border: "1px solid #d9cdfd",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           padding: "10px 12px",
           boxShadow: "0 12px 26px rgba(63, 47, 140, 0.2)",
@@ -440,49 +461,30 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        p: ({ children }) => <p style={{ margin: "0 0 6px", lineHeight: 1.55 }}>{children}</p>,
-        ul: ({ children }) => <ul style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ul>,
-        ol: ({ children }) => <ol style={{ margin: "6px 0", paddingLeft: 20 }}>{children}</ol>,
-        li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+        // Sem margem extra entre parágrafos — texto flui naturalmente
+        p: ({ children }) => <span style={{ display: "block", lineHeight: 1.55 }}>{children}</span>,
+        ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ul>,
+        ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ol>,
+        li: ({ children }) => <li style={{ marginBottom: 2, lineHeight: 1.5 }}>{children}</li>,
         strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
         em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
         blockquote: ({ children }) => (
-          <blockquote
-            style={{
-              margin: "8px 0",
-              padding: "4px 10px",
-              borderLeft: "3px solid #c4b2ff",
-              color: "#5a4a9d",
-              background: "#f5efff",
-              borderRadius: 6,
-            }}
-          >
+          <blockquote style={{ margin: "6px 0", padding: "3px 10px", borderLeft: "3px solid #c4b2ff", color: "#5a4a9d", background: "#f5efff", borderRadius: 6 }}>
             {children}
           </blockquote>
         ),
         code: ({ children }) => (
-          <code
-            style={{
-              background: "#ece5ff",
-              border: "1px solid #dacdff",
-              borderRadius: 6,
-              padding: "1px 5px",
-              fontSize: 12,
-              color: "#4a379b",
-            }}
-          >
+          <code style={{ background: "#ece5ff", border: "1px solid #dacdff", borderRadius: 6, padding: "1px 5px", fontSize: 12, color: "#4a379b" }}>
             {children}
           </code>
         ),
         a: ({ href, children }) => {
-          if (href && href.startsWith("/__mention__/")) {
+          if (href?.startsWith("/__mention__/")) {
             const normalizedName = decodeURIComponent(href.replace("/__mention__/", ""));
             const profile = mentionLookup.get(normalizedName);
             const mentionText = Array.isArray(children) ? children.join("") : String(children || "@");
-
             return <MentionToken mentionText={mentionText} profile={profile} />;
           }
-
           return <span>{children}</span>;
         },
       }}
@@ -495,15 +497,15 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
 // Estilos da aplicação - definições de CSS-in-JS para componentes
 const styles = {
     detailsModalCard: {
-      background: 'linear-gradient(165deg, #f8f6ff 0%, #f1ecff 42%, #ede7ff 100%)',
-      borderRadius: '24px',
-      boxShadow: '0 24px 52px rgba(57, 31, 136, 0.24), 0 3px 14px rgba(0,0,0,0.08)',
-      padding: '22px 24px',
+      background: 'var(--bg-card)',
+      borderRadius: '20px',
+      boxShadow: '0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)',
+      padding: '0',
       width: 'min(1280px, calc(100vw - 24px))',
-      maxHeight: '90vh',
+      maxHeight: '92vh',
       margin: '0 auto',
       position: 'relative',
-      border: '1px solid #d2c6ff',
+      border: '1px solid var(--border)',
       minHeight: '620px',
       fontFamily: 'inherit',
       display: 'flex',
@@ -514,7 +516,7 @@ const styles = {
     detailsContent: {
       display: 'grid',
       gridTemplateColumns: '0.55fr 1.45fr',
-      gap: '14px',
+      gap: '0',
       minHeight: 0,
       flex: 1,
       overflow: 'hidden',
@@ -522,110 +524,105 @@ const styles = {
     detailsMain: {
       display: 'flex',
       flexDirection: 'column',
-      background: '#f7f4ff',
-      border: '1px solid #d9ccff',
-      borderRadius: '18px',
-      padding: '18px',
+      background: 'var(--bg-card)',
+      borderRight: '1px solid var(--border)',
+      padding: '20px',
       minHeight: 0,
+      overflowY: 'auto',
     },
     detailsMainBody: {
       flex: 1,
       minHeight: 0,
       overflowY: 'auto',
-      paddingRight: '6px',
+      paddingRight: '4px',
     },
     detailsHeader: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '18px',
-      padding: '10px 12px',
-      borderRadius: '14px',
-      background: 'linear-gradient(135deg, rgba(132, 99, 255, 0.16), rgba(85, 57, 196, 0.14))',
-      border: '1px solid rgba(111, 87, 226, 0.26)',
+      padding: '18px 22px',
+      background: 'linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)',
+      borderBottom: '1px solid rgba(255,255,255,0.08)',
+      flexShrink: 0,
     },
     detailsTitle: {
       margin: 0,
-      color: '#4c3393',
-      fontSize: '26px',
+      color: '#ffffff',
+      fontSize: '18px',
       fontWeight: 700,
-      letterSpacing: '-0.5px',
+      letterSpacing: '-0.2px',
       display: 'flex',
       alignItems: 'center',
       gap: '10px',
     },
     detailsSection: {
-      marginBottom: '18px',
-      paddingBottom: '12px',
-      borderBottom: '1px solid #ece7fa',
+      marginBottom: '14px',
+      paddingBottom: '14px',
+      borderBottom: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px',
+      gap: '8px',
     },
     detailsRow: {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'flex-start',
-      gap: '4px',
-      fontSize: '16px',
-      color: '#3e2c9e',
-      fontWeight: 500,
-      padding: '8px 10px',
-      background: '#f8f5ff',
-      border: '1px solid #e6deff',
+      gap: '3px',
+      padding: '10px 12px',
+      background: 'var(--bg-input)',
+      border: '1px solid var(--border)',
       borderRadius: '10px',
+      transition: 'border-color 150ms ease',
     },
     detailsLabel: {
       minWidth: 'unset',
-      color: '#7c6fb7',
-      fontWeight: 600,
-      fontSize: '12px',
+      color: 'var(--text-label)',
+      fontWeight: 700,
+      fontSize: '10.5px',
       display: 'flex',
       alignItems: 'center',
-      gap: '6px',
+      gap: '5px',
       textTransform: 'uppercase',
-      letterSpacing: '0.4px',
+      letterSpacing: '0.6px',
     },
     detailsValue: {
-      color: '#2d225a',
+      color: 'var(--text)',
       fontWeight: 600,
-      fontSize: '17px',
-      lineHeight: 1.35,
+      fontSize: '14px',
+      lineHeight: 1.4,
     },
     detailsStatusRow: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px',
-      margin: '10px 0 0 0',
+      gap: '10px',
+      margin: '8px 0 0 0',
+      flexWrap: 'wrap',
     },
     detailsActions: {
-      margin: '14px 0 0 0',
-      paddingTop: '12px',
-      borderTop: '1px solid #e0d6ff',
+      margin: '16px 0 0 0',
+      paddingTop: '14px',
+      borderTop: '1px solid var(--border)',
       display: 'flex',
-      gap: '12px',
+      gap: '8px',
       flexWrap: 'wrap',
       justifyContent: 'flex-start',
-      background: '#f7f4ff',
-      borderRadius: '12px',
     },
     detailsObservacoes: {
-      background: '#ede7ff',
-      gridTemplateColumns: 'minmax(360px, 420px) minmax(0, 1fr)',
-      padding: '16px 18px',
-      color: '#4b3b9a',
-      fontSize: '14px',
-      marginTop: '8px',
+      background: 'var(--bg-input)',
+      padding: '12px 14px',
+      color: 'var(--text)',
+      fontSize: '13.5px',
+      marginTop: '4px',
       marginBottom: '8px',
-      border: '1px solid #d8cdfd',
+      border: '1px solid var(--border)',
+      borderRadius: '10px',
+      lineHeight: 1.55,
     },
     detailsComments: {
       marginTop: 0,
-      background: '#f0ecff',
-      borderRadius: '16px',
-      padding: '16px',
+      background: 'var(--bg-card)',
+      padding: '20px',
       minWidth: 0,
-      boxShadow: 'inset 0 0 0 1px #ddd3ff',
       minHeight: '540px',
       display: 'flex',
       flexDirection: 'column',
@@ -637,41 +634,44 @@ const styles = {
       minWidth: 0,
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: '12px',
-      paddingBottom: '10px',
-      borderBottom: '1px solid #ddd1ff',
+      marginBottom: '14px',
+      paddingBottom: '12px',
+      borderBottom: '1px solid var(--border)',
     },
     detailsCommentsList: {
       flex: 1,
       flexWrap: 'wrap',
       minHeight: 0,
       overflowY: 'auto',
-      paddingRight: '6px',
+      paddingRight: '4px',
     },
     detailsComposer: {
       marginTop: '12px',
-      paddingTop: '10px',
-      borderTop: '1px solid #ddd1ff',
-      background: '#f0ecff',
+      paddingTop: '12px',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--bg-card)',
     },
     detailsCommentItem: {
-      padding: '14px',
-      background: '#ffffff',
-      borderRadius: '12px',
-      marginBottom: '12px',
-      border: '1px solid #e1d8ff',
+      padding: '12px 14px',
+      background: 'var(--bg-input)',
+      borderRadius: '10px',
+      marginBottom: '8px',
+      border: '1px solid var(--border)',
     },
     detailsCommentAuthor: {
       margin: 0,
-      color: '#4f3dab',
+      color: 'var(--text)',
       fontWeight: 600,
+      fontSize: '13px',
     },
     detailsCommentText: {
       margin: '6px 0 0',
-      color: '#4f3dab',
+      color: 'var(--text)',
+      fontSize: '13.5px',
+      lineHeight: 1.55,
     },
     detailsCommentDate: {
-      color: '#7c6fb7',
+      color: 'var(--text-label)',
       fontSize: '11px',
       marginTop: '8px',
       display: 'block',
@@ -679,23 +679,29 @@ const styles = {
     },
     detailsCloseBtn: {
       border: 'none',
-      background: 'transparent',
-      fontSize: '28px',
+      background: 'rgba(255,255,255,0.15)',
+      borderRadius: '8px',
+      width: '32px',
+      height: '32px',
+      fontSize: '18px',
       cursor: 'pointer',
-      color: '#7f6ad7',
-      transition: 'color 0.2s',
-      marginLeft: '12px',
+      color: 'rgba(255,255,255,0.8)',
+      transition: 'background 150ms ease, color 150ms ease',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
     },
   container: {
     padding: "20px",
     minHeight: "80vh",
-    background: "linear-gradient(180deg, #f8f7ff 0%, #f2f0ff 100%)",
+    background: "var(--bg)",
     width: "100%",
     minWidth: 0,
     boxSizing: "border-box",
   },
   header: {
-    marginBottom: "28px",
+    marginBottom: "20px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -703,28 +709,30 @@ const styles = {
   },
   title: {
     color: "#3c2f9f",
-    fontSize: "28px",
+    fontSize: "24px",
     fontWeight: "700",
     letterSpacing: "-0.5px",
-    background: "linear-gradient(90deg, #8b64ff, #5a30ff)",
+    background: "linear-gradient(90deg, #7a4dff, #4c1d95)",
     backgroundClip: "text",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
+    margin: 0,
   },
   addButton: {
-    background: "linear-gradient(135deg, #7f5af0 0%, #5a36d6 100%)",
+    background: "linear-gradient(135deg, #7a4dff 0%, #9d4edd 100%)",
     color: "#fff",
     border: "none",
-    padding: "11px 20px",
+    padding: "10px 18px",
     borderRadius: "10px",
     cursor: "pointer",
-    boxShadow: "0 6px 14px rgba(82, 45, 199, 0.35)",
+    boxShadow: "0 4px 14px rgba(124, 77, 255, 0.4)",
     fontWeight: "600",
-    fontSize: "14px",
-    transition: "all 0.2s ease",
+    fontSize: "13.5px",
+    transition: "transform 150ms ease, box-shadow 150ms ease",
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    gap: "7px",
+    letterSpacing: "0.1px",
   },
   tableContainer: {
     width: "100%",
@@ -732,9 +740,9 @@ const styles = {
     overflowX: "auto",
     overflowY: "hidden",
     borderRadius: "16px",
-    background: "#faf9ff",
-    border: "1px solid #d6d0ff",
-    padding: "12px 0",
+    background: "transparent",
+    border: "none",
+    padding: "4px 0 12px",
     boxSizing: "border-box",
     position: "relative",
     scrollBehavior: "smooth",
@@ -748,42 +756,43 @@ const styles = {
     tableLayout: "auto",
   },
   th: {
-    background: "#fff",
-    color: "#3c2f9f",
-    padding: "10px 12px",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    padding: "12px 14px",
     textAlign: "left",
-    fontSize: "13px",
-    fontWeight: "600",
-    letterSpacing: "0.2px",
-    borderRadius: "12px 12px 0 0",
-    border: "1px solid #d6d0ff",
-    borderBottom: "none",
+    fontSize: "12.5px",
+    fontWeight: "700",
+    letterSpacing: "0.3px",
+    borderRadius: "14px 14px 0 0",
+    border: "1px solid var(--border)",
+    borderBottom: "2px solid var(--border)",
     minWidth: "360px",
+    boxShadow: "0 -2px 8px rgba(76,29,149,0.05)",
   },
   td: {
     padding: "0",
     verticalAlign: "top",
-    background: "#fff",
-    border: "1px solid #d6d0ff",
-    borderTop: "none",
-    borderRadius: "0 0 12px 12px",
+    background: "transparent",
+    border: "none",
+    borderRadius: "0 0 14px 14px",
     minWidth: "360px",
     width: "360px",
   },
   cardItem: {
-    background: "#fff",
+    background: "var(--bg-card)",
     borderRadius: "12px",
     padding: "16px 14px",
-    marginBottom: "10px",
-    boxShadow: "0 8px 18px rgba(62,44,158,0.08)",
-    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+    marginBottom: "8px",
+    boxShadow: "0 2px 8px rgba(76,29,149,0.07), 0 1px 2px rgba(76,29,149,0.04)",
+    transition: "transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms ease",
     cursor: "grab",
     borderWidth: "1px",
     borderStyle: "solid",
-    borderTopColor: "#d6d0ff",
-    borderRightColor: "#d6d0ff",
-    borderBottomColor: "#d6d0ff",
+    borderTopColor: "var(--border)",
+    borderRightColor: "var(--border)",
+    borderBottomColor: "var(--border)",
     borderLeftColor: "#7c5cff",
+    borderLeftWidth: "3px",
     position: "relative",
     display: "flex",
     flexDirection: "column",
@@ -799,7 +808,7 @@ const styles = {
   cardTitle: {
     fontSize: "15px",
     fontWeight: "600",
-    color: "#3c2f9f",
+    color: "var(--text)",
     marginBottom: "4px",
     lineHeight: "1.3",
     wordBreak: "break-word",
@@ -810,7 +819,7 @@ const styles = {
     textOverflow: "ellipsis",
   },
   infoText: {
-    color: "#5f5a88",
+    color: "var(--text-muted, var(--text))",
     flex: 1,
     wordBreak: "break-word",
     overflowWrap: "break-word",
@@ -821,10 +830,10 @@ const styles = {
   },
   cardItemHover: {
     transform: "translateY(-2px)",
-    boxShadow: "0 10px 18px rgba(75, 35, 182, 0.22)",
-    borderTopColor: "#bca8ff",
-    borderRightColor: "#bca8ff",
-    borderBottomColor: "#bca8ff",
+    boxShadow: "0 8px 20px rgba(76,29,149,0.15), 0 2px 6px rgba(76,29,149,0.08)",
+    borderTopColor: "#c4b5fd",
+    borderRightColor: "#c4b5fd",
+    borderBottomColor: "#c4b5fd",
     borderLeftColor: "#7c5cff",
   },
   cardItemPromoted: {
@@ -849,8 +858,8 @@ const styles = {
     lineHeight: "1.3",
   },
   cardBadge: {
-    background: "#faf9ff",
-    color: "#3c2f9f",
+    background: "var(--bg-input)",
+    color: "var(--text)",
     padding: "4px 10px",
     borderRadius: "8px",
     fontSize: "11px",
@@ -870,22 +879,22 @@ const styles = {
     alignItems: "center",
     gap: "8px",
     fontSize: "12px",
-    color: "#5a5a6e",
+    color: "var(--text-muted, var(--text))",
   },
   infoIcon: {
     fontSize: "14px",
     minWidth: "20px",
   },
   infoText: {
-    color: "#4a4a5e",
+    color: "var(--text-muted, var(--text))",
     flex: 1,
   },
   cardFooter: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: "12px",
-    borderTop: "1px solid #e8deff",
+    paddingTop: "10px",
+    borderTop: "1px solid var(--border)",
     marginTop: "4px",
   },
   vendorInfo: {
@@ -893,7 +902,7 @@ const styles = {
     alignItems: "center",
     gap: "6px",
     fontSize: "11px",
-    color: "#8b8aa2",
+    color: "var(--text-label)",
   },
   footerMeta: {
     display: "flex",
@@ -902,24 +911,25 @@ const styles = {
   },
   updatedInfo: {
     fontSize: "10px",
-    color: "#8f86b8",
+    color: "var(--text-label)",
     lineHeight: 1.2,
   },
   detailButton: {
-    background: "#ede6ff",
-    border: "none",
-    color: "#5b3ad1",
-    fontSize: "12px",
-    fontWeight: "500",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border)",
+    color: "var(--text)",
+    fontSize: "11.5px",
+    fontWeight: "600",
     cursor: "pointer",
-    padding: "6px 12px",
+    padding: "5px 11px",
     borderRadius: "7px",
-    transition: "all 0.2s ease",
+    transition: "background 150ms ease, box-shadow 150ms ease",
     display: "flex",
     alignItems: "center",
     gap: "4px",
     position: "relative",
     zIndex: 2,
+    letterSpacing: "0.1px",
   },
   priceTag: {
     fontWeight: "700",
@@ -953,40 +963,40 @@ const styles = {
     zIndex: 4000,
   },
   modal: {
-    background: "#fff",
-    borderRadius: "24px",
-    padding: "28px",
+    background: "var(--bg-card)",
+    borderRadius: "16px",
+    padding: "24px",
     width: "100%",
     maxWidth: "540px",
-    boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-    border: "1px solid rgba(108,59,255,0.1)",
+    boxShadow: "0 24px 48px rgba(30,10,80,0.2), 0 4px 12px rgba(0,0,0,0.06)",
+    border: "1px solid var(--border)",
   },
   createModal: {
-    background: "linear-gradient(180deg, #fcfbff 0%, #f6f1ff 100%)",
-    borderRadius: "26px",
-    padding: "20px",
-    width: "min(920px, calc(100vw - 28px))",
-    maxHeight: "88vh",
-    overflowY: "auto",
-    boxShadow: "0 28px 60px rgba(43, 20, 111, 0.24)",
-    border: "1px solid #ddd4ff",
+    background: "var(--bg-card)",
+    borderRadius: "20px",
+    padding: "0",
+    width: "min(940px, calc(100vw - 28px))",
+    maxHeight: "90vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 32px 64px rgba(30,10,80,0.22), 0 4px 16px rgba(0,0,0,0.06)",
+    border: "1px solid var(--border)",
+    overflow: "hidden",
   },
   modalTitle: {
     marginBottom: "20px",
-    color: "#4c3393",
+    color: "var(--text)",
     fontSize: "24px",
     fontWeight: "600",
   },
   createHero: {
-    display: "grid",
-    gridTemplateColumns: "1fr 220px",
-    gap: "14px",
-    padding: "16px",
-    background: "linear-gradient(135deg, #ffffff 0%, #f2ebff 100%)",
-    border: "1px solid #e3d8ff",
-    borderRadius: "20px",
-    marginBottom: "18px",
-    boxShadow: "0 10px 24px rgba(92, 57, 201, 0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "0",
+    padding: "20px 24px",
+    background: "linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)",
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    marginBottom: "0",
   },
   createHeroTitleWrap: {
     display: "flex",
@@ -995,17 +1005,17 @@ const styles = {
   },
   createHeroTitle: {
     margin: 0,
-    color: "#41288f",
-    fontSize: "24px",
+    color: "#ffffff",
+    fontSize: "20px",
     fontWeight: "700",
-    letterSpacing: "-0.5px",
+    letterSpacing: "-0.3px",
     display: "flex",
     alignItems: "center",
     gap: "10px",
   },
   createHeroText: {
     margin: 0,
-    color: "#6b5baa",
+    color: "rgba(255,255,255,0.65)",
     fontSize: "13px",
     lineHeight: 1.55,
     maxWidth: "470px",
@@ -1019,11 +1029,11 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "6px",
-    padding: "6px 10px",
+    padding: "5px 10px",
     borderRadius: "999px",
-    background: "#efe8ff",
-    border: "1px solid #ddd1ff",
-    color: "#5a43af",
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.2)",
+    color: "rgba(255,255,255,0.85)",
     fontSize: "12px",
     fontWeight: "600",
   },
@@ -1033,15 +1043,14 @@ const styles = {
     alignContent: "start",
   },
   createMetaCard: {
-    background: "rgba(255,255,255,0.92)",
-    border: "1px solid #e6dcff",
-    borderRadius: "16px",
+    background: "rgba(255,255,255,0.1)",
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: "12px",
     padding: "12px 14px",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
   },
   createMetaLabel: {
     margin: 0,
-    color: "#8978c1",
+    color: "rgba(255,255,255,0.55)",
     fontSize: "10px",
     fontWeight: "700",
     letterSpacing: "0.7px",
@@ -1049,20 +1058,26 @@ const styles = {
   },
   createMetaValue: {
     margin: "5px 0 0",
-    color: "#3f2b85",
+    color: "rgba(255,255,255,0.9)",
     fontSize: "14px",
     fontWeight: "700",
   },
   createBody: {
     display: "grid",
-    gap: "12px",
+    gap: "0",
+    padding: "20px 24px",
+    background: "var(--bg)",
+    overflowY: "auto",
+    flex: 1,
+    minHeight: 0,
   },
   createSection: {
-    background: "#f9f6ff",
-    border: "1px solid #e1d8ff",
-    borderRadius: "18px",
-    padding: "14px",
-    boxShadow: "0 8px 18px rgba(84, 56, 190, 0.06)",
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: "14px",
+    padding: "16px",
+    marginBottom: "12px",
+    boxShadow: "0 1px 4px rgba(76,29,149,0.05)",
   },
   createSectionHeader: {
     display: "flex",
@@ -1073,21 +1088,23 @@ const styles = {
   },
   createSectionTitle: {
     margin: 0,
-    color: "#463191",
-    fontSize: "14px",
+    color: "var(--text)",
+    fontSize: "13px",
     fontWeight: "700",
     display: "flex",
     alignItems: "center",
-    gap: "8px",
+    gap: "7px",
+    letterSpacing: "0.1px",
   },
   createSectionChip: {
-    fontSize: "11px",
+    fontSize: "10.5px",
     fontWeight: "700",
-    color: "#6d59b4",
-    background: "#eee7ff",
-    border: "1px solid #d8ccff",
+    color: "var(--text-label)",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border)",
     borderRadius: "999px",
-    padding: "4px 9px",
+    padding: "3px 9px",
+    letterSpacing: "0.3px",
   },
   createSectionGrid: {
     display: "grid",
@@ -1103,7 +1120,7 @@ const styles = {
     gap: "6px",
   },
   createLabel: {
-    color: "#6853b0",
+    color: "var(--text-label)",
     fontSize: "11px",
     fontWeight: "700",
     letterSpacing: "0.5px",
@@ -1119,35 +1136,35 @@ const styles = {
   },
   createInput: {
     width: "100%",
-    border: "1px solid #d9d0f9",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#ffffff",
-    color: "#201b5f",
-    fontSize: "13px",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    padding: "10px 13px",
+    background: "var(--bg-input)",
+    color: "var(--text)",
+    fontSize: "13.5px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease",
     boxSizing: "border-box",
     fontFamily: "inherit",
   },
   createTextArea: {
     width: "100%",
-    border: "1px solid #d9d0f9",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#ffffff",
-    color: "#201b5f",
-    fontSize: "13px",
-    minHeight: "110px",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    padding: "10px 13px",
+    background: "var(--bg-input)",
+    color: "var(--text)",
+    fontSize: "13.5px",
+    minHeight: "100px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, background 160ms ease",
     boxSizing: "border-box",
     fontFamily: "inherit",
     resize: "vertical",
   },
   createFooterNote: {
     margin: "2px 0 0",
-    color: "#7d6bb8",
+    color: "var(--text-label)",
     fontSize: "12px",
   },
   formGrid: {
@@ -1156,75 +1173,81 @@ const styles = {
   },
   modalInput: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
-    color: "#1e1a61",
-    fontSize: "14px",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    background: "var(--bg-input)",
+    color: "var(--text)",
+    fontSize: "13.5px",
     outline: "none",
-    transition: "all 0.2s ease",
+    transition: "border-color 160ms ease, box-shadow 160ms ease",
     boxSizing: "border-box",
+    fontFamily: "inherit",
   },
   modalTextArea: {
     width: "100%",
-    border: "1px solid #e2e0f0",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    background: "#fefefe",
-    color: "#1e1a61",
-    fontSize: "14px",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    background: "var(--bg-input)",
+    color: "var(--text)",
+    fontSize: "13.5px",
     minHeight: "80px",
     outline: "none",
     fontFamily: "inherit",
     boxSizing: "border-box",
     resize: "vertical",
+    transition: "border-color 160ms ease",
   },
   actionGroup: {
     display: "flex",
     justifyContent: "flex-end",
-    gap: "12px",
+    gap: "8px",
     marginTop: "20px",
   },
   cancelBtn: {
-    border: "1px solid #e2e0f0",
-    background: "#ffffff",
-    color: "#5b4eaa",
-    padding: "10px 20px",
-    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    background: "var(--bg-card)",
+    color: "var(--text)",
+    padding: "9px 18px",
+    borderRadius: "9px",
     cursor: "pointer",
-    fontWeight: "500",
-    transition: "all 0.2s ease",
+    fontWeight: "600",
+    fontSize: "13px",
+    transition: "background 150ms ease, border-color 150ms ease",
   },
   saveBtn: {
     border: "none",
-    background: "linear-gradient(135deg, #7c5bff, #5a30ff)",
+    background: "linear-gradient(135deg, #7a4dff, #9d4edd)",
     color: "#fff",
-    padding: "10px 24px",
-    borderRadius: "12px",
+    padding: "9px 22px",
+    borderRadius: "9px",
     cursor: "pointer",
     fontWeight: "600",
-    transition: "all 0.2s ease",
+    fontSize: "13px",
+    transition: "opacity 150ms ease, transform 150ms ease",
+    boxShadow: "0 3px 10px rgba(124,77,255,0.35)",
   },
   errorText: {
-    color: "#d32f2f",
+    color: "#c0392b",
     fontSize: "13px",
     fontWeight: "500",
     margin: "12px 0 0",
-    padding: "8px",
-    background: "#ffebee",
+    padding: "10px 12px",
+    background: "#fef2f2",
     borderRadius: "8px",
+    border: "1px solid #fecaca",
   },
   filterContainer: {
     display: "grid",
     gridTemplateColumns: "1fr 200px 200px auto",
-    gap: "12px",
-    marginBottom: "24px",
-    padding: "12px",
-    backgroundColor: "#efe8ff",
-    borderRadius: "14px",
-    border: "1px solid #dbd0ff",
-    boxShadow: "none",
+    gap: "10px",
+    marginBottom: "16px",
+    padding: "12px 14px",
+    backgroundColor: "var(--bg-card)",
+    borderRadius: "12px",
+    border: "1px solid var(--border)",
+    boxShadow: "0 1px 4px rgba(76,29,149,0.06)",
   },
   densityGroup: {
     display: "inline-flex",
@@ -1254,7 +1277,7 @@ const styles = {
 
 // Componente de coluna que recebe cards arrastáveis
 // Define uma área onde cards podem ser soltos (droppable)
-function DroppableColumn({ id, children, minHeight, padding }) {
+const DroppableColumn = memo(function DroppableColumn({ id, children, minHeight, padding }) {
   // useDroppable do dnd-kit para criar área de destino de drag and drop
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
@@ -1262,21 +1285,26 @@ function DroppableColumn({ id, children, minHeight, padding }) {
       ref={setNodeRef}
       style={{
         minHeight: minHeight || "540px",
-        background: isOver ? "#ece2ff" : "#f7f3ff",
-        borderRadius: "0 0 12px 12px",
-        border: "1px dashed #d4c4ff",
-        transition: "background 0.2s ease",
+        background: isOver ? "var(--bg-input)" : "var(--bg-surface2, var(--bg-input))",
+        borderRadius: "0 0 14px 14px",
+        border: isOver ? "1px solid var(--purple-400, #7a4dff)" : "1px solid var(--border)",
+        borderTop: "none",
+        transition: "background 160ms ease, border-color 160ms ease",
         padding: padding || "10px",
+        boxShadow: isOver ? "inset 0 2px 8px rgba(124,77,255,0.08)" : "none",
       }}
     >
       {children}
     </div>
   );
-}
+});
 
 // Componente de card que pode ser arrastado
-// Representa um item individual no kanban
-function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargeted = false, domId }) {
+// Representa um item individual no kanban.
+// memo: o Board re-renderiza por motivos diversos (estado de modal, drag, filtros…)
+// e antes disso reconstruía cada card. Com props estáveis (callback via useCallback,
+// densityCfg via useMemo) o memo evita re-render dos N cards visíveis.
+const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargeted = false, domId }) {
     // Função para copiar o link do card
     const handleCopyLink = (e) => {
       e.stopPropagation();
@@ -1354,24 +1382,25 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
     return new Date(deadline) < new Date();
   };
 
-  const formatTimeSinceUpdate = (dateValue) => {
-    if (!dateValue) return "Atualizado agora";
+  const formatTimeSinceUpdate = (dateValue, updaterName) => {
+    const quem = updaterName ? `por ${updaterName.split(" ")[0]} ` : "";
+    if (!dateValue) return `Atualizado ${quem}agora`;
     const date = new Date(dateValue);
-    if (Number.isNaN(date.getTime())) return "Atualizado agora";
+    if (Number.isNaN(date.getTime())) return `Atualizado ${quem}agora`;
 
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
 
-    if (diffMinutes < 1) return "Atualizado agora";
-    if (diffMinutes < 60) return `Atualizado há ${diffMinutes} min`;
+    if (diffMinutes < 1) return `Atualizado ${quem}agora`;
+    if (diffMinutes < 60) return `Atualizado ${quem}a ${diffMinutes} min`;
 
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `Atualizado há ${diffHours} h`;
+    if (diffHours < 24) return `Atualizado ${quem}a ${diffHours} h`;
 
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `Atualizado há ${diffDays} d`;
+    if (diffDays < 7) return `Atualizado ${quem}a ${diffDays} d`;
 
-    return `Atualizado em ${date.toLocaleDateString("pt-BR")}`;
+    return `Atualizado ${quem}em ${date.toLocaleDateString("pt-BR")}`;
   };
 
   // Manipulador para abrir o modal de detalhes do card
@@ -1573,7 +1602,7 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
             <User size={12} />
             <span>{card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor"}</span>
           </div>
-          <span style={styles.updatedInfo}>{formatTimeSinceUpdate(card.updatedAt || card.createdAt)}</span>
+          <span style={styles.updatedInfo}>{formatTimeSinceUpdate(card.updatedAt || card.createdAt, card.atualizado_por_nome)}</span>
         </div>
         <button
           onClick={handleDetailClick}
@@ -1586,18 +1615,53 @@ function DraggableCard({ card, onOpen, densityCfg, isPromoted = false, isTargete
       </div>
     </div>
   );
+});
+
+// Zona de drop flutuante para transferir um card entre Kanbans.
+// Visível apenas durante o drag de um card e quando há outro board acessível.
+function TransferDropZone({ toBoard }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `transfer:${toBoard}` });
+  const label = BOARD_LABELS[toBoard] || toBoard;
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        padding: "14px 28px",
+        borderRadius: 14,
+        border: isOver ? "2px solid #5a30ff" : "2px dashed #8f75ff",
+        background: isOver ? "#ede6ff" : "rgba(255,255,255,0.95)",
+        color: "#2f1e70",
+        fontWeight: 700,
+        fontSize: 14,
+        boxShadow: "0 12px 28px rgba(45, 18, 87, 0.18)",
+        pointerEvents: "auto",
+        transition: "background 160ms ease, border-color 160ms ease, transform 160ms ease",
+        transform: isOver ? "scale(1.04)" : "scale(1)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      📦 Transferir para {label}
+    </div>
+  );
 }
 
 // Componente principal do Kanban Board
-export default function Board() {
+export default function Board({ board = "delivery", canTransferTo = [], onTransferred }) {
+  const safeBoard = VALID_BOARDS.includes(board) ? board : "delivery";
+  const boardLabel = BOARD_LABELS[safeBoard] || "Delivery";
+
   // Estado para seleção múltipla
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedCards, setSelectedCards] = useState([]);
+  // Estado do dialog de transferência (drag-and-drop e botão de ação)
+  const [transferDialog, setTransferDialog] = useState(null);
+  // { card, toBoard, columns: [], loading: bool, error: "", submitting: bool, targetColumnId: number|null }
   const trelloPrefs = readTrelloPrefs();
   // Estados principais
   const [cards, setCards] = useState([]);           // Lista de todos os cards
   const [selectedCard, setSelectedCard] = useState(null); // Card selecionado para detalhes
   const [statusEdit, setStatusEdit] = useState("");    // Coluna temporária para edição (id em string)
+  const [successToast, setSuccessToast] = useState("");
   // Remover o estado global do comentário para evitar re-renderizações pesadas
   // O estado do texto do comentário será controlado apenas dentro do CommentInput
   const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false);
@@ -1605,6 +1669,7 @@ export default function Board() {
   const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
   const [editingReplyKey, setEditingReplyKey] = useState(null);
   const [editingReplyText, setEditingReplyText] = useState("");
+  const [replyMentionQueryByCommentId, setReplyMentionQueryByCommentId] = useState({});
   const [hoveredReactionKey, setHoveredReactionKey] = useState(null);
   const [vendorEdit, setVendorEdit] = useState("");
   const [vendorSearchCreate, setVendorSearchCreate] = useState("");
@@ -1616,9 +1681,14 @@ export default function Board() {
   const [isModalOpen, setIsModalOpen] = useState(false);   // Controle do modal de criação
   const [isEditCardOpen, setIsEditCardOpen] = useState(false); // Controle do modal de edição
   const [editingCard, setEditingCard] = useState(null);    // Card sendo editado
-  const [searchTerm, setSearchTerm] = useState(() => readKanbanPrefs().searchTerm || "");        // Termo de busca
-  const [statusFilter, setStatusFilter] = useState(() => readKanbanPrefs().statusFilter || "");    // Filtro por status
-  const [vendorFilter, setVendorFilter] = useState(() => readKanbanPrefs().vendorFilter || "");    // Filtro por vendedor
+  const [searchTerm, setSearchTerm] = useState(() => readKanbanPrefs(safeBoard).searchTerm || "");        // Termo de busca
+  const [statusFilter, setStatusFilter] = useState(() => readKanbanPrefs(safeBoard).statusFilter || "");    // Filtro por status
+  // Filtro por vendedor: armazena o id (string numérica) — formato legado
+  // (nome) é descartado na hidratação para evitar mismatch com o backend.
+  const [vendorFilter, setVendorFilter] = useState(() => {
+    const raw = readKanbanPrefs(safeBoard).vendorFilter || "";
+    return /^\d+$/.test(String(raw)) ? String(raw) : "";
+  });
   const [newCard, setNewCard] = useState({                 // Dados do novo card
     titulo: "",
     cliente: "",
@@ -1639,7 +1709,7 @@ export default function Board() {
   const [error, setError] = useState("");                  // Mensagem de erro
   const [activeId, setActiveId] = useState(null);          // ID do card sendo arrastado
   const [isCreating, setIsCreating] = useState(false);     // Flag para criação em andamento
-  const [density, setDensity] = useState(() => readKanbanPrefs().density || "confortavel");  // Densidade visual (Bitrix-style)
+  const [density, setDensity] = useState(() => readKanbanPrefs(safeBoard).density || "confortavel");  // Densidade visual (Bitrix-style)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importRaw, setImportRaw] = useState("");
   const [importDefaultStatus, setImportDefaultStatus] = useState("Novo");
@@ -1659,6 +1729,15 @@ export default function Board() {
   const [, setTimeTick] = useState(0);
   const [columnDefs, setColumnDefs] = useState([]);
   const [isColumnsReady, setIsColumnsReady] = useState(false);
+  // Totais reais (no banco) de cards por coluna. Vem do /cards/board-summary
+  // e é ajustado localmente quando criamos/excluímos/movemos cards.
+  const [columnTotals, setColumnTotals] = useState({});
+  // Colunas que estão buscando mais cards no momento (para feedback no botão "Ver mais").
+  const [loadingMoreByColumn, setLoadingMoreByColumn] = useState({});
+  // Modo "busca server-side": true quando o último fetch usou filtros (search/vendor/coluna).
+  // Em modo filtrado o backend retorna até `limit` matches direto — "Ver mais" some.
+  const [isServerFiltered, setIsServerFiltered] = useState(false);
+  const [serverFilterLimited, setServerFilterLimited] = useState(false);
 
   const columns = useMemo(
     () => [...columnDefs].sort((a, b) => a.ordem - b.ordem).map((item) => item.nome),
@@ -1705,7 +1784,15 @@ export default function Board() {
     },
   };
 
-  const densityCfg = densityPresets[density] || densityPresets.confortavel;
+  // densityCfg é passado como prop pra cada DraggableCard. Memoizado para que
+  // o React.memo do card não invalide quando outros estados do Board mudam.
+  const densityCfg = useMemo(
+    () => densityPresets[density] || densityPresets.confortavel,
+    // densityPresets é constante por render mas declarado dentro do componente;
+    // só `density` afeta o resultado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [density]
+  );
 
   // Configuração dos sensores para drag and drop (apenas pointer/mouse)
   const sensors = useSensors(
@@ -1724,6 +1811,17 @@ export default function Board() {
     const { active, over } = event;
     setActiveId(null);
     if (!over || !active) return;
+
+    // Drop em zona de transferência entre boards: abre o dialog de seleção de coluna.
+    if (String(over.id).startsWith("transfer:")) {
+      const toBoard = String(over.id).replace("transfer:", "");
+      if (!VALID_BOARDS.includes(toBoard) || toBoard === safeBoard) return;
+      const movedCard = cards.find((card) => getCardKey(card) === active.id);
+      if (movedCard) {
+        openTransferDialog(movedCard, toBoard);
+      }
+      return;
+    }
 
     // Verifica se soltou em uma coluna (IDs começam com "column-")
     if (String(over.id).startsWith("column-")) {
@@ -1744,6 +1842,8 @@ export default function Board() {
         };
 
         setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? optimisticCard : card)));
+        adjustColumnTotal(movedCardColumnId, -1);
+        adjustColumnTotal(targetColumn.id, +1);
 
         if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
           setSelectedCard(optimisticCard);
@@ -1756,10 +1856,10 @@ export default function Board() {
             coluna_id: targetColumn?.id,
           });
           const updatedCard = response.data;
-          
+
           // Atualiza o estado local com o card modificado
           promoteUpdatedCardToTop(updatedCard);
-          
+
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
           if (selectedCard && getCardKey(selectedCard) === getCardKey(updatedCard)) {
             setSelectedCard(updatedCard);
@@ -1767,6 +1867,8 @@ export default function Board() {
           }
         } catch (e) {
           setCards((prev) => prev.map((card) => (getCardKey(card) === getCardKey(movedCard) ? movedCard : card)));
+          adjustColumnTotal(movedCardColumnId, +1);
+          adjustColumnTotal(targetColumn.id, -1);
 
           if (selectedCard && getCardKey(selectedCard) === getCardKey(movedCard)) {
             setSelectedCard(movedCard);
@@ -1778,6 +1880,81 @@ export default function Board() {
       }
     }
   };
+
+  // Helper: ajusta o total de uma coluna (usado quando criamos/excluímos/movemos
+  // cards). Declarado aqui para estar disponível antes de confirmTransfer abaixo.
+  const adjustColumnTotal = useCallback((columnId, delta) => {
+    const key = String(columnId);
+    if (!key || key === "undefined" || key === "null" || key === "NaN") return;
+    setColumnTotals((prev) => {
+      const current = Number(prev?.[key]) || 0;
+      return { ...prev, [key]: Math.max(0, current + delta) };
+    });
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────
+  // Transferência entre Kanbans (Delivery ↔ Comercial)
+  // ─────────────────────────────────────────────────────────────────
+  const openTransferDialog = useCallback(async (card, toBoard) => {
+    if (!card || !VALID_BOARDS.includes(toBoard) || toBoard === safeBoard) return;
+
+    setTransferDialog({
+      card,
+      toBoard,
+      columns: [],
+      loading: true,
+      error: "",
+      submitting: false,
+      targetColumnId: null,
+    });
+
+    try {
+      const res = await api.get("/columns", { params: { board: toBoard } });
+      const incoming = Array.isArray(res.data) ? res.data : [];
+      const normalized = incoming
+        .map((item, index) => normalizeColumnEntity(item, index))
+        .filter((item) => item.nome);
+
+      setTransferDialog((prev) => prev && prev.card === card ? {
+        ...prev,
+        columns: normalized,
+        loading: false,
+        targetColumnId: normalized[0]?.id || null,
+      } : prev);
+    } catch {
+      setTransferDialog((prev) => prev && prev.card === card ? {
+        ...prev,
+        loading: false,
+        error: "Não foi possível carregar as colunas do board de destino.",
+      } : prev);
+    }
+  }, [safeBoard]);
+
+  const closeTransferDialog = useCallback(() => setTransferDialog(null), []);
+
+  const confirmTransfer = useCallback(async () => {
+    if (!transferDialog || !transferDialog.targetColumnId) return;
+    setTransferDialog((prev) => prev ? { ...prev, submitting: true, error: "" } : prev);
+
+    const { card, targetColumnId, toBoard } = transferDialog;
+    try {
+      await api.post(`/cards/${getCardKey(card)}/transfer`, { coluna_id: targetColumnId });
+      // Card sai do board atual: remove do state e decrementa o total da coluna de origem.
+      const fromColumnId = getCardColumnId(card);
+      setCards((prev) => prev.filter((c) => getCardKey(c) !== getCardKey(card)));
+      adjustColumnTotal(fromColumnId, -1);
+      if (selectedCard && getCardKey(selectedCard) === getCardKey(card)) {
+        setSelectedCard(null);
+      }
+      setTransferDialog(null);
+      if (typeof onTransferred === "function") {
+        onTransferred({ card, toBoard });
+      }
+    } catch (err) {
+      const message = err?.response?.data?.error || err?.message || "Falha ao transferir card.";
+      setTransferDialog((prev) => prev ? { ...prev, submitting: false, error: message } : prev);
+    }
+  }, [transferDialog, selectedCard, onTransferred, adjustColumnTotal]);
 
   // Recupera dados do usuário logado do localStorage
   const userData = JSON.parse(localStorage.getItem("user") || "null");
@@ -1869,16 +2046,99 @@ export default function Board() {
     return vendorOptions.filter((option) => option.label.toLowerCase().includes(query));
   }, [vendorOptions, vendorSearchDetails]);
 
-  // Efeito para carregar cards da API ao montar o componente
+  // Limpa estado relacionado ao board (não a filtros) quando troca de aba Delivery/Comercial.
   useEffect(() => {
-    api.get("/cards")
-      .then((res) => setCards(res.data))
-      .catch((err) => console.log(err));
-  }, []);
+    setSelectedCard(null);
+    setSelectedCards([]);
+    setMultiSelectMode(false);
+  }, [safeBoard]);
+
+  // Snapshot inicial do board.
+  //  - Sem filtros: pega top 5 por coluna via window function + totais globais.
+  //  - Com filtros: pede ao backend busca server-side (até 500 matches).
+  // Debounce de 300ms para o search digitado não disparar request a cada tecla.
+  useEffect(() => {
+    const trimmedSearch = searchTerm.trim();
+    const hasFilter = trimmedSearch.length > 0 || !!statusFilter || !!vendorFilter;
+
+    const timer = setTimeout(() => {
+      setCards([]);
+      setColumnTotals({});
+      setLoadingMoreByColumn({});
+
+      const params = { board: safeBoard };
+      if (hasFilter) {
+        if (trimmedSearch) params.search = trimmedSearch;
+        if (statusFilter) params.coluna_id = statusFilter;
+        if (vendorFilter) params.vendedor_id = vendorFilter;
+        params.limit = 500;
+      } else {
+        params.perColumn = 5;
+      }
+
+      api.get("/cards/board-summary", { params })
+        .then((res) => {
+          const data = res?.data || {};
+          setCards(Array.isArray(data.cards) ? data.cards : []);
+          setColumnTotals(data.totals && typeof data.totals === "object" ? data.totals : {});
+          setIsServerFiltered(!!data.filtered);
+          setServerFilterLimited(!!data.limited);
+        })
+        .catch((err) => console.log(err));
+    }, hasFilter ? 300 : 0);
+
+    return () => clearTimeout(timer);
+  }, [safeBoard, searchTerm, statusFilter, vendorFilter]);
+
+  // Helper: contagem de cards já carregados localmente por coluna.
+  const loadedByColumn = useMemo(() => {
+    const map = {};
+    for (const card of cards) {
+      const cid = getCardColumnId(card);
+      if (Number.isFinite(cid)) {
+        const key = String(cid);
+        map[key] = (map[key] || 0) + 1;
+      }
+    }
+    return map;
+  }, [cards]);
+
+  // Busca os próximos cards de uma coluna específica (paginação real no backend).
+  // Em modo filtrado (server-side search) o backend já devolveu todos os matches —
+  // "Ver mais" perde sentido e fica como no-op por segurança.
+  const loadMoreForColumn = useCallback(async (columnId) => {
+    if (isServerFiltered) return;
+    const key = String(columnId);
+    if (loadingMoreByColumn[key]) return;
+    setLoadingMoreByColumn((prev) => ({ ...prev, [key]: true }));
+    try {
+      const offset = loadedByColumn[key] || 0;
+      const res = await api.get("/cards", {
+        params: { coluna_id: columnId, offset, limit: 20 },
+      });
+      const incoming = Array.isArray(res.data) ? res.data : [];
+      if (incoming.length > 0) {
+        // Append: novos IDs que ainda não estão na lista local.
+        setCards((prev) => {
+          const existingIds = new Set(prev.map((c) => String(getCardKey(c))));
+          const filtered = incoming.filter((c) => !existingIds.has(String(getCardKey(c))));
+          return [...prev, ...filtered];
+        });
+      }
+    } catch (err) {
+      console.error("Erro ao carregar mais cards da coluna", columnId, err);
+    } finally {
+      setLoadingMoreByColumn((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  }, [loadingMoreByColumn, loadedByColumn, isServerFiltered]);
 
   const loadColumnsFromApi = useCallback(async () => {
     try {
-      const res = await api.get("/columns");
+      const res = await api.get("/columns", { params: { board: safeBoard } });
       const incoming = Array.isArray(res.data) ? res.data : [];
       const normalized = incoming
         .map((item, index) => normalizeColumnEntity(item, index))
@@ -1899,11 +2159,20 @@ export default function Board() {
       setError(`Não foi possível carregar colunas da API (${apiBase}). Verifique backend e VITE_API_URL.`);
       return [];
     }
-  }, []);
+  }, [safeBoard]);
 
   useEffect(() => {
     loadColumnsFromApi();
   }, [loadColumnsFromApi]);
+
+  // Quando o board mudar, recarrega prefs persistidas do novo board.
+  useEffect(() => {
+    const prefs = readKanbanPrefs(safeBoard);
+    setSearchTerm(prefs.searchTerm || "");
+    setStatusFilter(prefs.statusFilter || "");
+    setVendorFilter(/^\d+$/.test(String(prefs.vendorFilter || "")) ? String(prefs.vendorFilter) : "");
+    if (prefs.density) setDensity(prefs.density);
+  }, [safeBoard]);
 
   useEffect(() => {
     const fetchDirectoryUsers = async () => {
@@ -1954,10 +2223,10 @@ export default function Board() {
 
   useEffect(() => {
     localStorage.setItem(
-      KANBAN_PREFS_KEY,
+      getKanbanPrefsKey(safeBoard),
       JSON.stringify({ density, searchTerm, statusFilter, vendorFilter })
     );
-  }, [density, searchTerm, statusFilter, vendorFilter]);
+  }, [safeBoard, density, searchTerm, statusFilter, vendorFilter]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1978,33 +2247,48 @@ export default function Board() {
     return () => clearInterval(intervalId);
   }, []);
 
-  const focusCardById = useCallback((pendingCardId) => {
-    if (!pendingCardId || cards.length === 0) return false;
-
-    const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
-    if (!targetCard) return false;
-
-    // Garante que o card esteja visível mesmo com filtros ativos
+  const openCardDirectly = useCallback((card) => {
+    if (!card) return;
     setSearchTerm("");
     setStatusFilter("");
     setVendorFilter("");
-
-    setSelectedCard(targetCard);
-    setStatusEdit(String(getCardColumnId(targetCard) || ""));
-    setTargetedCardId(String(getCardKey(targetCard)));
-
-    requestAnimationFrame(() => {
-      const domId = getCardDomId(getCardKey(targetCard));
-      const cardElement = document.getElementById(domId);
-      cardElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    });
-
+    setSelectedCard(card);
+    setStatusEdit(String(getCardColumnId(card) || ""));
+    setTargetedCardId(String(getCardKey(card)));
     setTimeout(() => {
-      setTargetedCardId((current) => (current === String(getCardKey(targetCard)) ? null : current));
+      setTargetedCardId((cur) => cur === String(getCardKey(card)) ? null : cur);
     }, 1400);
+    requestAnimationFrame(() => {
+      document.getElementById(getCardDomId(getCardKey(card)))
+        ?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    });
+  }, []);
 
-    return true;
-  }, [cards]);
+  const focusCardById = useCallback((pendingCardId) => {
+    if (!pendingCardId) return false;
+
+    // Tenta encontrar nos cards já carregados
+    const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
+    if (targetCard) {
+      openCardDirectly(targetCard);
+      return true;
+    }
+
+    // Card não está na lista local (paginação perColumn:5) → busca direto na API
+    if (cards.length > 0) {
+      api.get(`/cards/${pendingCardId}`)
+        .then((res) => {
+          if (res.data) {
+            openCardDirectly(res.data);
+            localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+          }
+        })
+        .catch(() => {});
+      return true; // indica que vai processar de forma async
+    }
+
+    return false;
+  }, [cards, openCardDirectly]);
 
   // Deep link: abre o card automaticamente se o hash da URL for #card-ID
   useEffect(() => {
@@ -2134,7 +2418,7 @@ export default function Board() {
 
     try {
       if (columnModalType === "add") {
-        await api.post("/columns", { nome: name });
+        await api.post("/columns", { nome: name, board: safeBoard });
         await loadColumnsFromApi();
       } else if (columnModalType === "edit" && editingColumnId !== null) {
         const target = columnDefs.find((item) => item.id === editingColumnId);
@@ -2181,17 +2465,15 @@ export default function Board() {
   };
 
   const handleDeleteAllCardsInColumn = async (column) => {
-    const cardsInColumn = cards.filter((card) => {
-      const cardColumnId = getCardColumnId(card);
-      return cardColumnId === column.id;
-    });
-    if (cardsInColumn.length === 0) {
+    // Usa o total real (não só os cards já carregados, pois o Kanban é paginado).
+    const totalInColumn = Number(columnTotals[String(column.id)]) || 0;
+    if (totalInColumn === 0) {
       alert("Essa coluna não possui cards para excluir.");
       return;
     }
 
     const confirmed = window.confirm(
-      `Excluir TODOS os ${cardsInColumn.length} card(s) da coluna \"${column.nome}\"? Essa ação não pode ser desfeita.`
+      `Excluir TODOS os ${totalInColumn} card(s) da coluna "${column.nome}"? Essa ação não pode ser desfeita.`
     );
     if (!confirmed) return;
 
@@ -2199,26 +2481,20 @@ export default function Board() {
     setIsBulkDeletingCards(true);
 
     try {
-      const results = await Promise.allSettled(
-        cardsInColumn.map((card) => api.delete(`/cards/${getCardKey(card)}`))
-      );
+      // Endpoint dedicado no backend: 1 query em vez de N deletes.
+      const response = await api.delete(`/columns/${column.id}/cards`);
+      const removed = Number(response?.data?.removed) || 0;
 
-      const deletedIds = cardsInColumn
-        .filter((_, index) => results[index]?.status === "fulfilled")
-        .map((card) => getCardKey(card));
+      // Limpa cards locais dessa coluna e zera o total.
+      setCards((prev) => prev.filter((card) => getCardColumnId(card) !== column.id));
+      setColumnTotals((prev) => ({ ...prev, [String(column.id)]: 0 }));
 
-      const failedCount = cardsInColumn.length - deletedIds.length;
-
-      if (deletedIds.length > 0) {
-        setCards((prev) => prev.filter((card) => !deletedIds.includes(getCardKey(card))));
-
-        if (selectedCard && deletedIds.includes(getCardKey(selectedCard))) {
-          handleCloseCard();
-        }
+      if (selectedCard && getCardColumnId(selectedCard) === column.id) {
+        handleCloseCard();
       }
 
-      if (failedCount > 0) {
-        setError(`Alguns cards não puderam ser removidos (${failedCount}). Tente novamente.`);
+      if (removed < totalInColumn) {
+        setError(`Apenas ${removed} de ${totalInColumn} cards foram removidos.`);
       }
     } catch {
       setError("Erro ao excluir todos os cards da coluna.");
@@ -2244,16 +2520,16 @@ export default function Board() {
   };
 
   // Abre modal de detalhes do card
-  const handleOpenCard = (card) => {
-    console.log('[Detalhes] handleOpenCard chamado', card);
+  // useCallback para manter identidade estável entre renders — o React.memo
+  // do DraggableCard depende disso para evitar re-render dos cards visíveis.
+  const handleOpenCard = useCallback((card) => {
     setSelectedCard(card);
     setStatusEdit(String(getCardColumnId(card) || ""));
     setVendorEdit(String(card?.vendedor?.id || card?.vendedor_id || ""));
     setVendorSearchDetails("");
-    // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
-    setPendingAttachments([]); // Corrige: limpa anexos pendentes
-  };
+    setPendingAttachments([]);
+  }, []);
 
   // Fecha modal de detalhes
   const handleCloseCard = () => {
@@ -2286,50 +2562,28 @@ export default function Board() {
     return () => window.removeEventListener("keydown", handleEscToClose);
   }, [previewImage]);
 
-  const persistCommentsOnSelectedCard = async (nextComments) => {
-    if (!selectedCard) return null;
-
-    const cardUpdate = {
-      comments: nextComments,
-      colunaId: getCardColumnId(selectedCard),
-    };
-
-    const response = await api.put(`/cards/${getCardKey(selectedCard)}`, cardUpdate);
-    const updatedCard = response.data;
+  // Aplica no estado local o card devolvido pelo backend após uma operação
+  // atômica de comentário/resposta/reação. Substitui o antigo
+  // `persistCommentsOnSelectedCard` (que mandava o array inteiro e perdia
+  // comments adicionados em paralelo por outros usuários).
+  const applyServerCard = useCallback((updatedCard) => {
+    if (!updatedCard) return;
     promoteUpdatedCardToTop(updatedCard);
-    setSelectedCard(updatedCard);
-    return updatedCard;
-  };
+    setSelectedCard((prev) => {
+      if (!prev) return prev;
+      return String(getCardKey(prev)) === String(getCardKey(updatedCard)) ? updatedCard : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleReaction = async (commentId, emoji) => {
     if (!selectedCard) return;
-    const reactionUser = userData?.nome || userData?.username || userData?.email || `user-${sellerId || "anon"}`;
-    const reactionUserKey = getReactionUserKey(reactionUser);
-    const reactionUserDisplay = getReactionUserDisplayName(reactionUser);
-    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
-
-    const nextComments = currentComments.map((comment) => {
-      if (String(comment.id) !== String(commentId)) return comment;
-
-      const reactions = comment?.reactions && typeof comment.reactions === "object" ? { ...comment.reactions } : {};
-      const currentUsers = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
-      const alreadyReacted = currentUsers.some((name) => getReactionUserKey(name) === reactionUserKey);
-
-      const nextUsers = alreadyReacted
-        ? currentUsers.filter((name) => getReactionUserKey(name) !== reactionUserKey)
-        : [...currentUsers, reactionUserDisplay];
-
-      if (nextUsers.length > 0) reactions[emoji] = nextUsers;
-      else delete reactions[emoji];
-
-      return {
-        ...comment,
-        reactions,
-      };
-    });
-
     try {
-      await persistCommentsOnSelectedCard(nextComments);
+      const res = await api.post(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/reactions`,
+        { emoji }
+      );
+      applyServerCard(res.data);
     } catch {
       setError("Erro ao reagir ao comentário");
     }
@@ -2340,31 +2594,12 @@ export default function Board() {
     const rawReply = String(replyDraftByCommentId?.[commentId] || "").trim();
     if (!rawReply) return;
 
-    const author = userData?.nome || userData?.username || userData?.email || "Usuário";
-    const authorAvatar = userData?.avatar || "";
-    const nowIso = new Date().toISOString();
-
-    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
-    const nextComments = currentComments.map((comment) => {
-      if (String(comment.id) !== String(commentId)) return comment;
-
-      const replies = Array.isArray(comment.replies) ? [...comment.replies] : [];
-      replies.push({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        text: rawReply,
-        author,
-        authorAvatar,
-        createdAt: nowIso,
-      });
-
-      return {
-        ...comment,
-        replies,
-      };
-    });
-
     try {
-      await persistCommentsOnSelectedCard(nextComments);
+      const res = await api.post(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/replies`,
+        { text: rawReply }
+      );
+      applyServerCard(res.data);
       setReplyDraftByCommentId((prev) => ({ ...prev, [commentId]: "" }));
       setActiveReplyCommentId(null);
     } catch {
@@ -2386,34 +2621,15 @@ export default function Board() {
 
   const handleSaveEditReply = async (commentId, replyId) => {
     if (!selectedCard) return;
-
     const nextText = String(editingReplyText || "").trim();
     if (!nextText) return;
 
-    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
-    const nowIso = new Date().toISOString();
-    const nextComments = currentComments.map((comment) => {
-      if (String(comment.id) !== String(commentId)) return comment;
-
-      const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
-      const replies = currentReplies.map((reply) => {
-        if (String(reply.id) !== String(replyId)) return reply;
-
-        return {
-          ...reply,
-          text: nextText,
-          editedAt: nowIso,
-        };
-      });
-
-      return {
-        ...comment,
-        replies,
-      };
-    });
-
     try {
-      await persistCommentsOnSelectedCard(nextComments);
+      const res = await api.patch(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/replies/${replyId}`,
+        { text: nextText }
+      );
+      applyServerCard(res.data);
       handleCancelEditReply();
     } catch {
       setError("Erro ao editar resposta");
@@ -2422,30 +2638,43 @@ export default function Board() {
 
   const handleDeleteReply = async (commentId, replyId) => {
     if (!selectedCard) return;
-
     const confirmed = window.confirm("Tem certeza que deseja excluir esta resposta?");
     if (!confirmed) return;
 
-    const currentComments = Array.isArray(selectedCard.comments) ? selectedCard.comments : [];
-    const nextComments = currentComments.map((comment) => {
-      if (String(comment.id) !== String(commentId)) return comment;
-
-      const currentReplies = Array.isArray(comment.replies) ? comment.replies : [];
-      const replies = currentReplies.filter((reply) => String(reply.id) !== String(replyId));
-
-      return {
-        ...comment,
-        replies,
-      };
-    });
-
     try {
-      await persistCommentsOnSelectedCard(nextComments);
+      const res = await api.delete(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/replies/${replyId}`
+      );
+      applyServerCard(res.data);
       if (editingReplyKey === getReplyEditKey(commentId, replyId)) {
         handleCancelEditReply();
       }
     } catch {
       setError("Erro ao excluir resposta");
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!selectedCard || !commentId) return;
+    try {
+      const res = await api.delete(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}`
+      );
+      applyServerCard(res.data);
+    } catch {
+      setError("Erro ao excluir comentário");
+    }
+  };
+
+  const handlePinComment = async (commentId) => {
+    if (!selectedCard || !commentId) return;
+    try {
+      const res = await api.patch(
+        `/cards/${getCardKey(selectedCard)}/comments/${commentId}/pin`
+      );
+      applyServerCard(res.data);
+    } catch {
+      setError("Erro ao fixar comentário");
     }
   };
 
@@ -2467,32 +2696,18 @@ export default function Board() {
   // Estado local do texto do comentário
   const [commentText, setCommentText] = useState("");
   const [isCommentLoading, setIsCommentLoading] = useState(false);
-  const [editingCommentIdx, setEditingCommentIdx] = useState(null);
+  // ID do comentário em edição (string). Antes era um índice — gerou bug onde o
+  // texto ia parar no comentário errado quando a lista mudava entre abrir e salvar.
+  const [editingCommentId, setEditingCommentId] = useState(null);
 
-  // Recebe array de arquivos, lê todos e adiciona ao pendingAttachments
-  const handleAttachmentSelect = (files) => {
-    if (!files || files.length === 0) return;
-    const newFiles = Array.isArray(files) ? files : [files];
-    let filesProcessed = 0;
-    const newAttachments = [];
-    newFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result;
-        if (base64) {
-          newAttachments.push({ name: file.name, type: file.type, data: base64 });
-        }
-        filesProcessed++;
-        if (filesProcessed === newFiles.length) {
-          setPendingAttachments((prev) => [...prev, ...newAttachments]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+  // Limpa um anexo específico pelo índice
+  const handleClearAttachment = (idx) => {
+    if (typeof idx === "number") {
+      setPendingAttachments((prev) => prev.filter((_, i) => i !== idx));
+    } else {
+      setPendingAttachments([]);
+    }
   };
-
-  // Limpa anexos pendentes
-  const handleClearAttachment = () => setPendingAttachments([]);
 
   const getAvatarInitials = (name) => {
     const safeName = String(name || "Usuário").trim();
@@ -2508,52 +2723,44 @@ export default function Board() {
   // Adiciona comentário ao card
   // Adiciona comentário ao card
 
-  const handleAddComment = async (commentTextArg) => {
+  // Aceita (text, attachments) — os anexos vêm do CommentInput para evitar race condition
+  const handleAddComment = async (commentTextArg, inlineAttachments) => {
     if (!selectedCard) return;
 
     const normalizedText = (commentTextArg || "").trim();
-    if (!normalizedText && pendingAttachments.length === 0) return;
+    const attachments = Array.isArray(inlineAttachments) && inlineAttachments.length > 0
+      ? inlineAttachments
+      : pendingAttachments;
 
-    const userData = JSON.parse(localStorage.getItem("user") || "null");
-    const author = userData?.nome || userData?.username || userData?.email || "Usuário";
-    const authorAvatar = userData?.avatar || "";
-
-    let updatedComments;
-
-    // ADICIONAR: se está editando, substitui no índice; senão, adiciona novo
-    if (editingCommentIdx !== null) {
-      updatedComments = (selectedCard.comments || []).map((c, i) =>
-        i === editingCommentIdx
-          ? { ...c, text: normalizedText, updatedAt: new Date().toISOString() }
-          : c
-      );
-    } else {
-      const newComment = {
-        id: Date.now(),
-        text: normalizedText,
-        author,
-        authorAvatar,
-        createdAt: new Date().toISOString(),
-        attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
-      };
-      updatedComments = [...(selectedCard.comments || []), newComment];
-    }
+    if (!normalizedText && attachments.length === 0) return;
 
     setIsCommentLoading(true);
     setError("");
     const commentTimeout = setTimeout(() => setIsCommentLoading(false), 120000);
+
     try {
-      await persistCommentsOnSelectedCard(updatedComments);
+      let res;
+      if (editingCommentId) {
+        // Edição por ID — envia texto e anexos (atualizados pelo usuário)
+        res = await api.patch(
+          `/cards/${getCardKey(selectedCard)}/comments/${editingCommentId}`,
+          { text: normalizedText, attachments }
+        );
+      } else {
+        res = await api.post(`/cards/${getCardKey(selectedCard)}/comments`, {
+          text: normalizedText,
+          ...(attachments.length > 0 ? { attachments } : {}),
+        });
+      }
+      applyServerCard(res.data);
       setCommentText("");
       setIsCommentComposerOpen(false);
       setPendingAttachments([]);
-      setIsCommentLoading(false);
-      setEditingCommentIdx(null); // ADICIONAR: limpa o estado de edição
-      clearTimeout(commentTimeout);
+      setEditingCommentId(null);
     } catch (err) {
       console.error("erro ao salvar comentário", err);
-      alert("Erro ao salvar comentário: " + (err?.message || err));
-      setError("Erro ao salvar comentário. Tente novamente.");
+      setError(err?.response?.data?.error || "Erro ao salvar comentário. Tente novamente.");
+    } finally {
       setIsCommentLoading(false);
       clearTimeout(commentTimeout);
     }
@@ -2567,7 +2774,8 @@ export default function Board() {
     const explicitColumnId = updates?.colunaId ?? updates?.coluna_id;
 
     if (explicitColumnId !== undefined && explicitColumnId !== null && String(explicitColumnId).trim() !== "") {
-      payload.colunaId = Number(explicitColumnId);
+      payload.coluna_id = Number(explicitColumnId);
+      delete payload.colunaId; // garante snake_case para o backend sobrescrever corretamente
     } else {
       const requestedColumnName = String(updates?.status || updates?.coluna || "").trim();
       if (requestedColumnName) {
@@ -2592,7 +2800,7 @@ export default function Board() {
       const response = await api.put(`/cards/${getCardKey(selectedCard)}`, payload);
       const updatedCard = response.data;
       promoteUpdatedCardToTop(updatedCard);
-      setSelectedCard(updatedCard);
+      setSelectedCard(enrichCardWithUpdater(updatedCard));
     } catch (err) {
       console.error("Erro ao salvar alterações do card", err);
       setError("Erro ao salvar alterações");
@@ -2603,9 +2811,11 @@ export default function Board() {
   const handleDeleteCard = async () => {
     if (!selectedCard) return;
 
+    const deletedColumnId = getCardColumnId(selectedCard);
     try {
       await api.delete(`/cards/${getCardKey(selectedCard)}`);
       setCards((prev) => prev.filter((c) => getCardKey(c) !== getCardKey(selectedCard)));
+      adjustColumnTotal(deletedColumnId, -1);
       handleCloseCard(); // Fecha modal após exclusão
     } catch (err) {
       console.error("Erro ao deletar card", err);
@@ -2634,6 +2844,7 @@ export default function Board() {
     try {
       const response = await api.post("/cards", duplicatePayload);
       setCards((prev) => [response.data, ...prev]); // Adiciona no início da lista
+      adjustColumnTotal(getCardColumnId(response.data), +1);
       handleCloseCard();
     } catch (err) {
       console.error("Erro ao duplicar card", err);
@@ -2644,7 +2855,11 @@ export default function Board() {
   // Altera status do card
   const handleChangeStatus = async (newColumnId) => {
     if (!selectedCard) return;
-    await handleSaveCardChanges({ colunaId: Number(newColumnId) });
+    const col = orderedColumnDefs.find(c => String(c.id) === String(newColumnId));
+    await handleSaveCardChanges({ coluna_id: Number(newColumnId) });
+    const label = col?.nome || "novo status";
+    setSuccessToast(`✓ Status atualizado para "${label}"`);
+    setTimeout(() => setSuccessToast(""), 3000);
   };
 
   // Cria novo card com validação de campos obrigatórios
@@ -2716,6 +2931,7 @@ export default function Board() {
       
       if (response.data) {
         setCards((prev) => [response.data, ...prev]); // Adiciona ao início
+        adjustColumnTotal(getCardColumnId(response.data), +1);
         setIsModalOpen(false); // Fecha modal
         
         // Reseta formulário
@@ -2828,6 +3044,13 @@ export default function Board() {
 
     if (createdCards.length > 0) {
       setCards((prev) => [...createdCards, ...prev]);
+      // Incrementa totals por coluna alvo (1 por card importado).
+      const incByCol = new Map();
+      for (const c of createdCards) {
+        const cid = getCardColumnId(c);
+        if (Number.isFinite(cid)) incByCol.set(cid, (incByCol.get(cid) || 0) + 1);
+      }
+      for (const [cid, n] of incByCol) adjustColumnTotal(cid, +n);
     }
 
     setImportSummary(`Importação finalizada: ${createdCards.length} criado(s), ${failedCount} falha(s).`);
@@ -3086,8 +3309,9 @@ export default function Board() {
       }
 
       if (matches && vendorFilter) {
-        const vendorName = card.vendedor?.nome || card.vendedor || card.vendedorId || "Sem vendedor";
-        matches = vendorName === vendorFilter;
+        const filterVendorId = Number(vendorFilter);
+        const cardVendorId = Number(card.vendedor?.id ?? card.vendedor_id ?? card.vendedorId);
+        matches = Number.isFinite(filterVendorId) && cardVendorId === filterVendorId;
       }
 
       if (!matches) return;
@@ -3113,8 +3337,20 @@ export default function Board() {
   );
 
   const promoteUpdatedCardToTop = (updatedCard) => {
-    const updatedId = getCardKey(updatedCard);
-    setCards((prev) => [updatedCard, ...prev.filter((card) => getCardKey(card) !== updatedId)]);
+    const enriched = enrichCardWithUpdater(updatedCard);
+    const updatedId = getCardKey(enriched);
+    setCards((prev) => {
+      const previous = prev.find((card) => getCardKey(card) === updatedId);
+      if (previous) {
+        const prevCol = getCardColumnId(previous);
+        const newCol = getCardColumnId(enriched);
+        if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
+          adjustColumnTotal(prevCol, -1);
+          adjustColumnTotal(newCol, +1);
+        }
+      }
+      return [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)];
+    });
     setPromotedCardId(updatedId);
     setTimeout(() => {
       setPromotedCardId((current) => (current === updatedId ? null : current));
@@ -3157,6 +3393,14 @@ export default function Board() {
       setError("Coluna de destino inválida.");
       return;
     }
+    // Conta cards por coluna de origem para ajustar totals depois.
+    const originByCard = new Map();
+    for (const card of cards) {
+      const key = getCardKey(card);
+      if (selectedCards.includes(key)) {
+        originByCard.set(key, getCardColumnId(card));
+      }
+    }
     // Atualização otimista
     setCards((prev) => prev.map((card) =>
       selectedCards.includes(getCardKey(card))
@@ -3169,6 +3413,15 @@ export default function Board() {
           }
         : card
     ));
+    // Ajusta totals: -1 em cada coluna de origem, +N na coluna alvo.
+    let movedCount = 0;
+    for (const [, fromCol] of originByCard) {
+      if (Number.isFinite(fromCol) && fromCol !== targetColumn.id) {
+        adjustColumnTotal(fromCol, -1);
+        movedCount += 1;
+      }
+    }
+    if (movedCount > 0) adjustColumnTotal(targetColumn.id, +movedCount);
     // Atualiza no backend
     try {
       await Promise.all(
@@ -3196,26 +3449,8 @@ export default function Board() {
           100% { box-shadow: 0 0 0 12px rgba(127, 90, 240, 0), 0 8px 20px rgba(95, 61, 198, 0.18); }
         }`}
       </style>
-      {/* Botão para ativar/desativar seleção múltipla */}
-      <div style={{ marginBottom: 18 }}>
-        {!multiSelectMode ? (
-          <button
-            style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
-            onClick={() => setMultiSelectMode(true)}
-          >
-            Selecionar vários
-          </button>
-        ) : (
-          <button
-            style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
-            onClick={clearSelectedCards}
-          >
-            Cancelar seleção
-          </button>
-        )}
-      </div>
       <div style={styles.header}>
-        <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban de Entregas</h1>
+        <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban {boardLabel}</h1>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={styles.densityGroup}>
             {[
@@ -3236,8 +3471,24 @@ export default function Board() {
               </button>
             ))}
           </div>
+          {/* Botão para ativar/desativar seleção múltipla */}
+          {!multiSelectMode ? (
+            <button
+              style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              onClick={() => setMultiSelectMode(true)}
+            >
+              Selecionar vários
+            </button>
+          ) : (
+            <button
+              style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              onClick={clearSelectedCards}
+            >
+              Cancelar seleção
+            </button>
+          )}
           {/* Botão para criar novo card */}
-          <button 
+          <button
             style={styles.addButton}
             onClick={() => setIsModalOpen(true)}
             onMouseEnter={(e) => { 
@@ -3273,8 +3524,8 @@ export default function Board() {
                   top: "calc(100% + 8px)",
                   right: 0,
                   minWidth: "190px",
-                  background: "#fff",
-                  border: "1px solid #d8cffb",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
                   borderRadius: 10,
                   boxShadow: "0 14px 28px rgba(56, 36, 138, 0.2)",
                   padding: 8,
@@ -3392,9 +3643,17 @@ export default function Board() {
             onClick={async () => {
               if (window.confirm(`Excluir ${selectedCards.length} card(s) selecionado(s)? Essa ação não pode ser desfeita.`)) {
                 setError("");
+                // Snapshot da coluna de cada card selecionado antes de remover.
+                const colsToDecrement = [];
+                for (const c of cards) {
+                  if (selectedCards.includes(getCardKey(c))) {
+                    colsToDecrement.push(getCardColumnId(c));
+                  }
+                }
                 try {
                   await Promise.all(selectedCards.map(cardId => api.delete(`/cards/${cardId}`)));
                   setCards(prev => prev.filter(card => !selectedCards.includes(getCardKey(card))));
+                  for (const cid of colsToDecrement) adjustColumnTotal(cid, -1);
                   clearSelectedCards();
                 } catch {
                   setError("Erro ao excluir cards em lote. Tente novamente.");
@@ -3443,16 +3702,18 @@ export default function Board() {
           ))}
         </select>
         
-        {/* Select para filtrar por vendedor */}
+        {/* Select para filtrar por vendedor — popula a partir do diretório completo
+            (independe de quais cards estão carregados, vital para a busca server-side). */}
         <select
           value={vendorFilter}
           onChange={(e) => setVendorFilter(e.target.value)}
           style={styles.modalInput}
         >
           <option value="">Todos os Vendedores</option>
-          {/* Extrai lista única de vendedores dos cards existentes */}
-          {[...new Set(cards.map((c) => c.vendedor?.nome || c.vendedor || c.vendedorId || "Sem vendedor"))].map((vendor) => (
-            <option key={vendor} value={vendor}>{vendor}</option>
+          {directoryUsers.map((u) => (
+            <option key={u.id} value={String(u.id)}>
+              {u.nome || u.email || `Usuário #${u.id}`}
+            </option>
           ))}
         </select>
         
@@ -3464,6 +3725,46 @@ export default function Board() {
           Limpar filtros
         </button>
       </div>
+
+      {/* Indicador de busca server-side ativa + aviso de truncamento. */}
+      {isServerFiltered && (
+        <div
+          style={{
+            margin: "10px 0 14px 0",
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: serverFilterLimited ? "#fff4d9" : "#eef2ff",
+            border: `1px solid ${serverFilterLimited ? "#f0c66c" : "#c8d3ff"}`,
+            color: serverFilterLimited ? "#7a5b00" : "#2f3d99",
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <span>
+            {serverFilterLimited
+              ? "Mais de 500 resultados encontrados — refine sua busca para ver todos."
+              : `Busca ativa: ${cards.length} resultado(s).`}
+          </span>
+          <button
+            onClick={() => { setSearchTerm(""); setStatusFilter(""); setVendorFilter(""); }}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "inherit",
+              fontWeight: 700,
+              cursor: "pointer",
+              textDecoration: "underline",
+              fontSize: 13,
+            }}
+          >
+            Limpar
+          </button>
+        </div>
+      )}
 
       {/* Contexto de Drag and Drop - envolve todo o Kanban */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -3579,9 +3880,12 @@ export default function Board() {
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                           <GripVertical size={14} /> {col}
                         </span>
-                        {/* Contador de cards na coluna */}
-                        <span style={{ background: "#f4efff", padding: "2px 8px", borderRadius: "8px", fontSize: "12px", color: "#5f3dc6", border: "1px solid #d6c7ff" }}>
-                          {columnCards.length}
+                        {/* Contador de cards na coluna (total real no banco) */}
+                        <span
+                          style={{ background: "#f4efff", padding: "2px 8px", borderRadius: "8px", fontSize: "12px", color: "#5f3dc6", border: "1px solid #d6c7ff" }}
+                          title={`${columnCards.length} carregados de ${Number(columnTotals[String(column.id)]) || 0} no banco`}
+                        >
+                          {Number(columnTotals[String(column.id)]) || columnCards.length}
                         </span>
                         {/* Botão para editar coluna */}
                         <button 
@@ -3670,14 +3974,18 @@ export default function Board() {
                 {orderedColumnDefs.map((column) => {
                   const col = column.nome;
                   const columnCards = cardsByColumn[String(column.id)] || [];
-                  // Componente interno para manter estado de expansão por coluna
+                  // Paginação real: o backend devolveu top N por coluna + total.
+                  // O botão "Ver mais" busca os próximos cards daquela coluna.
+                  const columnKey = String(column.id);
+                  const totalInColumn = Number(columnTotals[columnKey]) || 0;
+                  const loadedInColumn = loadedByColumn[columnKey] || 0;
+                  const hasMore = loadedInColumn < totalInColumn;
+                  const isLoadingMore = !!loadingMoreByColumn[columnKey];
                   function ColumnWithShowMore() {
-                    const [expanded, setExpanded] = useState(false);
-                    const visible = expanded ? columnCards : columnCards.slice(0, 5);
                     return (
                       <td key={column.id || col} style={{ ...styles.td, minWidth: densityCfg.columnWidth, width: densityCfg.columnWidth }}>
                         <DroppableColumn id={`column-${column.id}`} minHeight={densityCfg.columnMinHeight} padding={densityCfg.columnPadding}>
-                          {visible.map((card) => (
+                          {columnCards.map((card) => (
                             <div key={getCardKey(card)} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                               {multiSelectMode && (
                                 <input
@@ -3698,8 +4006,9 @@ export default function Board() {
                               />
                             </div>
                           ))}
-                          {columnCards.length > 5 && !expanded && (
+                          {hasMore && (
                             <button
+                              disabled={isLoadingMore}
                               style={{
                                 margin: '12px auto 0',
                                 display: 'block',
@@ -3710,37 +4019,26 @@ export default function Board() {
                                 fontWeight: 600,
                                 borderRadius: 8,
                                 padding: '8px 18px',
-                                cursor: 'pointer',
+                                cursor: isLoadingMore ? 'wait' : 'pointer',
                                 boxShadow: '0 2px 8px rgba(90,48,255,0.08)',
+                                opacity: isLoadingMore ? 0.7 : 1,
                               }}
-                              onClick={() => setExpanded(true)}
+                              onClick={() => loadMoreForColumn(column.id)}
+                              title={`${loadedInColumn} de ${totalInColumn} cards carregados`}
                             >
-                              Ver mais
+                              {isLoadingMore
+                                ? "Carregando..."
+                                : `Ver mais (${totalInColumn - loadedInColumn} restantes)`}
                             </button>
                           )}
-                          {columnCards.length > 5 && expanded && (
-                            <button
-                              style={{
-                                margin: '12px auto 0',
-                                display: 'block',
-                                background: '#f7f4ff',
-                                border: 'none',
-                                color: '#7c5cff',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                borderRadius: 8,
-                                padding: '8px 18px',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px rgba(90,48,255,0.08)',
-                              }}
-                              onClick={() => setExpanded(false)}
-                            >
-                              Mostrar menos
-                            </button>
-                          )}
-                          {columnCards.length === 0 && (
+                          {columnCards.length === 0 && totalInColumn === 0 && (
                             <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
                               Nenhum card
+                            </div>
+                          )}
+                          {columnCards.length === 0 && totalInColumn > 0 && (
+                            <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
+                              {totalInColumn} card(s) ocultos pelos filtros atuais.
                             </div>
                           )}
                         </DroppableColumn>
@@ -3761,54 +4059,87 @@ export default function Board() {
             </div>
           ) : null}
         </DragOverlay>
+        {/* Zonas de transferência entre Kanbans — só aparecem durante drag de um card. */}
+        {canTransferTo.length > 0 && !!activeId && (
+          <div style={{
+            position: "fixed",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 60,
+            display: "flex",
+            gap: 12,
+            pointerEvents: "none",
+          }}>
+            {canTransferTo.map((toBoard) => (
+              <TransferDropZone key={toBoard} toBoard={toBoard} />
+            ))}
+          </div>
+        )}
       </DndContext>
+
+      {/* Toast de sucesso */}
+      {successToast && (
+        <div style={{
+          position: "fixed",
+          bottom: 28,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 9999,
+          background: "linear-gradient(135deg, #1f7a3f, #2db05a)",
+          color: "#fff",
+          padding: "12px 22px",
+          borderRadius: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          pointerEvents: "none",
+          animation: "slideUpFade 0.25s ease",
+          whiteSpace: "nowrap",
+        }}>
+          {successToast}
+        </div>
+      )}
+      <style>{`@keyframes slideUpFade { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
 
       {/* Modal de criação de card */}
       {isModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.createModal}>
             <div style={styles.createHero}>
-              <div style={styles.createHeroTitleWrap}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <h2 style={styles.createHeroTitle}>
                   <Plus size={20} /> Criar novo card
                 </h2>
-                <p style={styles.createHeroText}>
-                  Monte a solicitação com o mesmo padrão visual do Bitrix: dados principais primeiro, contexto operacional em seguida e um fechamento claro para a equipe.
-                </p>
-                <div style={styles.createHeroBadgeRow}>
-                  <span style={styles.createHeroBadge}><Wrench size={13} /> Fluxo comercial</span>
-                  <span style={styles.createHeroBadge}><Zap size={13} /> Entrada rápida</span>
-                  <span style={styles.createHeroBadge}><CalendarDays size={13} /> Pronto para operação</span>
-                </div>
-              </div>
-
-              <div style={styles.createHeroSide}>
-                <div style={styles.createMetaCard}>
-                  <p style={styles.createMetaLabel}>Responsável</p>
-                  <p style={styles.createMetaValue}>{selectedVendorOption?.label || seller}</p>
-                </div>
-                <div style={styles.createMetaCard}>
-                  <p style={styles.createMetaLabel}>Etapa inicial</p>
-                  <select
-                    style={{
-                      ...styles.createInput,
-                      fontWeight: 700,
-                      color: '#5a30ff',
-                      background: '#f7f5ff',
-                      border: '1px solid #d6d0ff',
-                      cursor: 'pointer',
-                      marginTop: 2,
-                      minWidth: 120,
-                    }}
-                    value={newCard.colunaId || orderedColumnDefs[0]?.id || ''}
-                    onChange={e => {
-                      setNewCard((prev) => ({ ...prev, colunaId: Number(e.target.value) }));
-                    }}
-                  >
-                    {orderedColumnDefs.map(col => (
-                      <option key={col.id} value={col.id}>{col.nome}</option>
-                    ))}
-                  </select>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <div style={styles.createMetaCard}>
+                    <p style={styles.createMetaLabel}>Responsável</p>
+                    <p style={{ ...styles.createMetaValue, margin: 0 }}>{selectedVendorOption?.label || seller}</p>
+                  </div>
+                  <div style={styles.createMetaCard}>
+                    <p style={styles.createMetaLabel}>Etapa inicial</p>
+                    <select
+                      style={{
+                        ...styles.createInput,
+                        fontWeight: 700,
+                        color: "rgba(255,255,255,0.9)",
+                        background: "rgba(255,255,255,0.1)",
+                        border: "1px solid rgba(255,255,255,0.2)",
+                        cursor: "pointer",
+                        marginTop: 4,
+                        minWidth: 140,
+                        padding: "6px 10px",
+                      }}
+                      value={newCard.colunaId || orderedColumnDefs[0]?.id || ''}
+                      onChange={e => {
+                        setNewCard((prev) => ({ ...prev, colunaId: Number(e.target.value) }));
+                      }}
+                    >
+                      {orderedColumnDefs.map(col => (
+                        <option key={col.id} value={col.id}>{col.nome}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4172,7 +4503,10 @@ export default function Board() {
                 <ClipboardList size={19} />
                 {selectedCard.titulo || selectedCard.cliente || "Detalhes do card"}
               </h2>
-              <button onClick={handleCloseCard} style={styles.detailsCloseBtn} title="Fechar">x</button>
+              <button onClick={handleCloseCard} style={styles.detailsCloseBtn} title="Fechar"
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+              >✕</button>
             </div>
             <div style={styles.detailsContent}>
               <div style={styles.detailsMain}>
@@ -4200,18 +4534,15 @@ export default function Board() {
                 <span style={styles.detailsLabel}><MapPin size={14} /> Coordenadas:</span>
                 <span style={styles.detailsValue}>
                   {(() => {
-                    let lat = '--', lng = '--';
-                    if (selectedCard?.coordenadas) {
-                      if (typeof selectedCard.coordenadas === 'string' && selectedCard.coordenadas.includes(',')) {
-                        const [latStr, lngStr] = selectedCard.coordenadas.split(',').map(s => s.trim());
-                        lat = latStr || '--';
-                        lng = lngStr || '--';
-                      } else if (typeof selectedCard.coordenadas === 'object' && selectedCard.coordenadas !== null) {
-                        lat = selectedCard.coordenadas.lat || selectedCard.coordenadas[0] || '--';
-                        lng = selectedCard.coordenadas.lng || selectedCard.coordenadas[1] || '--';
-                      }
+                    const c = selectedCard?.coordenadas;
+                    if (!c) return '--';
+                    if (typeof c === 'string' && c.includes(',')) return c;
+                    if (typeof c === 'object') {
+                      const lat = c.lat || '--';
+                      const lng = c.lng || '--';
+                      return `${lat}, ${lng}`;
                     }
-                    return `${lat}, ${lng}`;
+                    return '--';
                   })()}
                 </span>
               </div>
@@ -4320,6 +4651,16 @@ export default function Board() {
               <button onClick={handleDuplicateCard} style={{ ...styles.cancelBtn, background: "#ebf2ff", color: "#1f4baf" }}>
                 Duplicar
               </button>
+              {canTransferTo.map((toBoard) => (
+                <button
+                  key={toBoard}
+                  onClick={() => openTransferDialog(selectedCard, toBoard)}
+                  style={{ ...styles.cancelBtn, background: "#f5edff", color: "#5a30ff" }}
+                  title={`Move este card para o Kanban ${BOARD_LABELS[toBoard]} (registra comentário de sistema).`}
+                >
+                  Transferir para {BOARD_LABELS[toBoard]}
+                </button>
+              ))}
               <button onClick={handleDeleteCard} style={{ ...styles.cancelBtn, background: "#ffe9e4", color: "#b33524" }}>
                 Excluir
               </button>
@@ -4344,16 +4685,27 @@ export default function Board() {
                     Nenhum comentário ainda.
                   </p>
                 ) : (
-                  [...(selectedCard.comments || [])].reverse().map((comment, idx) => {
-                    const originalIdx = (selectedCard.comments || []).length - 1 - idx;
+                  (() => {
+                    const allComments = selectedCard.comments || [];
+                    const pinned = allComments.filter(c => c.pinned);
+                    const rest = [...allComments.filter(c => !c.pinned)].reverse();
+                    return [...pinned, ...rest];
+                  })().map((comment) => {
                     const isSystem = comment.isSystem;
+                    const isPinned = !!comment.pinned;
                     return (
-                    <div key={comment.id} style={{
-                      ...styles.detailsCommentItem,
-                      background: isSystem ? 'linear-gradient(90deg, #f3f0ff 80%, #e0e7ff 100%)' : undefined,
-                      borderLeft: isSystem ? '4px solid #7c6fb7' : undefined,
-                      opacity: isSystem ? 0.92 : 1,
-                    }}>
+                    <div key={comment.id}
+                      className={isPinned ? 'comment-pinned' : undefined}
+                      style={{
+                        ...styles.detailsCommentItem,
+                        background: isPinned
+                          ? undefined
+                          : isSystem ? 'linear-gradient(90deg, var(--bg-input) 80%, var(--bg-card) 100%)' : 'var(--bg-input)',
+                        borderLeft: isPinned
+                          ? undefined
+                          : isSystem ? '4px solid #7c6fb7' : undefined,
+                        opacity: isSystem ? 0.92 : 1,
+                      }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {comment.authorAvatar ? (
@@ -4389,29 +4741,55 @@ export default function Board() {
                               {isSystem ? 'S' : getAvatarInitials(comment.author || 'Usuário')}
                             </div>
                           )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <p style={{
                             ...styles.detailsCommentAuthor,
                             color: isSystem ? '#7c6fb7' : undefined,
                             fontWeight: isSystem ? 700 : undefined,
+                            margin: 0,
                           }}>{isSystem ? 'Sistema' : (comment.author || 'Usuário')}:</p>
+                          {isPinned && (
+                            <span className="badge-pinned" style={{ fontSize: 10, fontWeight: 800, borderRadius: 999, padding: '1px 7px', letterSpacing: '0.3px' }}>
+                              📌 Fixado
+                            </span>
+                          )}
+                        </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }} title="Excluir comentário" onClick={async () => {
-                            const updatedComments = (selectedCard.comments || []).filter((_, i) => i !== originalIdx);
-                            try {
-                              await persistCommentsOnSelectedCard(updatedComments);
-                            } catch (err) {
-                              setError("Erro ao excluir comentário");
-                            }
-                          }}><Trash2 size={15} /></button>
-                          <button style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }} title="Editar comentário" onClick={() => {
-                            setEditingCommentIdx(originalIdx);
-                            setCommentText(comment.text || "");
-                            setIsCommentComposerOpen(true);
-                          }}><Pencil size={15} /></button>
+                          {!isSystem && (
+                            <button
+                              style={{ background: 'none', border: 'none', color: isPinned ? '#b45309' : '#7264a8', fontSize: 16, cursor: 'pointer' }}
+                              title={isPinned ? 'Desafixar comentário' : 'Fixar comentário'}
+                              onClick={() => handlePinComment(comment.id)}
+                            >
+                              📌
+                            </button>
+                          )}
+                          {!isSystem && (
+                            <>
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
+                                title="Excluir comentário"
+                                onClick={() => handleDeleteComment(comment.id)}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
+                                title="Editar comentário"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id);
+                                  setCommentText(comment.text || "");
+                                  setIsCommentComposerOpen(true);
+                                }}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-line' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-wrap' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
                           const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
@@ -4442,8 +4820,8 @@ export default function Board() {
                                 type="button"
                                 onClick={() => handleToggleReaction(comment.id, emoji)}
                                 style={{
-                                  border: reactedByMe ? '1px solid #8f7cff' : '1px solid #e1d8ff',
-                                  background: reactedByMe ? '#efe9ff' : '#fff',
+                                  border: reactedByMe ? '1px solid #8f7cff' : '1px solid var(--border)',
+                                  background: reactedByMe ? '#efe9ff' : 'var(--bg-card)',
                                   color: '#4b3b9a',
                                   borderRadius: 999,
                                   fontSize: 12,
@@ -4462,8 +4840,8 @@ export default function Board() {
                                     bottom: 'calc(100% + 8px)',
                                     left: '50%',
                                     transform: 'translateX(-50%)',
-                                    background: '#ffffff',
-                                    border: '1px solid #e3d9ff',
+                                    background: 'var(--bg-card)',
+                                    border: '1px solid var(--border)',
                                     boxShadow: '0 8px 22px rgba(75, 59, 154, 0.2)',
                                     borderRadius: 10,
                                     padding: '7px 9px',
@@ -4500,9 +4878,9 @@ export default function Board() {
                           type="button"
                           onClick={() => setActiveReplyCommentId((prev) => (String(prev) === String(comment.id) ? null : comment.id))}
                           style={{
-                            border: '1px solid #d8cdfd',
-                            background: '#fff',
-                            color: '#4b3b9a',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-card)',
+                            color: 'var(--text)',
                             borderRadius: 999,
                             fontSize: 12,
                             fontWeight: 700,
@@ -4527,9 +4905,9 @@ export default function Board() {
                               const isEditingThisReply = editingReplyKey === replyEditKey;
 
                               return (
-                                <div key={reply.id} style={{ background: '#faf8ff', border: '1px solid #ece6ff', borderRadius: 10, padding: '8px 10px' }}>
+                                <div key={reply.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                    <div style={{ fontSize: 12, color: '#5c4ca8', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
                                     <div style={{ display: 'flex', gap: 8 }}>
                                       <button
                                         type="button"
@@ -4559,9 +4937,9 @@ export default function Board() {
                                         placeholder="Edite a resposta..."
                                         style={{
                                           flex: 1,
-                                          border: '1px solid #d8cdfd',
-                                          background: '#fff',
-                                          color: '#3f3292',
+                                          border: '1px solid var(--border)',
+                                          background: 'var(--bg-input)',
+                                          color: 'var(--text)',
                                           borderRadius: 8,
                                           fontSize: 12,
                                           padding: '7px 9px',
@@ -4587,9 +4965,9 @@ export default function Board() {
                                         type="button"
                                         onClick={handleCancelEditReply}
                                         style={{
-                                          border: '1px solid #d8cdfd',
-                                          background: '#fff',
-                                          color: '#4b3b9a',
+                                          border: '1px solid var(--border)',
+                                          background: 'var(--bg-card)',
+                                          color: 'var(--text)',
                                           borderRadius: 8,
                                           fontSize: 12,
                                           fontWeight: 700,
@@ -4601,7 +4979,7 @@ export default function Board() {
                                       </button>
                                     </div>
                                   ) : (
-                                    <div style={{ fontSize: 13, color: '#4f3dab', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
                                   )}
 
                                   <small style={{ color: '#8d83b3', fontSize: 10 }}>
@@ -4615,22 +4993,77 @@ export default function Board() {
                       )}
 
                       {String(activeReplyCommentId) === String(comment.id) && (
-                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                          <input
-                            type="text"
-                            value={replyDraftByCommentId?.[comment.id] || ''}
-                            onChange={(e) => setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: e.target.value }))}
-                            placeholder="Escreva uma resposta..."
-                            style={{
-                              flex: 1,
-                              border: '1px solid #d8cdfd',
-                              background: '#fff',
-                              color: '#3f3292',
-                              borderRadius: 8,
-                              fontSize: 12,
-                              padding: '8px 10px',
-                            }}
-                          />
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, position: 'relative' }}>
+                            <input
+                              type="text"
+                              value={replyDraftByCommentId?.[comment.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: val }));
+                                const atIdx = val.lastIndexOf('@');
+                                if (atIdx !== -1) {
+                                  const afterAt = val.slice(atIdx + 1);
+                                  if (!afterAt.includes(' ')) {
+                                    setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: afterAt.toLowerCase() }));
+                                    return;
+                                  }
+                                }
+                                setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                                if (e.key === 'Enter' && !replyMentionQueryByCommentId?.[comment.id]) handleAddReply(comment.id);
+                              }}
+                              onBlur={() => setTimeout(() => setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null })), 150)}
+                              placeholder="Escreva uma resposta... use @ para mencionar"
+                              style={{
+                                width: '100%',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-input)',
+                                color: 'var(--text)',
+                                borderRadius: 8,
+                                fontSize: 12,
+                                padding: '8px 10px',
+                                boxSizing: 'border-box',
+                              }}
+                            />
+                            {/* Dropdown de menção */}
+                            {replyMentionQueryByCommentId?.[comment.id] !== null &&
+                             replyMentionQueryByCommentId?.[comment.id] !== undefined && (() => {
+                              const query = replyMentionQueryByCommentId[comment.id] || '';
+                              const filtered = (directoryUsers || [])
+                                .filter((u) => u.nome?.toLowerCase().includes(query) || u.email?.toLowerCase().includes(query))
+                                .slice(0, 6);
+                              if (!filtered.length) return null;
+                              return (
+                                <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#fff', border: '1px solid #d8cdfd', borderRadius: 10, boxShadow: '0 4px 16px rgba(90,60,180,0.14)', zIndex: 9999, overflow: 'hidden' }}>
+                                  {filtered.map((u) => (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        const current = replyDraftByCommentId?.[comment.id] || '';
+                                        const atIdx = current.lastIndexOf('@');
+                                        const newText = current.slice(0, atIdx) + '@' + u.nome + ' ';
+                                        setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: newText }));
+                                        setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
+                                      }}
+                                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: '#3f3292', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f0ff'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6c3bff', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                                        {u.nome?.charAt(0)?.toUpperCase()}
+                                      </span>
+                                      {u.nome}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleAddReply(comment.id)}
@@ -4643,6 +5076,7 @@ export default function Board() {
                               fontWeight: 700,
                               cursor: 'pointer',
                               padding: '8px 10px',
+                              flexShrink: 0,
                             }}
                           >
                             Enviar
@@ -4654,7 +5088,7 @@ export default function Board() {
                       {Array.isArray(comment.attachments) && comment.attachments.length > 0 ? (
                         <div style={{ marginTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                           {comment.attachments.map((att, idx) => (
-                            <div key={idx} style={{ minWidth: 120, maxWidth: 220, background: '#f8f5ff', border: '1px solid #ded2ff', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px #f3f0ff' }}>
+                            <div key={idx} style={{ minWidth: 120, maxWidth: 220, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
                               {att.type && att.type.startsWith('image/') ? (
                                 <button
                                   type="button"
@@ -4768,9 +5202,9 @@ export default function Board() {
                     type="button"
                     onClick={() => setIsCommentComposerOpen(true)}
                     style={{
-                      border: "1px solid #d8cdfd",
-                      background: "#ffffff",
-                      color: "#4b3b9a",
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-card)",
+                      color: "var(--text)",
                       borderRadius: "8px",
                       padding: "8px 12px",
                       fontSize: "12px",
@@ -4786,14 +5220,25 @@ export default function Board() {
                   </button>
                 ) : (
                   <>
+                    {/* key força remount quando troca entre "novo comentário" e
+                        "editar comentário X" — evita o useEffect de reset do CommentInput
+                        clobberar o que o usuário já digitou. */}
                     <CommentInput
+                      key={editingCommentId ? `edit-${editingCommentId}` : "new-comment"}
                       onSend={handleAddComment}
-                      onFile={handleAttachmentSelect}
+
                       placeholder="Escreva um comentário..."
                       mentionUsers={mentionUsers}
-                      pendingAttachments={pendingAttachments}
-                      onClearAttachment={handleClearAttachment}
-                      initialValue={editingCommentIdx !== null && selectedCard && selectedCard.comments && selectedCard.comments[editingCommentIdx] ? selectedCard.comments[editingCommentIdx].text : ""}
+                      initialValue={
+                        editingCommentId
+                          ? (selectedCard?.comments?.find((c) => String(c.id) === String(editingCommentId))?.text || "")
+                          : ""
+                      }
+                      initialAttachments={
+                        editingCommentId
+                          ? (selectedCard?.comments?.find((c) => String(c.id) === String(editingCommentId))?.attachments || [])
+                          : []
+                      }
                     />
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                       <button
@@ -4801,7 +5246,7 @@ export default function Board() {
                         onClick={() => {
                           setIsCommentComposerOpen(false);
                           setPendingAttachments([]);
-                          setEditingCommentIdx(null);
+                          setEditingCommentId(null);
                           // Não precisa mais limpar commentText
                         }}
                         style={{
@@ -4980,19 +5425,20 @@ export default function Board() {
       {/* Modal de edição de card - usa componente CardModal para formulário completo */}
       {isEditCardOpen && editingCard && (
         <div style={styles.modalOverlay}>
-          <div style={{ ...styles.modal, maxWidth: "700px", maxHeight: "85vh", overflowY: "auto" }}>
+          <div style={{ ...styles.modal, maxWidth: "700px", maxHeight: "88vh", overflowY: "auto", padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {/* Cabeçalho do modal de edição */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h2 style={{ margin: 0, color: "#4c3393", fontSize: "22px" }}><Pencil size={18} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Editar Card</h2>
-              <button 
-                onClick={() => { setIsEditCardOpen(false); setEditingCard(null); }} 
-                style={{ border: "none", background: "transparent", fontSize: "24px", cursor: "pointer", color: "#7f6ad7", transition: "color 0.2s" }}
-                onMouseEnter={(e) => e.currentTarget.style.color = "#ff4444"}
-                onMouseLeave={(e) => e.currentTarget.style.color = "#7f6ad7"}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", background: "linear-gradient(90deg, #3d1472 0%, #4c1d95 60%, #4f238f 100%)", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+              <h2 style={{ margin: 0, color: "#ffffff", fontSize: "17px", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><Pencil size={16} />Editar Card</h2>
+              <button
+                onClick={() => { setIsEditCardOpen(false); setEditingCard(null); }}
+                style={{ border: "none", background: "rgba(255,255,255,0.15)", borderRadius: 8, width: 32, height: 32, fontSize: "16px", cursor: "pointer", color: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 150ms ease" }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
               >
-                x
+                ✕
               </button>
             </div>
+            <div style={{ padding: "20px", overflowY: "auto", flex: 1, background: "var(--bg)" }}>
             
             {/* Componente CardModal reutilizável para edição */}
             <CardModal 
@@ -5007,11 +5453,19 @@ export default function Board() {
                   }
                   delete payload.vendedorId;
                   const response = await api.put(`/cards/${getCardKey(editingCard)}`, payload);
-                  const savedCard = response.data;
-                  
+                  const savedCard = enrichCardWithUpdater(response.data);
+
+                  // Detecta mudança de coluna para manter columnTotals consistente.
+                  const previousColId = getCardColumnId(editingCard);
+                  const newColId = getCardColumnId(savedCard);
+                  if (Number.isFinite(previousColId) && Number.isFinite(newColId) && previousColId !== newColId) {
+                    adjustColumnTotal(previousColId, -1);
+                    adjustColumnTotal(newColId, +1);
+                  }
+
                   // Atualiza estado dos cards
                   setCards((prev) => prev.map((c) => getCardKey(c) === getCardKey(savedCard) ? savedCard : c));
-                  
+
                   // Se o card editado está selecionado, atualiza também
                   if (selectedCard && getCardKey(selectedCard) === getCardKey(savedCard)) {
                     setSelectedCard(savedCard);
@@ -5026,11 +5480,136 @@ export default function Board() {
                   alert("Erro ao salvar as alterações. Tente novamente.");
                 }
               }}
-              onClose={() => { 
-                setIsEditCardOpen(false); 
-                setEditingCard(null); 
+              onClose={() => {
+                setIsEditCardOpen(false);
+                setEditingCard(null);
               }}
             />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de transferência entre Kanbans */}
+      {transferDialog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(20, 8, 48, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            // Acima do modal de detalhes do card (zIndex 4000).
+            zIndex: 5000,
+            padding: 16,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !transferDialog.submitting) {
+              closeTransferDialog();
+            }
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 460,
+              background: "var(--bg-card)",
+              borderRadius: 16,
+              boxShadow: "0 20px 50px rgba(45, 18, 87, 0.35)",
+              padding: 24,
+              border: "1px solid var(--border)",
+            }}
+          >
+            <h2 style={{ margin: 0, color: "var(--text)", fontSize: 20 }}>
+              Transferir para {BOARD_LABELS[transferDialog.toBoard] || transferDialog.toBoard}
+            </h2>
+            <p style={{ margin: "8px 0 16px 0", color: "var(--text-label)", fontSize: 14 }}>
+              Card atual:{" "}
+              <strong style={{ color: "#2f1e70" }}>
+                {transferDialog.card?.titulo || transferDialog.card?.cliente || `#${getCardKey(transferDialog.card)}`}
+              </strong>
+            </p>
+
+            {transferDialog.loading && (
+              <p style={{ margin: 0, color: "#7159a8", fontSize: 13 }}>Carregando colunas de destino…</p>
+            )}
+
+            {!transferDialog.loading && transferDialog.columns.length === 0 && !transferDialog.error && (
+              <p style={{ margin: 0, color: "#b33524", fontSize: 13 }}>
+                Nenhuma coluna encontrada no board de destino.
+              </p>
+            )}
+
+            {transferDialog.columns.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#4b3b9a" }}>Coluna de destino</label>
+                <select
+                  value={transferDialog.targetColumnId || ""}
+                  onChange={(e) =>
+                    setTransferDialog((prev) =>
+                      prev ? { ...prev, targetColumnId: Number(e.target.value) || null } : prev
+                    )
+                  }
+                  disabled={transferDialog.submitting}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-input)",
+                    fontSize: 14,
+                    color: "var(--text)",
+                  }}
+                >
+                  {transferDialog.columns.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {transferDialog.error && (
+              <p style={{ margin: "12px 0 0 0", color: "#b33524", fontSize: 13 }}>{transferDialog.error}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button
+                type="button"
+                onClick={closeTransferDialog}
+                disabled={transferDialog.submitting}
+                style={{
+                  border: "1px solid #d4c8fb",
+                  background: "#faf7ff",
+                  color: "#4b2d84",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  fontWeight: 600,
+                  cursor: transferDialog.submitting ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmTransfer}
+                disabled={transferDialog.submitting || !transferDialog.targetColumnId}
+                style={{
+                  border: "1px solid #5a30ff",
+                  background: "linear-gradient(135deg, #7a50c6 0%, #5a30ff 100%)",
+                  color: "#fff",
+                  borderRadius: 10,
+                  padding: "9px 16px",
+                  fontWeight: 700,
+                  cursor:
+                    transferDialog.submitting || !transferDialog.targetColumnId ? "not-allowed" : "pointer",
+                  opacity: transferDialog.submitting || !transferDialog.targetColumnId ? 0.7 : 1,
+                }}
+              >
+                {transferDialog.submitting ? "Transferindo…" : "Confirmar transferência"}
+              </button>
+            </div>
           </div>
         </div>
       )}

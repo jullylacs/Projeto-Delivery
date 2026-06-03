@@ -1,4 +1,3 @@
-const { Op } = require("sequelize");
 const { Card, Column, Notification, Schedule, Technician, User } = require("../models");
 
 let cachedNotificationTypes = null;
@@ -53,6 +52,24 @@ const toIdentityKey = (value) => {
   return raw.replace(/\s+/g, " ");
 };
 
+const stableCommentId = (comment, fallback) => {
+  if (comment?.id !== undefined && comment?.id !== null && String(comment.id).trim() !== "") {
+    return String(comment.id).trim();
+  }
+  const createdAt = comment?.createdAt ? String(comment.createdAt).trim() : "";
+  if (createdAt) return `t:${createdAt}`;
+  return `p:${fallback}`;
+};
+
+const stableReplyId = (reply, commentId, fallback) => {
+  if (reply?.id !== undefined && reply?.id !== null && String(reply.id).trim() !== "") {
+    return String(reply.id).trim();
+  }
+  const createdAt = reply?.createdAt ? String(reply.createdAt).trim() : "";
+  if (createdAt) return `${commentId}-t:${createdAt}`;
+  return `${commentId}-p:${fallback}`;
+};
+
 const buildCommentInteractionNotifications = (cards, currentUser) => {
   const meNameKey = toIdentityKey(currentUser?.nome);
   const meEmailKey = toIdentityKey(currentUser?.email);
@@ -68,7 +85,7 @@ const buildCommentInteractionNotifications = (cards, currentUser) => {
     const events = [];
 
     comments.forEach((comment, commentIndex) => {
-      const commentId = comment?.id || commentIndex;
+      const commentId = stableCommentId(comment, commentIndex);
       const commentAuthorKey = toIdentityKey(comment?.author);
       const commentBelongsToMe = commentAuthorKey && myKeys.has(commentAuthorKey);
 
@@ -76,18 +93,20 @@ const buildCommentInteractionNotifications = (cards, currentUser) => {
         const reactions = comment?.reactions && typeof comment.reactions === "object" ? comment.reactions : {};
         Object.entries(reactions).forEach(([emoji, users]) => {
           const reactorList = Array.isArray(users) ? users : [];
-          reactorList.forEach((reactorRaw, reactorIndex) => {
+          const seenReactors = new Set();
+          reactorList.forEach((reactorRaw) => {
             const reactorKey = toIdentityKey(reactorRaw);
             if (!reactorKey || myKeys.has(reactorKey)) return;
+            if (seenReactors.has(reactorKey)) return;
+            seenReactors.add(reactorKey);
 
             const reactorName = String(reactorRaw || "Alguém").trim() || "Alguém";
             events.push({
               kind: "reaction",
-              source_key: `reaction-${cardId}-${commentId}-${emoji}-${reactorKey}-${reactorIndex}`,
+              source_key: `reaction-${cardId}-${commentId}-${emoji}-${reactorKey}`,
               card_id: cardId,
               title,
               message: `${reactorName} reagiu ${emoji} no seu comentário.`,
-              when_at: new Date(),
               priority: "medium",
               metadata: {
                 type: "comment-reaction",
@@ -104,9 +123,9 @@ const buildCommentInteractionNotifications = (cards, currentUser) => {
           const replierKey = toIdentityKey(reply?.author);
           if (!replierKey || myKeys.has(replierKey)) return;
 
-          const replyId = reply?.id || `${commentId}-${replyIndex}`;
-          const when = reply?.createdAt ? new Date(reply.createdAt) : new Date();
-          const safeWhen = Number.isNaN(when.getTime()) ? new Date() : when;
+          const replyId = stableReplyId(reply, commentId, replyIndex);
+          const when = reply?.createdAt ? new Date(reply.createdAt) : null;
+          const safeWhen = when && !Number.isNaN(when.getTime()) ? when : null;
           const author = String(reply?.author || "Alguém").trim() || "Alguém";
           const snippet = String(reply?.text || "").replace(/\s+/g, " ").trim().slice(0, 140);
 
@@ -159,9 +178,9 @@ const buildMentionNotifications = (cards, currentUserName) => {
         return commentMentionsUser(comment.text, currentUserName);
       })
       .map((comment, index) => {
-        const when = comment?.createdAt ? new Date(comment.createdAt) : new Date();
-        const safeWhen = Number.isNaN(when.getTime()) ? new Date() : when;
-        const commentId = comment?.id || `${safeWhen.toISOString()}-${index}`;
+        const when = comment?.createdAt ? new Date(comment.createdAt) : null;
+        const safeWhen = when && !Number.isNaN(when.getTime()) ? when : null;
+        const commentId = stableCommentId(comment, index);
         const snippet = String(comment.text || "")
           .replace(/\s+/g, " ")
           .trim()
@@ -281,71 +300,74 @@ exports.syncMine = async (req, res) => {
       limit: 500,
     });
 
-    const generated = [
+    const generatedRaw = [
       ...buildMentionNotifications(cards, user.nome || user.email),
       ...buildCommentInteractionNotifications(cards, user),
       ...buildTodayScheduleNotifications(schedules),
     ];
 
+    // Deduplica em memória por source_key (mesma execução pode gerar
+    // dois eventos idênticos por ruído na origem — fica só o último).
+    const generatedBySourceKey = new Map();
+    for (const item of generatedRaw) {
+      if (!item?.source_key) continue;
+      generatedBySourceKey.set(item.source_key, item);
+    }
+    const generated = Array.from(generatedBySourceKey.values());
+
     const allowedTypes = await loadAllowedNotificationTypes();
+    const sequelize = Notification.sequelize;
 
-    const existingRows = await Notification.findAll({
-      where: { usuario_id: userId },
-      attributes: ["id", "metadata"],
-      order: [["id", "DESC"]],
-      limit: 500,
-    });
-
-    const existingBySourceKey = new Map();
-    for (const row of existingRows) {
-      const sourceKey = row?.metadata?.sourceKey;
-      if (sourceKey && !existingBySourceKey.has(sourceKey)) {
-        existingBySourceKey.set(sourceKey, row.id);
-      }
-    }
-
+    let synced = 0;
     for (const item of generated) {
-      const existingId = existingBySourceKey.get(item.source_key);
-      const existing = existingId
-        ? await Notification.findOne({ where: { id: existingId, usuario_id: userId } })
-        : null;
+      const safeTipo = resolveSafeTipo(item.kind, allowedTypes);
+      const metadata = {
+        ...item.metadata,
+        sourceKey: item.source_key,
+        priority: item.priority,
+        when: item.when_at || new Date(),
+        originalKind: item.kind,
+      };
 
-      if (existing) {
-        const safeTipo = resolveSafeTipo(item.kind, allowedTypes);
-        await existing.update({
-          card_id: item.card_id,
-          tipo: safeTipo,
-          titulo: item.title,
-          mensagem: item.message,
-          metadata: {
-            ...item.metadata,
-            sourceKey: item.source_key,
-            priority: item.priority,
-            when: item.when_at,
-            originalKind: item.kind,
+      // INSERT atômico com ON CONFLICT no índice único parcial
+      // (usuario_id, metadata->>'sourceKey') — ver migration. Duas
+      // requests concorrentes não conseguem criar duplicatas porque o
+      // índice é respeitado pela transação, e o UPDATE preserva lida/limpa
+      // e a data original ("when") da notificação.
+      await sequelize.query(
+        `
+          INSERT INTO notifications
+            (usuario_id, card_id, tipo, titulo, mensagem, lida, limpa, metadata, "createdAt", "updatedAt")
+          VALUES
+            (:usuario_id, :card_id, :tipo, :titulo, :mensagem, false, false, CAST(:metadata AS JSONB), NOW(), NOW())
+          ON CONFLICT (usuario_id, ((metadata->>'sourceKey')))
+            WHERE metadata ? 'sourceKey'
+          DO UPDATE SET
+            card_id = EXCLUDED.card_id,
+            tipo = EXCLUDED.tipo,
+            titulo = EXCLUDED.titulo,
+            mensagem = EXCLUDED.mensagem,
+            metadata = notifications.metadata
+              || (EXCLUDED.metadata - 'when')
+              || jsonb_build_object('when',
+                   COALESCE(notifications.metadata->'when', EXCLUDED.metadata->'when')),
+            "updatedAt" = NOW();
+        `,
+        {
+          replacements: {
+            usuario_id: userId,
+            card_id: item.card_id ?? null,
+            tipo: safeTipo,
+            titulo: item.title,
+            mensagem: item.message,
+            metadata: JSON.stringify(metadata),
           },
-        });
-      } else {
-        const safeTipo = resolveSafeTipo(item.kind, allowedTypes);
-        await Notification.create({
-          usuario_id: userId,
-          card_id: item.card_id,
-          tipo: safeTipo,
-          titulo: item.title,
-          mensagem: item.message,
-          lida: false,
-          metadata: {
-            ...item.metadata,
-            sourceKey: item.source_key,
-            priority: item.priority,
-            when: item.when_at,
-            originalKind: item.kind,
-          },
-        });
-      }
+        }
+      );
+      synced += 1;
     }
 
-    return res.json({ synced: generated.length });
+    return res.json({ synced });
   } catch (err) {
     console.error("Erro ao sincronizar notificações:", err);
     return res.status(500).json({ message: "Erro ao sincronizar notificações" });
@@ -405,6 +427,25 @@ exports.markAllAsRead = async (req, res) => {
   } catch (err) {
     console.error("Erro ao marcar todas como lidas:", err);
     return res.status(500).json({ message: "Erro ao atualizar notificações" });
+  }
+};
+
+exports.clearOne = async (req, res) => {
+  try {
+    const userId = Number(req.userId);
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: "ID inválido" });
+
+    const [cleared] = await Notification.update(
+      { limpa: true, limpaEm: new Date() },
+      { where: { id, usuario_id: userId, limpa: false } }
+    );
+
+    if (!cleared) return res.status(404).json({ message: "Notificação não encontrada" });
+    return res.json({ cleared });
+  } catch (err) {
+    console.error("Erro ao limpar notificação:", err);
+    return res.status(500).json({ message: "Erro ao limpar notificação" });
   }
 };
 

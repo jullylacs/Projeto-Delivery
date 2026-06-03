@@ -10,6 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'), // @ aponta para src
     },
   },
+  optimizeDeps: {
+    include: ['@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-underline'],
+  },
   server: {
     host: true,
     port: 5173,
