@@ -31,6 +31,8 @@ services:
       - JWT_SECRET=troque_por_uma_chave_segura_64_caracteres
       - JWT_REFRESH_SECRET=troque_por_uma_chave_segura_64_caracteres
       - SYSTEM_API_TOKEN=troque_por_uma_chave_segura_64_caracteres
+      # ----- IA / Google Gemini -----
+      - GEMINI_API_KEY=AIza...
       # ----- Network -----
       - FRONTEND_URL=http://localhost:5173
       - CORS_ALLOWED_ORIGINS=http://localhost:5173,https://delivery.nvxnetworks.com
