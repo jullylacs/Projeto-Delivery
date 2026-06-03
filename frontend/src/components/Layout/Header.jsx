@@ -122,6 +122,17 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
       const focusCardId = String(normalizedCardId).trim();
       localStorage.setItem(KANBAN_FOCUS_CARD_KEY, focusCardId);
 
+      // Descobre o board do card para garantir que a aba certa seja aberta
+      try {
+        const res = await api.get(`/cards/${focusCardId}`);
+        const cardBoard = res.data?.board || res.data?.column?.board;
+        if (cardBoard) {
+          window.dispatchEvent(new CustomEvent("kanban-switch-board", { detail: { board: cardBoard } }));
+        }
+      } catch {
+        // Falha silenciosa — o focus event tentará assim mesmo
+      }
+
       window.dispatchEvent(
         new CustomEvent(KANBAN_FOCUS_EVENT, {
           detail: { cardId: focusCardId },

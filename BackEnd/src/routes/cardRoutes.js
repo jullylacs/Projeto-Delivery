@@ -29,6 +29,9 @@ router.delete("/:id/comments/:commentId/replies/:replyId", auth, controller.dele
 router.patch("/:id/comments/:commentId/pin", auth, controller.pinComment);
 router.post("/:id/comments/:commentId/reactions", auth, controller.toggleReaction);
 
+// GET /cards/:id — busca um card por ID (ex: para descobrir seu board via notificação)
+router.get("/:id", auth, controller.getCardById);
+
 // PUT /cards/:id — atualiza os dados de um card específico
 router.put("/:id", auth, controller.updateCard);
 

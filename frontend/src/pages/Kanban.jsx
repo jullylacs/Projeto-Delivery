@@ -169,6 +169,18 @@ export default function Kanban() {
     }
   }, [activeBoard]);
 
+  // Troca de aba ao clicar em "Ver card" numa notificação de outro board
+  useEffect(() => {
+    const handle = (e) => {
+      const board = e?.detail?.board;
+      if (board && availableBoards.includes(board)) {
+        setActiveBoard(board);
+      }
+    };
+    window.addEventListener("kanban-switch-board", handle);
+    return () => window.removeEventListener("kanban-switch-board", handle);
+  }, [availableBoards]);
+
   if (availableBoards.length === 0) {
     return <NoAccessNotice />;
   }

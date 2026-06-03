@@ -204,6 +204,26 @@ const buildCardPayload = async (input) => {
   return { payload };
 };
 
+// 🔹 Busca um card por ID (usado pelo front para descobrir o board antes de navegar)
+exports.getCardById = async (req, res) => {
+  try {
+    const id = parseCardId(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID inválido" });
+
+    const card = await Card.findByPk(id, {
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+    });
+
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    return res.json(normalizeCard(card));
+  } catch (err) {
+    return handleControllerError(res, err, "Erro ao buscar card");
+  }
+};
+
 // 🔹 Criação de um novo card
 exports.createCard = async (req, res) => {
   try {

@@ -2247,33 +2247,48 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     return () => clearInterval(intervalId);
   }, []);
 
-  const focusCardById = useCallback((pendingCardId) => {
-    if (!pendingCardId || cards.length === 0) return false;
-
-    const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
-    if (!targetCard) return false;
-
-    // Garante que o card esteja visível mesmo com filtros ativos
+  const openCardDirectly = useCallback((card) => {
+    if (!card) return;
     setSearchTerm("");
     setStatusFilter("");
     setVendorFilter("");
-
-    setSelectedCard(targetCard);
-    setStatusEdit(String(getCardColumnId(targetCard) || ""));
-    setTargetedCardId(String(getCardKey(targetCard)));
-
-    requestAnimationFrame(() => {
-      const domId = getCardDomId(getCardKey(targetCard));
-      const cardElement = document.getElementById(domId);
-      cardElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-    });
-
+    setSelectedCard(card);
+    setStatusEdit(String(getCardColumnId(card) || ""));
+    setTargetedCardId(String(getCardKey(card)));
     setTimeout(() => {
-      setTargetedCardId((current) => (current === String(getCardKey(targetCard)) ? null : current));
+      setTargetedCardId((cur) => cur === String(getCardKey(card)) ? null : cur);
     }, 1400);
+    requestAnimationFrame(() => {
+      document.getElementById(getCardDomId(getCardKey(card)))
+        ?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    });
+  }, []);
 
-    return true;
-  }, [cards]);
+  const focusCardById = useCallback((pendingCardId) => {
+    if (!pendingCardId) return false;
+
+    // Tenta encontrar nos cards já carregados
+    const targetCard = cards.find((card) => String(getCardKey(card)) === String(pendingCardId));
+    if (targetCard) {
+      openCardDirectly(targetCard);
+      return true;
+    }
+
+    // Card não está na lista local (paginação perColumn:5) → busca direto na API
+    if (cards.length > 0) {
+      api.get(`/cards/${pendingCardId}`)
+        .then((res) => {
+          if (res.data) {
+            openCardDirectly(res.data);
+            localStorage.removeItem(KANBAN_FOCUS_CARD_KEY);
+          }
+        })
+        .catch(() => {});
+      return true; // indica que vai processar de forma async
+    }
+
+    return false;
+  }, [cards, openCardDirectly]);
 
   // Deep link: abre o card automaticamente se o hash da URL for #card-ID
   useEffect(() => {
