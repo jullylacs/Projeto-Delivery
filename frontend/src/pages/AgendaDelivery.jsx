@@ -311,7 +311,7 @@ export default function AgendaDelivery() {
 
   const openCreateModal = (preselectDate) => {
     if (scope === SCOPE.geral && !canEditGeral) {
-      setToast("Apenas gestores podem criar eventos na Agenda Geral.");
+      setToast("Apenas gestores podem criar eventos na Agenda Team.");
       return;
     }
     resetForm();
@@ -750,7 +750,7 @@ export default function AgendaDelivery() {
       {/* Cabeçalho */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1a1535", letterSpacing: "-0.4px" }}>Agenda Geral</h2>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1a1535", letterSpacing: "-0.4px" }}>Agenda Team</h2>
           <span style={{
             fontSize: 10,
             color: "#7c5fe8",
@@ -779,7 +779,7 @@ export default function AgendaDelivery() {
               onClick={() => setScope(SCOPE.geral)}
               style={tabBtnStyle(scope === SCOPE.geral)}
             >
-              Agenda Geral
+              Agenda Team
             </button>
           )}
         </div>

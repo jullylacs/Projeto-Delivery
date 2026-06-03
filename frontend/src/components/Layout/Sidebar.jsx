@@ -13,9 +13,10 @@ export default function Sidebar({ isOpen = true }) {
     { name: "Gráficos",        icon: "◈",  path: "/graficos" },
     { name: "Kanban",          icon: "⬡",  path: "/kanban" },
     { name: "Agenda",          icon: "◷",  path: "/agenda" },
-    ...(canSeeAgendaDelivery ? [{ name: "Agenda Geral", icon: "⬡", path: "/agenda-delivery" }] : []),
+    ...(canSeeAgendaDelivery ? [{ name: "Agenda Team", icon: "⬡", path: "/agenda-delivery" }] : []),
     { name: "Ramais",          icon: "✆",  path: "/ramais" },
     { name: "Mural",           icon: "◈",  path: "/mural" },
+    { name: "Consulta IA",    icon: "🤖", path: "/buscar-provedores" },
     ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "◉", path: "/admin/users" }] : []),
   ];
 
@@ -26,8 +27,9 @@ export default function Sidebar({ isOpen = true }) {
     "/agenda":          "📅",
     "/agenda-delivery": "🛵",
     "/ramais":          "📞",
-    "/mural":           "📝",
-    "/admin/users":     "👥",
+    "/mural":              "📝",
+    "/buscar-provedores":  "🤖",
+    "/admin/users":        "👥",
   };
 
   return (
@@ -85,7 +87,7 @@ export default function Sidebar({ isOpen = true }) {
             Delivery
           </div>
           <div style={{ fontSize: "11px", opacity: 0.5, letterSpacing: "0.5px", marginTop: "2px" }}>
-            NVX Fibra LTDA
+            NVX Networks
           </div>
         </div>
       </div>
