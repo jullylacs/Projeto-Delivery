@@ -4789,7 +4789,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           )}
                         </div>
                       </div>
-                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-wrap' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={styles.detailsCommentText}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
                           const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
