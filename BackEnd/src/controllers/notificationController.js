@@ -430,6 +430,25 @@ exports.markAllAsRead = async (req, res) => {
   }
 };
 
+exports.clearOne = async (req, res) => {
+  try {
+    const userId = Number(req.userId);
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: "ID inválido" });
+
+    const [cleared] = await Notification.update(
+      { limpa: true, limpaEm: new Date() },
+      { where: { id, usuario_id: userId, limpa: false } }
+    );
+
+    if (!cleared) return res.status(404).json({ message: "Notificação não encontrada" });
+    return res.json({ cleared });
+  } catch (err) {
+    console.error("Erro ao limpar notificação:", err);
+    return res.status(500).json({ message: "Erro ao limpar notificação" });
+  }
+};
+
 exports.clearRead = async (req, res) => {
   try {
     const userId = Number(req.userId);
