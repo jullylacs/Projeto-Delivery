@@ -352,7 +352,6 @@ export default function AdminUsers() {
   const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState(null);
   const [editingId, setEditingId] = useState(null); // ID do usuário em edição inline
-  const [showPasswordIds, setShowPasswordIds] = useState(new Set()); // IDs com senha visível
   const [form, setForm] = useState({
     nome: "",
     email: "",
@@ -538,16 +537,6 @@ export default function AdminUsers() {
       acesso_kanban_comercial: false,
       acesso_kanban_bko: false,
       nova_senha: "",
-    });
-  };
-
-  const isBcryptHash = (s) => typeof s === "string" && s.startsWith("$2b$");
-
-  const toggleShowPassword = (id) => {
-    setShowPasswordIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
     });
   };
 
@@ -836,28 +825,7 @@ export default function AdminUsers() {
                         autoComplete="new-password"
                       />
                     ) : (
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {isBcryptHash(user.senha) ? (
-                          <span style={{ color: "#7a73a1", fontSize: 13 }}>••••••••</span>
-                        ) : (
-                          <span style={{ fontFamily: "monospace", fontSize: 13, color: "#2f2758" }}>
-                            {showPasswordIds.has(user.id) ? (user.senha || "—") : "••••••••"}
-                          </span>
-                        )}
-                        {!isBcryptHash(user.senha) && user.senha && (
-                          <button
-                            type="button"
-                            onClick={() => toggleShowPassword(user.id)}
-                            title={showPasswordIds.has(user.id) ? "Ocultar" : "Mostrar"}
-                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#7264a8", padding: 0 }}
-                          >
-                            {showPasswordIds.has(user.id) ? "🙈" : "👁"}
-                          </button>
-                        )}
-                        {isBcryptHash(user.senha) && (
-                          <span style={{ fontSize: 10, color: "#9b8fd8", fontStyle: "italic" }}>hash</span>
-                        )}
-                      </div>
+                      <span style={{ color: "#7a73a1", fontSize: 13 }}>••••••••</span>
                     )}
                   </td>
 
