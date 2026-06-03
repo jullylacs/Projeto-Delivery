@@ -155,7 +155,27 @@ export default function Sidebar({ isOpen = true }) {
           letterSpacing: "0.4px",
         }}
       >
-        © 2026 Delivery System - By Júlia and Eduardo
+        <div>© 2026 Delivery System</div>
+        <div style={{ marginTop: "2px" }}>
+          by{" "}
+          <a
+            href="https://github.com/jullylacs"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit", textDecoration: "underline" }}
+          >
+            jullylacs
+          </a>{" "}
+          &{" "}
+          <a
+            href="https://github.com/riguettodev"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit", textDecoration: "underline" }}
+          >
+            riguettodev
+          </a>
+        </div>
       </div>
     </div>
   );

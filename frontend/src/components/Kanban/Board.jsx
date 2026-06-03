@@ -3449,24 +3449,6 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           100% { box-shadow: 0 0 0 12px rgba(127, 90, 240, 0), 0 8px 20px rgba(95, 61, 198, 0.18); }
         }`}
       </style>
-      {/* Botão para ativar/desativar seleção múltipla */}
-      <div style={{ marginBottom: 18 }}>
-        {!multiSelectMode ? (
-          <button
-            style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
-            onClick={() => setMultiSelectMode(true)}
-          >
-            Selecionar vários
-          </button>
-        ) : (
-          <button
-            style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
-            onClick={clearSelectedCards}
-          >
-            Cancelar seleção
-          </button>
-        )}
-      </div>
       <div style={styles.header}>
         <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban {boardLabel}</h1>
         <div style={{ display: "flex", gap: 10 }}>
@@ -3489,8 +3471,24 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
               </button>
             ))}
           </div>
+          {/* Botão para ativar/desativar seleção múltipla */}
+          {!multiSelectMode ? (
+            <button
+              style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              onClick={() => setMultiSelectMode(true)}
+            >
+              Selecionar vários
+            </button>
+          ) : (
+            <button
+              style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              onClick={clearSelectedCards}
+            >
+              Cancelar seleção
+            </button>
+          )}
           {/* Botão para criar novo card */}
-          <button 
+          <button
             style={styles.addButton}
             onClick={() => setIsModalOpen(true)}
             onMouseEnter={(e) => { 

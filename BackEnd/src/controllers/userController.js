@@ -439,6 +439,7 @@ exports.getAll = async (req, res) => {
       order: [[sortBy, sortOrder]],
       offset,
       limit,
+      attributes: { exclude: ["senha"] },
     });
 
     const total = result.count;
