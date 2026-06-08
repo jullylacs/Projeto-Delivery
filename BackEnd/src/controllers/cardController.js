@@ -52,7 +52,8 @@ function buildSystemComment(text) {
 
 // Aplica uma mutação no array `comments` de um card de forma atômica.
 // `mutate(commentsCopy, card)` recebe uma cópia do array e deve retornar o array novo.
-async function mutateCardComments(cardId, mutate) {
+// `updaterName` atualiza atualizado_por_nome quando fornecido.
+async function mutateCardComments(cardId, mutate, updaterName = null) {
   return sequelize.transaction(async (t) => {
     const card = await Card.findByPk(cardId, { lock: t.LOCK.UPDATE, transaction: t });
     if (!card) {
@@ -62,16 +63,18 @@ async function mutateCardComments(cardId, mutate) {
     }
     const comments = Array.isArray(card.comments) ? [...card.comments] : [];
     const next = await mutate(comments, card);
-    await card.update({ comments: Array.isArray(next) ? next : comments }, { transaction: t });
+    const payload = { comments: Array.isArray(next) ? next : comments };
+    if (updaterName) payload.atualizado_por_nome = updaterName;
+    await card.update(payload, { transaction: t });
     return card;
   });
 }
 
-async function appendCommentAtomically(cardId, newComment) {
+async function appendCommentAtomically(cardId, newComment, updaterName = null) {
   return mutateCardComments(cardId, (comments) => {
     comments.push(newComment);
     return comments;
-  });
+  }, updaterName);
 }
 
 async function reloadCardWithRelations(cardId) {
@@ -675,7 +678,7 @@ exports.addComment = async (req, res) => {
       ...(attachments.length > 0 ? { attachments } : {}),
     };
 
-    await appendCommentAtomically(cardId, newComment);
+    await appendCommentAtomically(cardId, newComment, name);
     const full = await reloadCardWithRelations(cardId);
     return res.json(normalizeCard(full));
   } catch (err) {
@@ -693,6 +696,7 @@ exports.editComment = async (req, res) => {
     if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
     if (!text) return res.status(400).json({ error: "Texto vazio" });
 
+    const editorName = await resolveAuthorName(req);
     let found = false;
     await mutateCardComments(cardId, (comments) => {
       return comments.map((c) => {
@@ -703,7 +707,7 @@ exports.editComment = async (req, res) => {
         if (Array.isArray(attachments)) update.attachments = attachments;
         return update;
       });
-    });
+    }, editorName);
 
     if (!found) return res.status(404).json({ error: "Comentário não encontrado" });
     const full = await reloadCardWithRelations(cardId);
@@ -746,6 +750,7 @@ exports.deleteComment = async (req, res) => {
     const commentId = String(req.params.commentId || "");
     if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
 
+    const deleterName = await resolveAuthorName(req);
     let found = false;
     await mutateCardComments(cardId, (comments) => {
       const next = comments.filter((c) => {
@@ -756,7 +761,7 @@ exports.deleteComment = async (req, res) => {
         return true;
       });
       return next;
-    });
+    }, deleterName);
 
     if (!found) return res.status(404).json({ error: "Comentário não encontrado" });
     const full = await reloadCardWithRelations(cardId);
@@ -792,7 +797,7 @@ exports.addReply = async (req, res) => {
         const replies = Array.isArray(c.replies) ? [...c.replies, newReply] : [newReply];
         return { ...c, replies };
       });
-    });
+    }, name);
 
     if (!found) return res.status(404).json({ error: "Comentário não encontrado" });
     const full = await reloadCardWithRelations(cardId);
@@ -812,6 +817,7 @@ exports.editReply = async (req, res) => {
     if (!cardId || !commentId || !replyId) return res.status(400).json({ error: "Parâmetros inválidos" });
     if (!text) return res.status(400).json({ error: "Texto vazio" });
 
+    const editorName = await resolveAuthorName(req);
     let found = false;
     await mutateCardComments(cardId, (comments) => {
       return comments.map((c) => {
@@ -825,7 +831,7 @@ exports.editReply = async (req, res) => {
           : [];
         return { ...c, replies };
       });
-    });
+    }, editorName);
 
     if (!found) return res.status(404).json({ error: "Resposta não encontrada" });
     const full = await reloadCardWithRelations(cardId);
@@ -843,6 +849,7 @@ exports.deleteReply = async (req, res) => {
     const replyId = String(req.params.replyId || "");
     if (!cardId || !commentId || !replyId) return res.status(400).json({ error: "Parâmetros inválidos" });
 
+    const deleterName = await resolveAuthorName(req);
     let found = false;
     await mutateCardComments(cardId, (comments) => {
       return comments.map((c) => {
@@ -858,7 +865,7 @@ exports.deleteReply = async (req, res) => {
           : [];
         return { ...c, replies };
       });
-    });
+    }, deleterName);
 
     if (!found) return res.status(404).json({ error: "Resposta não encontrada" });
     const full = await reloadCardWithRelations(cardId);
