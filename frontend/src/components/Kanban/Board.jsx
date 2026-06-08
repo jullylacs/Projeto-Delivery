@@ -3411,18 +3411,20 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const promoteUpdatedCardToTop = (updatedCard) => {
     const enriched = enrichCardWithUpdater(updatedCard);
     const updatedId = getCardKey(enriched);
-    setCards((prev) => {
-      const previous = prev.find((card) => getCardKey(card) === updatedId);
-      if (previous) {
-        const prevCol = getCardColumnId(previous);
-        const newCol = getCardColumnId(enriched);
-        if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
-          adjustColumnTotal(prevCol, -1);
-          adjustColumnTotal(newCol, +1);
-        }
+
+    // Detecta mudança de coluna fora do setCards para evitar side-effects duplos
+    // causados pelo StrictMode (React 18 invoca updaters duas vezes em dev).
+    const previous = cards.find((card) => getCardKey(card) === updatedId);
+    if (previous) {
+      const prevCol = getCardColumnId(previous);
+      const newCol = getCardColumnId(enriched);
+      if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
+        adjustColumnTotal(prevCol, -1);
+        adjustColumnTotal(newCol, +1);
       }
-      return [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)];
-    });
+    }
+
+    setCards((prev) => [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)]);
     setPromotedCardId(updatedId);
     setTimeout(() => {
       setPromotedCardId((current) => (current === updatedId ? null : current));
