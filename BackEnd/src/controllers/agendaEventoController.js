@@ -222,7 +222,7 @@ exports.list = async (req, res) => {
       if (!PERFIS_GERAL_READ.has(user.perfil)) {
         return res
           .status(403)
-          .json({ message: "Sem permissão para visualizar agenda geral." });
+          .json({ message: "Sem permissão para visualizar agenda Team." });
       }
     }
 

@@ -1,4 +1,4 @@
-# NVX Fibra LTDA — Plataforma Operacional
+# NVX Networks — Plataforma Operacional
 
 Plataforma web para gestão operacional e comercial com Kanban multi-board, Agenda, Mural, Ramais, Gráficos e colaboração em tempo real.
 

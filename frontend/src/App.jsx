@@ -16,6 +16,7 @@ import AgendaDelivery from "./pages/AgendaDelivery"; // Página Agenda Delivery
 import Profile from "./pages/Profile";            // Página Profile
 import RamaisPage from "./pages/Ramais";
 import MuralPage from "./pages/Mural";
+import BuscarProvedores from "./pages/BuscarProvedores";
 
 import AdminUsers from "./pages/AdminUsers";
 import Login from "./pages/Login";
@@ -23,7 +24,7 @@ import Register from "./pages/Register";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users"];
+const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users", "/buscar-provedores"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
@@ -123,6 +124,7 @@ function MainLayout() {
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/ramais" element={<RamaisPage />} />
             <Route path="/mural" element={<MuralPage />} />
+            <Route path="/buscar-provedores" element={<BuscarProvedores />} />
 
             {/* Redireciona "/" para última rota privada */}
             <Route path="/" element={<Navigate to={restoreRoute} replace />} />

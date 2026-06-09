@@ -2,6 +2,7 @@
 import api from "../../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 
 // Injeta o nome do usuário logado em cards que não têm atualizado_por_nome
 function enrichCardWithUpdater(card) {
@@ -208,6 +209,21 @@ const downloadBlobFile = (content, mimeType, fileName) => {
 };
 
 const getCardKey = (card) => card?._id || card?.id;
+
+const formatTimeAgo = (dateValue) => {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) return 'agora';
+  if (diffMinutes < 60) return `${diffMinutes}min`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
 const getCardDomId = (cardId) => `kanban-card-${String(cardId ?? "").replace(/[^a-zA-Z0-9_-]/g, "")}`;
 const getCardColumnId = (card) => {
   const candidate = card?.coluna_id ?? card?.colunaId ?? card?.column?.id;
@@ -459,10 +475,9 @@ const renderCommentMarkdownWithMentions = (text, mentionLookup) => {
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={[remarkGfm, remarkBreaks]}
       components={{
-        // Sem margem extra entre parágrafos — texto flui naturalmente
-        p: ({ children }) => <span style={{ display: "block", lineHeight: 1.55 }}>{children}</span>,
+        p: ({ children }) => <span style={{ display: "block", lineHeight: 1.55, marginBottom: "0.5em" }}>{children}</span>,
         ul: ({ children }) => <ul style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ul>,
         ol: ({ children }) => <ol style={{ margin: "4px 0", paddingLeft: 18 }}>{children}</ol>,
         li: ({ children }) => <li style={{ marginBottom: 2, lineHeight: 1.5 }}>{children}</li>,
@@ -654,21 +669,22 @@ const styles = {
     detailsCommentItem: {
       padding: '12px 14px',
       background: 'var(--bg-input)',
-      borderRadius: '10px',
-      marginBottom: '8px',
+      borderRadius: '12px',
+      marginBottom: '10px',
       border: '1px solid var(--border)',
+      transition: 'border-color 0.15s, box-shadow 0.15s',
     },
     detailsCommentAuthor: {
       margin: 0,
       color: 'var(--text)',
-      fontWeight: 600,
+      fontWeight: 700,
       fontSize: '13px',
     },
     detailsCommentText: {
-      margin: '6px 0 0',
+      margin: '8px 0 0',
       color: 'var(--text)',
       fontSize: '13.5px',
-      lineHeight: 1.55,
+      lineHeight: 1.6,
     },
     detailsCommentDate: {
       color: 'var(--text-label)',
@@ -915,21 +931,21 @@ const styles = {
     lineHeight: 1.2,
   },
   detailButton: {
-    background: "var(--bg-input)",
-    border: "1px solid var(--border)",
-    color: "var(--text)",
+    background: "linear-gradient(135deg, #6c3bff18, #9b6dff10)",
+    border: "1px solid #c4b5fd",
+    color: "#5a30ff",
     fontSize: "11.5px",
-    fontWeight: "600",
+    fontWeight: "700",
     cursor: "pointer",
-    padding: "5px 11px",
-    borderRadius: "7px",
-    transition: "background 150ms ease, box-shadow 150ms ease",
+    padding: "5px 12px",
+    borderRadius: "8px",
+    transition: "background 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
     display: "flex",
     alignItems: "center",
     gap: "4px",
     position: "relative",
     zIndex: 2,
-    letterSpacing: "0.1px",
+    letterSpacing: "0.2px",
   },
   priceTag: {
     fontWeight: "700",
@@ -1422,18 +1438,20 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: card.tipo_card ? 8 : 0 }}>
         {card.tipo_card && (
           <div style={{
-            background: '#e7e3ff',
+            background: '#ede8ff',
             color: '#5a30ff',
-            fontWeight: 700,
-            fontSize: 13,
-            borderRadius: 10,
-            padding: '4px 16px',
-            display: 'inline-block',
-            letterSpacing: 0.5,
-            textTransform: 'uppercase',
+            fontWeight: 600,
+            fontSize: 11,
+            borderRadius: 20,
+            padding: '3px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
             border: '1px solid #cfc2ff',
+            letterSpacing: 0.2,
             alignSelf: 'flex-start',
           }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c5cff', display: 'inline-block', flexShrink: 0 }} />
             {card.tipo_card}
           </div>
         )}
@@ -1475,8 +1493,17 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
             </div>
           )}
         </div>
-        <div style={styles.cardBadge}>
-          <Zap size={12} /> {card.status || "Novo"}
+        <div style={{
+          ...styles.cardBadge,
+          background: '#f3f0ff',
+          color: '#5a30ff',
+          border: '1px solid #ddd6ff',
+          fontSize: '10.5px',
+          fontWeight: 600,
+          padding: '3px 8px',
+          borderRadius: '6px',
+        }}>
+          {card.status || "Novo"}
         </div>
       </div>
 
@@ -1607,8 +1634,8 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
         <button
           onClick={handleDetailClick}
           style={styles.detailButton}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#f3f0ff"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#ddd6ff"; e.currentTarget.style.borderColor = "#a78bfa"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "linear-gradient(135deg, #6c3bff18, #9b6dff10)"; e.currentTarget.style.borderColor = "#c4b5fd"; }}
         >
           Ver detalhes
         </button>
@@ -2057,14 +2084,31 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   //  - Sem filtros: pega top 5 por coluna via window function + totais globais.
   //  - Com filtros: pede ao backend busca server-side (até 500 matches).
   // Debounce de 300ms para o search digitado não disparar request a cada tecla.
+  const BOARD_CACHE_KEY = `kanbanBoard_${safeBoard}`;
+
   useEffect(() => {
     const trimmedSearch = searchTerm.trim();
     const hasFilter = trimmedSearch.length > 0 || !!statusFilter || !!vendorFilter;
 
+    // Carrega cache imediatamente (sem filtros ativos) para exibição instantânea.
+    if (!hasFilter) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(BOARD_CACHE_KEY) || "null");
+        if (cached && Array.isArray(cached.cards) && cached.cards.length > 0) {
+          setCards(cached.cards);
+          setColumnTotals(cached.totals || {});
+          setIsServerFiltered(false);
+          setServerFilterLimited(false);
+        }
+      } catch {}
+    }
+
     const timer = setTimeout(() => {
-      setCards([]);
-      setColumnTotals({});
-      setLoadingMoreByColumn({});
+      if (hasFilter) {
+        setCards([]);
+        setColumnTotals({});
+        setLoadingMoreByColumn({});
+      }
 
       const params = { board: safeBoard };
       if (hasFilter) {
@@ -2079,16 +2123,24 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       api.get("/cards/board-summary", { params })
         .then((res) => {
           const data = res?.data || {};
-          setCards(Array.isArray(data.cards) ? data.cards : []);
-          setColumnTotals(data.totals && typeof data.totals === "object" ? data.totals : {});
+          const freshCards = Array.isArray(data.cards) ? data.cards : [];
+          const freshTotals = data.totals && typeof data.totals === "object" ? data.totals : {};
+          setCards(freshCards);
+          setColumnTotals(freshTotals);
           setIsServerFiltered(!!data.filtered);
           setServerFilterLimited(!!data.limited);
+          // Salva dados frescos no cache (somente carga sem filtro)
+          if (!hasFilter) {
+            try {
+              localStorage.setItem(BOARD_CACHE_KEY, JSON.stringify({ cards: freshCards, totals: freshTotals }));
+            } catch {}
+          }
         })
         .catch((err) => console.log(err));
     }, hasFilter ? 300 : 0);
 
     return () => clearTimeout(timer);
-  }, [safeBoard, searchTerm, statusFilter, vendorFilter]);
+  }, [safeBoard, searchTerm, statusFilter, vendorFilter, BOARD_CACHE_KEY]);
 
   // Helper: contagem de cards já carregados localmente por coluna.
   const loadedByColumn = useMemo(() => {
@@ -2113,10 +2165,12 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     setLoadingMoreByColumn((prev) => ({ ...prev, [key]: true }));
     try {
       const offset = loadedByColumn[key] || 0;
+      const LIMIT = 20;
       const res = await api.get("/cards", {
-        params: { coluna_id: columnId, offset, limit: 20 },
+        params: { coluna_id: columnId, offset, limit: LIMIT },
       });
       const incoming = Array.isArray(res.data) ? res.data : [];
+
       if (incoming.length > 0) {
         // Append: novos IDs que ainda não estão na lista local.
         setCards((prev) => {
@@ -2124,6 +2178,13 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           const filtered = incoming.filter((c) => !existingIds.has(String(getCardKey(c))));
           return [...prev, ...filtered];
         });
+      }
+
+      // Se o backend retornou menos que o limite pedido, chegamos ao fim real.
+      // Corrige o total para que o botão "Ver mais" desapareça corretamente.
+      if (incoming.length < LIMIT) {
+        const newTotal = offset + incoming.length;
+        setColumnTotals((prev) => ({ ...prev, [key]: newTotal }));
       }
     } catch (err) {
       console.error("Erro ao carregar mais cards da coluna", columnId, err);
@@ -2135,6 +2196,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       });
     }
   }, [loadingMoreByColumn, loadedByColumn, isServerFiltered]);
+
+  const COLS_CACHE_KEY = `kanbanCols_${safeBoard}`;
 
   const loadColumnsFromApi = useCallback(async () => {
     try {
@@ -2149,21 +2212,30 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
 
       if (normalized.length === 0) {
         setError("A API não retornou colunas. Verifique seed/migrações da tabela columns.");
+      } else {
+        try { localStorage.setItem(COLS_CACHE_KEY, JSON.stringify(normalized)); } catch {}
       }
 
       return normalized;
     } catch {
-      setColumnDefs([]);
       setIsColumnsReady(false);
       const apiBase = api?.defaults?.baseURL || "API";
       setError(`Não foi possível carregar colunas da API (${apiBase}). Verifique backend e VITE_API_URL.`);
       return [];
     }
-  }, [safeBoard]);
+  }, [safeBoard, COLS_CACHE_KEY]);
 
+  // Carrega colunas do cache imediatamente, depois confirma/atualiza via API em paralelo.
   useEffect(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(COLS_CACHE_KEY) || "null");
+      if (Array.isArray(cached) && cached.length > 0) {
+        setColumnDefs(cached);
+        setIsColumnsReady(true);
+      }
+    } catch {}
     loadColumnsFromApi();
-  }, [loadColumnsFromApi]);
+  }, [loadColumnsFromApi, COLS_CACHE_KEY]);
 
   // Quando o board mudar, recarrega prefs persistidas do novo board.
   useEffect(() => {
@@ -3339,18 +3411,20 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const promoteUpdatedCardToTop = (updatedCard) => {
     const enriched = enrichCardWithUpdater(updatedCard);
     const updatedId = getCardKey(enriched);
-    setCards((prev) => {
-      const previous = prev.find((card) => getCardKey(card) === updatedId);
-      if (previous) {
-        const prevCol = getCardColumnId(previous);
-        const newCol = getCardColumnId(enriched);
-        if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
-          adjustColumnTotal(prevCol, -1);
-          adjustColumnTotal(newCol, +1);
-        }
+
+    // Detecta mudança de coluna fora do setCards para evitar side-effects duplos
+    // causados pelo StrictMode (React 18 invoca updaters duas vezes em dev).
+    const previous = cards.find((card) => getCardKey(card) === updatedId);
+    if (previous) {
+      const prevCol = getCardColumnId(previous);
+      const newCol = getCardColumnId(enriched);
+      if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
+        adjustColumnTotal(prevCol, -1);
+        adjustColumnTotal(newCol, +1);
       }
-      return [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)];
-    });
+    }
+
+    setCards((prev) => [enriched, ...prev.filter((card) => getCardKey(card) !== updatedId)]);
     setPromotedCardId(updatedId);
     setTimeout(() => {
       setPromotedCardId((current) => (current === updatedId ? null : current));
@@ -4706,61 +4780,73 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           : isSystem ? '4px solid #7c6fb7' : undefined,
                         opacity: isSystem ? 0.92 : 1,
                       }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                           {comment.authorAvatar ? (
                             <img
                               src={comment.authorAvatar}
                               alt={comment.author || 'Usuário'}
                               style={{
-                                width: 28,
-                                height: 28,
+                                width: 34,
+                                height: 34,
                                 borderRadius: '50%',
                                 objectFit: 'cover',
-                                border: '1px solid #d9cdfd',
-                                boxShadow: '0 2px 6px rgba(92, 58, 170, 0.22)',
+                                border: '2px solid #d9cdfd',
+                                boxShadow: '0 2px 6px rgba(92, 58, 170, 0.18)',
+                                flexShrink: 0,
                               }}
                             />
                           ) : (
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: '50%',
-                                background: isSystem ? 'linear-gradient(135deg, #bcb6e6, #a3a0c9)' : 'linear-gradient(135deg, #8f6bff, #5b3fc9)',
-                                color: isSystem ? '#4b3b9a' : '#fff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 11,
-                                fontWeight: 700,
-                                border: '1px solid #d9cdfd',
-                                boxShadow: '0 2px 6px rgba(92, 58, 170, 0.22)',
-                              }}
-                            >
-                              {isSystem ? 'S' : getAvatarInitials(comment.author || 'Usuário')}
+                            <div style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: '50%',
+                              background: isSystem ? 'linear-gradient(135deg, #bcb6e6, #a3a0c9)' : 'linear-gradient(135deg, #8f6bff, #5b3fc9)',
+                              color: isSystem ? '#4b3b9a' : '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 12,
+                              fontWeight: 800,
+                              border: '2px solid #d9cdfd',
+                              boxShadow: '0 2px 6px rgba(92, 58, 170, 0.18)',
+                              flexShrink: 0,
+                              letterSpacing: '-0.5px',
+                            }}>
+                              {isSystem ? '⚙' : getAvatarInitials(comment.author || 'Usuário')}
                             </div>
                           )}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <p style={{
-                            ...styles.detailsCommentAuthor,
-                            color: isSystem ? '#7c6fb7' : undefined,
-                            fontWeight: isSystem ? 700 : undefined,
-                            margin: 0,
-                          }}>{isSystem ? 'Sistema' : (comment.author || 'Usuário')}:</p>
-                          {isPinned && (
-                            <span className="badge-pinned" style={{ fontSize: 10, fontWeight: 800, borderRadius: 999, padding: '1px 7px', letterSpacing: '0.3px' }}>
-                              📌 Fixado
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{
+                                ...styles.detailsCommentAuthor,
+                                color: isSystem ? '#7c6fb7' : 'var(--text)',
+                              }}>
+                                {isSystem ? 'Sistema' : (comment.author || 'Usuário')}
+                              </span>
+                              {isPinned && (
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 20, padding: '1px 7px', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                  📌 Fixado
+                                </span>
+                              )}
+                              {comment.editedAt && (
+                                <span style={{ fontSize: 10, color: 'var(--text-label)', fontStyle: 'italic' }}>editado</span>
+                              )}
+                            </div>
+                            <span style={{ fontSize: 11, color: 'var(--text-label)', lineHeight: 1 }}
+                              title={comment.createdAt ? new Date(comment.createdAt).toLocaleString('pt-BR') : ''}>
+                              {formatTimeAgo(comment.createdAt)}
                             </span>
-                          )}
+                          </div>
                         </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           {!isSystem && (
                             <button
-                              style={{ background: 'none', border: 'none', color: isPinned ? '#b45309' : '#7264a8', fontSize: 16, cursor: 'pointer' }}
+                              style={{ background: 'none', border: 'none', color: isPinned ? '#b45309' : '#9f8fc4', fontSize: 15, cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s' }}
                               title={isPinned ? 'Desafixar comentário' : 'Fixar comentário'}
                               onClick={() => handlePinComment(comment.id)}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f5f0ff'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
                             >
                               📌
                             </button>
@@ -4768,28 +4854,32 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           {!isSystem && (
                             <>
                               <button
-                                style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
+                                style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
                                 title="Excluir comentário"
                                 onClick={() => handleDeleteComment(comment.id)}
+                                onMouseEnter={e => e.currentTarget.style.background = '#fff0ee'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={14} />
                               </button>
                               <button
-                                style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
+                                style={{ background: 'none', border: 'none', color: '#5a30ff', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
                                 title="Editar comentário"
                                 onClick={() => {
                                   setEditingCommentId(comment.id);
                                   setCommentText(comment.text || "");
                                   setIsCommentComposerOpen(true);
                                 }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
                               >
-                                <Pencil size={15} />
+                                <Pencil size={14} />
                               </button>
                             </>
                           )}
                         </div>
                       </div>
-                      <div style={{ ...styles.detailsCommentText, whiteSpace: 'pre-wrap' }}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
+                      <div style={styles.detailsCommentText}>{renderCommentMarkdownWithMentions(comment.text, mentionProfileLookup)}</div>
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {['👍', '❤️', '😂', '😮', '👏'].map((emoji) => {
                           const users = Array.isArray(comment?.reactions?.[emoji]) ? comment.reactions[emoji] : [];
@@ -4905,87 +4995,86 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               const isEditingThisReply = editingReplyKey === replyEditKey;
 
                               return (
-                                <div key={reply.id} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
+                                <div key={reply.id} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{reply.author || 'Usuário'}</div>
-                                    <div style={{ display: 'flex', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 700 }}>{reply.author || 'Usuário'}</span>
+                                      {reply.editedAt && <span style={{ fontSize: 10, color: 'var(--text-label)', fontStyle: 'italic' }}>editado</span>}
+                                      <span style={{ fontSize: 10, color: 'var(--text-label)' }}
+                                        title={reply.createdAt ? new Date(reply.createdAt).toLocaleString('pt-BR') : ''}>
+                                        · {formatTimeAgo(reply.createdAt)}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 2 }}>
                                       <button
                                         type="button"
                                         title="Editar resposta"
                                         onClick={() => handleStartEditReply(comment.id, reply)}
-                                        style={{ background: 'none', border: 'none', color: '#4b3b9a', fontSize: 16, cursor: 'pointer' }}
+                                        style={{ background: 'none', border: 'none', color: '#5a30ff', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                       >
-                                        <Pencil size={13} />
+                                        <Pencil size={12} />
                                       </button>
                                       <button
                                         type="button"
                                         title="Excluir resposta"
                                         onClick={() => handleDeleteReply(comment.id, reply.id)}
-                                        style={{ background: 'none', border: 'none', color: '#b33524', fontSize: 16, cursor: 'pointer' }}
+                                        style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#fff0ee'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
                                       >
-                                        <Trash2 size={13} />
+                                        <Trash2 size={12} />
                                       </button>
                                     </div>
                                   </div>
 
                                   {isEditingThisReply ? (
-                                    <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-                                      <input
-                                        type="text"
+                                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      <textarea
                                         value={editingReplyText}
                                         onChange={(e) => setEditingReplyText(e.target.value)}
-                                        placeholder="Edite a resposta..."
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveEditReply(comment.id, reply.id);
+                                          if (e.key === 'Escape') handleCancelEditReply();
+                                        }}
+                                        placeholder="Edite a resposta… Ctrl+Enter para salvar"
+                                        rows={2}
                                         style={{
-                                          flex: 1,
-                                          border: '1px solid var(--border)',
+                                          width: '100%',
+                                          border: '1.5px solid #c4b5fd',
                                           background: 'var(--bg-input)',
                                           color: 'var(--text)',
                                           borderRadius: 8,
                                           fontSize: 12,
                                           padding: '7px 9px',
+                                          resize: 'vertical',
+                                          fontFamily: 'inherit',
+                                          lineHeight: 1.5,
+                                          boxSizing: 'border-box',
+                                          outline: 'none',
                                         }}
                                       />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSaveEditReply(comment.id, reply.id)}
-                                        style={{
-                                          border: 'none',
-                                          background: '#6f57e8',
-                                          color: '#fff',
-                                          borderRadius: 8,
-                                          fontSize: 12,
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '7px 9px',
-                                        }}
-                                      >
-                                        Salvar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={handleCancelEditReply}
-                                        style={{
-                                          border: '1px solid var(--border)',
-                                          background: 'var(--bg-card)',
-                                          color: 'var(--text)',
-                                          borderRadius: 8,
-                                          fontSize: 12,
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                          padding: '7px 9px',
-                                        }}
-                                      >
-                                        Cancelar
-                                      </button>
+                                      <div style={{ display: 'flex', gap: 6 }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveEditReply(comment.id, reply.id)}
+                                          style={{ border: 'none', background: '#6f57e8', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px' }}
+                                        >
+                                          Salvar
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleCancelEditReply}
+                                          style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
                                     </div>
                                   ) : (
-                                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 2 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
+                                    <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6, lineHeight: 1.55 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
                                   )}
-
-                                  <small style={{ color: '#8d83b3', fontSize: 10 }}>
-                                    {reply.createdAt ? new Date(reply.createdAt).toLocaleString('pt-BR') : ''}
-                                    {reply.editedAt ? ' (editado)' : ''}
-                                  </small>
                                 </div>
                               );
                             })}
@@ -4993,10 +5082,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       )}
 
                       {String(activeReplyCommentId) === String(comment.id) && (
-                        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                           <div style={{ flex: 1, position: 'relative' }}>
-                            <input
-                              type="text"
+                            <textarea
                               value={replyDraftByCommentId?.[comment.id] || ''}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -5013,19 +5101,24 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === 'Escape') setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
-                                if (e.key === 'Enter' && !replyMentionQueryByCommentId?.[comment.id]) handleAddReply(comment.id);
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !replyMentionQueryByCommentId?.[comment.id]) handleAddReply(comment.id);
                               }}
                               onBlur={() => setTimeout(() => setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null })), 150)}
-                              placeholder="Escreva uma resposta... use @ para mencionar"
+                              placeholder="Escreva uma resposta… use @ para mencionar · Ctrl+Enter para enviar"
+                              rows={2}
                               style={{
                                 width: '100%',
-                                border: '1px solid var(--border)',
+                                border: '1.5px solid var(--border)',
                                 background: 'var(--bg-input)',
                                 color: 'var(--text)',
                                 borderRadius: 8,
                                 fontSize: 12,
                                 padding: '8px 10px',
                                 boxSizing: 'border-box',
+                                resize: 'vertical',
+                                fontFamily: 'inherit',
+                                lineHeight: 1.5,
+                                outline: 'none',
                               }}
                             />
                             {/* Dropdown de menção */}
@@ -5064,23 +5157,22 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               );
                             })()}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleAddReply(comment.id)}
-                            style={{
-                              border: 'none',
-                              background: '#6f57e8',
-                              color: '#fff',
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              padding: '8px 10px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            Enviar
-                          </button>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => setActiveReplyCommentId(null)}
+                              style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAddReply(comment.id)}
+                              style={{ border: 'none', background: 'linear-gradient(135deg, #6c3bff, #9b6dff)', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px', boxShadow: '0 2px 8px rgba(108,59,255,0.25)' }}
+                            >
+                              Responder
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -5187,9 +5279,6 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           )}
                         </div>
                       )}
-                      <small style={styles.detailsCommentDate}>
-                        {new Date(comment.createdAt).toLocaleString('pt-BR')}
-                      </small>
                     </div>
                   );
                   })

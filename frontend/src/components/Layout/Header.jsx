@@ -486,7 +486,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
             opacity: 0.95,
           }}
         >
-          🚀 NVX Fibra LTDA
+          🚀 NVX Networks
         </h2>
       </div>
 
