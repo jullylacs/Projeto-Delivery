@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & push (${{ matrix.app }})
+    runs-on: [self-hosted, delivery]
+    strategy:
+      matrix:
+        include:
+          - { app: backend, dockerfile: docker/Dockerfile.backend }
+          - { app: frontend, dockerfile: docker/Dockerfile.frontend }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/delivery-${{ matrix.app }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy (produção)
+    needs: [build]
+    runs-on: [self-hosted, delivery]
+    environment: production
+    steps:
+      - name: Redeploy via Portainer
+        env:
+          PORTAINER_URL: ${{ vars.PORTAINER_URL }}
+          API_KEY: ${{ secrets.PORTAINER_API_KEY }}
+          STACK_ID: ${{ vars.PORTAINER_STACK_ID }}
+          ENDPOINT_ID: ${{ vars.PORTAINER_ENDPOINT_ID }}
+        run: |
+          set -euo pipefail
+          content=$(curl -fsS -H "X-API-Key: ${API_KEY}" \
+            "${PORTAINER_URL}/api/stacks/${STACK_ID}/file" | jq -r '.StackFileContent')
+          jq -n --arg c "$content" '{StackFileContent:$c, pullImage:true, prune:true}' \
+            | curl -fsS -X PUT \
+                -H "X-API-Key: ${API_KEY}" -H "Content-Type: application/json" \
+                "${PORTAINER_URL}/api/stacks/${STACK_ID}?endpointId=${ENDPOINT_ID}" \
+                -d @- > /dev/null
+
+      - name: Healthcheck
+        if: ${{ vars.HEALTHCHECK_URL != '' }}
+        env:
+          URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' "$URL" || echo 000)
+            if [ "$code" = "200" ]; then echo "OK (200)"; exit 0; fi
+            echo "tentativa ${i}: ${code}"; sleep 5
+          done
+          echo "::error::healthcheck não respondeu 200"
+          exit 1

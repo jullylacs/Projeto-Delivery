@@ -14,6 +14,11 @@ const MuralPost = sequelize.define("MuralPost", {
   data: {
     type: DataTypes.DATEONLY,
     allowNull: false
+  },
+  midias: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: []
   }
 }, {
   tableName: "mural_posts",
