@@ -295,10 +295,10 @@ html[data-theme="dark"] .agenda-day-card             { background: #18153a !impo
 html[data-theme="dark"] .agenda-day-card:hover       { box-shadow: 0 6px 24px rgba(0,0,0,0.5) !important; transform: translateY(-1px); }
 
 /* Ramais */
-html[data-theme="dark"] .ramal-row                  { background: #110e24 !important; }
-html[data-theme="dark"] .ramal-row:hover             { background-color: #18153a !important; }
-html[data-theme="dark"] .ramal-btn-edit:hover        { background: #2a2650 !important; }
-html[data-theme="dark"] .ramal-btn-del:hover         { background: #3a1022 !important; }
+html[data-theme="dark"] .ramal-card                 { background: #110e24 !important; border-color: #2a2650 !important; }
+html[data-theme="dark"] .ramal-card:hover           { box-shadow: 0 8px 28px rgba(0,0,0,0.45) !important; }
+html[data-theme="dark"] .ramal-btn-edit:hover       { background: #2a2650 !important; }
+html[data-theme="dark"] .ramal-btn-del:hover        { background: #3a1022 !important; }
 
 /* ── Sidebar mais dramática no escuro ── */
 html[data-theme="dark"] [style*="linear-gradient(180deg, #1e0638"],
@@ -356,9 +356,20 @@ html[data-theme="dark"] .badge-pinned {
   border: 1px solid #78400a;
 }
 
-/* Ramais — hover states */
-.ramal-row:hover {
-  background-color: #faf7ff !important;
+/* Ramais — cards */
+.ramal-card {
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.ramal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(108,59,255,0.14) !important;
+}
+.ramal-card-actions {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ramal-card:hover .ramal-card-actions {
+  opacity: 1;
 }
 .ramal-btn-edit:hover {
   background: #ede7ff !important;

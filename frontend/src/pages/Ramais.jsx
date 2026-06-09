@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
 
-// Gera as iniciais do nome para o avatar
 const initials = (name) =>
   String(name || "?")
     .split(" ")
@@ -10,7 +9,6 @@ const initials = (name) =>
     .map((w) => w[0].toUpperCase())
     .join("");
 
-// Paleta de cores para avatares baseada no nome
 const AVATAR_COLORS = [
   "#6c3bff", "#0e5a7a", "#1f7a3f", "#e8405a",
   "#ff9500", "#9b6dff", "#0e7a6b", "#7a2f8a",
@@ -30,6 +28,7 @@ export default function RamaisPage() {
   const [novoRamal, setNovoRamal] = useState("");
   const [novoResponsavel, setNovoResponsavel] = useState("");
   const [busca, setBusca] = useState("");
+  const [copiado, setCopiado] = useState(null);
 
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
@@ -85,6 +84,13 @@ export default function RamaisPage() {
     setEditIndex(null);
   }
 
+  function copiarRamal(ramal) {
+    navigator.clipboard.writeText(ramal).then(() => {
+      setCopiado(ramal);
+      setTimeout(() => setCopiado(null), 1500);
+    });
+  }
+
   const filtrados = ramais.filter(
     (r) =>
       r.ramal?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -92,21 +98,68 @@ export default function RamaisPage() {
   );
 
   return (
-    <div style={{ padding: "22px 24px", background: "var(--bg)", minHeight: "94vh", color: "var(--text)" }}>
+    <div style={{ padding: "24px 28px", background: "var(--bg)", minHeight: "94vh", color: "var(--text)" }}>
+
       {/* Cabeçalho */}
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#1a1535", letterSpacing: "-0.4px" }}>
-          Ramais
-        </h2>
-        <p style={{ margin: "3px 0 0", fontSize: 13, color: "#7264a8" }}>
-          {ramais.length} contato{ramais.length !== 1 ? "s" : ""} cadastrado{ramais.length !== 1 ? "s" : ""}
-        </p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+            background: "linear-gradient(135deg, #6c3bff, #9b6dff)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 22, boxShadow: "0 4px 16px rgba(108,59,255,0.35)",
+          }}>
+            ☎
+          </div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.5px" }}>
+              Ramais
+            </h2>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: "#7264a8" }}>
+              {ramais.length} contato{ramais.length !== 1 ? "s" : ""} cadastrado{ramais.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Busca */}
+        <div style={{ position: "relative" }}>
+          <span style={{
+            position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)",
+            color: "#9b8fd8", fontSize: 13, pointerEvents: "none",
+          }}>
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar ramal ou responsável..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            style={{
+              padding: "9px 14px 9px 34px",
+              border: "1.5px solid #ddd5fc",
+              borderRadius: 10,
+              fontSize: 13,
+              background: "var(--bg-card)",
+              color: "var(--text)",
+              width: 260,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
       </div>
 
       {/* Formulário de adição */}
       {isGestorOuAdmin && (
-        <div style={{ background: "#fff", border: "1px solid #ddd5fc", borderRadius: 16, padding: "18px 20px", boxShadow: "0 4px 20px rgba(90,60,180,0.08)", marginBottom: 18 }}>
-          <p style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 800, color: "#6b5ca8", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        <div style={{
+          background: "var(--bg-card)",
+          border: "1px solid #ddd5fc",
+          borderRadius: 16,
+          padding: "16px 20px",
+          boxShadow: "0 4px 20px rgba(90,60,180,0.08)",
+          marginBottom: 24,
+        }}>
+          <p style={{ margin: "0 0 11px", fontSize: 11, fontWeight: 800, color: "#6b5ca8", textTransform: "uppercase", letterSpacing: "0.6px" }}>
             Novo ramal
           </p>
           <form onSubmit={adicionarRamal} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -131,143 +184,157 @@ export default function RamaisPage() {
         </div>
       )}
 
-      {/* Busca */}
-      <div style={{ marginBottom: 14 }}>
-        <input
-          type="text"
-          placeholder="Buscar por ramal ou responsável..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          style={{
-            width: "100%",
-            maxWidth: 380,
-            padding: "9px 14px",
-            border: "1.5px solid #ddd5fc",
-            borderRadius: 10,
-            fontSize: 13,
-            background: "rgba(255,255,255,0.9)",
-            color: "#2f2758",
-            boxSizing: "border-box",
-            outline: "none",
-          }}
-        />
-      </div>
-
-      {/* Lista de contatos */}
-      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden", boxShadow: "0 4px 24px rgba(90,60,180,0.08)" }}>
-        {/* Cabeçalho da tabela */}
+      {/* Grid de cards */}
+      {filtrados.length === 0 ? (
+        <div style={{
+          padding: "60px 24px",
+          textAlign: "center",
+          color: "#9b8fd8",
+          background: "var(--bg-card)",
+          borderRadius: 16,
+          border: "1.5px dashed #ddd5fc",
+        }}>
+          <div style={{ fontSize: 38, marginBottom: 10 }}>📞</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, color: "var(--text)" }}>
+            {busca ? "Nenhum resultado encontrado" : "Nenhum ramal cadastrado"}
+          </div>
+          <div style={{ fontSize: 13, opacity: 0.65 }}>
+            {busca ? `Sem resultados para "${busca}"` : "Adicione o primeiro ramal acima"}
+          </div>
+        </div>
+      ) : (
         <div style={{
           display: "grid",
-          gridTemplateColumns: isGestorOuAdmin ? "56px 1fr 1fr auto" : "56px 1fr 1fr",
-          gap: 0,
-          background: "linear-gradient(90deg, #f5f1ff 0%, #eff3ff 100%)",
-          borderBottom: "1px solid #ede7ff",
-          padding: "10px 20px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: 14,
         }}>
-          <div />
-          <div style={thSt}>Responsável</div>
-          <div style={thSt}>Ramal</div>
-          {isGestorOuAdmin && <div style={thSt}>Ações</div>}
-        </div>
+          {filtrados.map((r, i) => {
+            const color = avatarColor(r.responsavel);
+            const isCopied = copiado === r.ramal;
+            return (
+              <div
+                key={r.id ?? i}
+                className="ramal-card"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 18,
+                  padding: "22px 16px 18px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 10,
+                  boxShadow: "0 2px 12px rgba(90,60,180,0.07)",
+                  position: "relative",
+                }}
+              >
+                {/* Ações no hover */}
+                {isGestorOuAdmin && (
+                  <div className="ramal-card-actions" style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 4 }}>
+                    <button
+                      className="ramal-btn-edit"
+                      onClick={() => abrirModalEdicao(ramais.indexOf(r))}
+                      title="Editar"
+                      style={iconBtnEditSt}
+                    >✏</button>
+                    <button
+                      className="ramal-btn-del"
+                      onClick={async () => {
+                        if (!window.confirm(`Excluir o ramal de ${r.responsavel}?`)) return;
+                        try {
+                          await api.delete(`/ramais/${r.id}`);
+                          setRamais(ramais.filter((x) => x.id !== r.id));
+                        } catch (err) {
+                          alert("Erro ao excluir: " + (err?.response?.data?.error || ""));
+                        }
+                      }}
+                      title="Excluir"
+                      style={iconBtnDelSt}
+                    >✕</button>
+                  </div>
+                )}
 
-        {/* Linhas */}
-        {filtrados.length === 0 ? (
-          <div style={{ padding: "40px 24px", textAlign: "center", color: "#9b8fd8", fontSize: 14, fontWeight: 600 }}>
-            {busca ? "Nenhum resultado encontrado." : "Nenhum ramal cadastrado."}
-          </div>
-        ) : (
-          filtrados.map((r, i) => (
-            <div
-              key={r.id ?? i}
-              className="ramal-row"
-              style={{
-                display: "grid",
-                gridTemplateColumns: isGestorOuAdmin ? "56px 1fr 1fr auto" : "56px 1fr 1fr",
-                alignItems: "center",
-                gap: 0,
-                padding: "12px 20px",
-                borderBottom: i < filtrados.length - 1 ? "1px solid #f0eaff" : "none",
-                transition: "background 0.12s",
-              }}
-            >
-              {/* Avatar */}
-              <div>
-                <span style={{
-                  display: "inline-flex",
+                {/* Avatar */}
+                <div style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: "50%",
+                  background: color,
+                  color: "#fff",
+                  display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  background: avatarColor(r.responsavel),
-                  color: "#fff",
-                  fontSize: 13,
+                  fontSize: 22,
                   fontWeight: 800,
+                  boxShadow: `0 6px 20px ${color}55`,
+                  marginTop: 2,
                   flexShrink: 0,
                 }}>
                   {initials(r.responsavel)}
-                </span>
-              </div>
+                </div>
 
-              {/* Responsável */}
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1e2d4a" }}>
-                {r.responsavel}
-              </div>
+                {/* Nome */}
+                <div style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  textAlign: "center",
+                  lineHeight: 1.3,
+                  maxWidth: "100%",
+                  wordBreak: "break-word",
+                }}>
+                  {r.responsavel}
+                </div>
 
-              {/* Ramal com link SIP */}
-              <div>
-                <a
-                  href={`sip:${r.ramal}`}
-                  title="Clique para ligar"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: "#6c3bff",
-                    textDecoration: "none",
-                    background: "#f0eaff",
-                    borderRadius: 8,
-                    padding: "4px 10px",
-                  }}
-                >
-                  <span style={{ fontSize: 12 }}>✆</span>
-                  {r.ramal}
-                </a>
-              </div>
-
-              {/* Ações */}
-              {isGestorOuAdmin && (
-                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                  <button
-                    className="ramal-btn-edit"
-                    onClick={() => abrirModalEdicao(ramais.indexOf(r))}
-                    style={editBtnSt}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    className="ramal-btn-del"
-                    onClick={async () => {
-                      if (!window.confirm(`Excluir o ramal de ${r.responsavel}?`)) return;
-                      try {
-                        await api.delete(`/ramais/${r.id}`);
-                        setRamais(ramais.filter((x) => x.id !== r.id));
-                      } catch (err) {
-                        alert("Erro ao excluir: " + (err?.response?.data?.error || ""));
-                      }
+                {/* Ramal + copiar */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <a
+                    href={`sip:${r.ramal}`}
+                    title="Clique para ligar"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#6c3bff",
+                      textDecoration: "none",
+                      background: "#f0eaff",
+                      borderRadius: 9,
+                      padding: "5px 12px",
+                      letterSpacing: "0.5px",
                     }}
-                    style={delBtnSt}
                   >
-                    Excluir
+                    <span style={{ fontSize: 12 }}>✆</span>
+                    {r.ramal}
+                  </a>
+                  <button
+                    onClick={() => copiarRamal(r.ramal)}
+                    title={isCopied ? "Copiado!" : "Copiar ramal"}
+                    style={{
+                      border: `1.5px solid ${isCopied ? "#a5d6a7" : "#ddd5fc"}`,
+                      background: isCopied ? "#e8f5e9" : "var(--bg-card)",
+                      color: isCopied ? "#2e7d32" : "#9b8fd8",
+                      borderRadius: 8,
+                      width: 30,
+                      height: 30,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      transition: "all 0.15s",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isCopied ? "✓" : "⎘"}
                   </button>
                 </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal de edição */}
       {editIndex !== null && (
@@ -292,7 +359,6 @@ export default function RamaisPage() {
             boxShadow: "0 32px 64px rgba(40,20,90,0.28)",
             overflow: "hidden",
           }}>
-            {/* Header colorido */}
             <div style={{
               background: "linear-gradient(135deg, #5c2eff 0%, #8b5cff 100%)",
               padding: "16px 20px",
@@ -382,34 +448,36 @@ const addBtnSt = {
   whiteSpace: "nowrap",
 };
 
-const thSt = {
-  fontSize: 10,
-  color: "#7264a8",
-  fontWeight: 800,
-  textTransform: "uppercase",
-  letterSpacing: "0.8px",
-};
-
-const editBtnSt = {
-  fontSize: 12,
-  fontWeight: 700,
-  padding: "5px 12px",
-  borderRadius: 8,
+const iconBtnEditSt = {
   border: "1.5px solid #d4c8fb",
   background: "#f6f2ff",
   color: "#4b2d84",
+  borderRadius: 7,
+  width: 26,
+  height: 26,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 700,
+  padding: 0,
 };
 
-const delBtnSt = {
-  fontSize: 12,
-  fontWeight: 700,
-  padding: "5px 12px",
-  borderRadius: 8,
+const iconBtnDelSt = {
   border: "1.5px solid #ffc4cf",
   background: "#fff5f6",
   color: "#b00020",
+  borderRadius: 7,
+  width: 26,
+  height: 26,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   cursor: "pointer",
+  fontSize: 11,
+  fontWeight: 700,
+  padding: 0,
 };
 
 const labelSt = {

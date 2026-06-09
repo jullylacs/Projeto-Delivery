@@ -2,9 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import api from "../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bold, Italic, List, ListOrdered, Quote, Code, Pin, Pencil, Trash2, Send, X, Check } from "lucide-react";
+import { Bold, Italic, List, ListOrdered, Quote, Code, Pin, Pencil, Trash2, Send, X, Check, ImagePlus, Play } from "lucide-react";
 
-// ── Paleta de avatares baseada no nome ───────────────────────────────────────
+// ── Utilitários ───────────────────────────────────────────────────────────────
 const AVATAR_PALETTE = [
   ["#6c3bff", "#9b6dff"], ["#e8405a", "#ff7a8a"],
   ["#0e5a7a", "#1b8bbf"], ["#1f7a3f", "#2db05a"],
@@ -19,7 +19,6 @@ const initials = (name) =>
   String(name || "?").split(" ").filter(Boolean).slice(0, 2)
     .map(w => w[0].toUpperCase()).join("") || "?";
 
-// ── Tempo relativo ────────────────────────────────────────────────────────────
 const relativeTime = (dateStr) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -32,45 +31,70 @@ const relativeTime = (dateStr) => {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 };
 
-// ── CSS injetado ──────────────────────────────────────────────────────────────
+// Lê arquivo como data URL (base64)
+function lerArquivo(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Limites de tamanho
+const LIMITE_IMAGEM_MB = 3;
+const LIMITE_VIDEO_MB = 8;
+const MAX_IMAGENS = 5;
+const MAX_VIDEOS = 1;
+
+// ── CSS ───────────────────────────────────────────────────────────────────────
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
   .mural-root {
-    --ink:      #1a1220;
-    --ink-soft: #4a3d60;
-    --ink-faint:#8b7faa;
-    --bg:       #f4f0ff;
-    --surface:  #ffffff;
-    --surface2: #f0ebff;
-    --accent:   #6c3bff;
-    --accent2:  #e8405a;
-    --accent3:  #ff9500;
-    --border:   rgba(100,80,160,0.14);
-    --shadow:   0 2px 16px rgba(60,30,120,0.07);
-    --shadow-md:0 8px 32px rgba(60,30,120,0.13);
+    --ink:       #1a1220;
+    --ink-soft:  #4a3d60;
+    --ink-faint: #8b7faa;
+    --bg:        #f4f0ff;
+    --surface:   #ffffff;
+    --surface2:  #f0ebff;
+    --accent:    #6c3bff;
+    --accent2:   #e8405a;
+    --border:    rgba(100,80,160,0.14);
+    --shadow:    0 2px 16px rgba(60,30,120,0.07);
+    --shadow-md: 0 8px 32px rgba(60,30,120,0.13);
     font-family: 'Inter', sans-serif;
     background: var(--bg);
     min-height: 100vh;
     padding: 0 0 80px;
   }
 
-  /* ── Header hero ── */
+  /* Hero */
   .mural-hero {
     background: linear-gradient(135deg, #3a0f7a 0%, #6c3bff 55%, #9b6dff 100%);
-    padding: 36px 24px 32px;
+    padding: 38px 24px 34px;
     position: relative;
     overflow: hidden;
+  }
+  .mural-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
   }
   .mural-hero::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse 60% 80% at 80% 50%, rgba(255,255,255,0.08), transparent);
+    bottom: -60px; left: 10%;
+    width: 280px; height: 280px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
     pointer-events: none;
   }
   .mural-hero-inner {
-    max-width: 760px;
+    max-width: 780px;
     margin: 0 auto;
     display: flex;
     align-items: flex-end;
@@ -81,7 +105,7 @@ const css = `
   }
   .mural-title {
     font-family: 'Playfair Display', serif;
-    font-size: 34px;
+    font-size: 36px;
     font-weight: 700;
     color: #fff;
     line-height: 1;
@@ -89,34 +113,35 @@ const css = `
     margin: 0;
   }
   .mural-subtitle {
-    margin: 6px 0 0;
+    margin: 7px 0 0;
     font-size: 13px;
-    color: rgba(255,255,255,0.65);
+    color: rgba(255,255,255,0.62);
     font-weight: 400;
   }
   .mural-badge {
     font-size: 11px;
     font-weight: 700;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.88);
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.22);
     border-radius: 999px;
-    padding: 4px 12px;
+    padding: 5px 14px;
     letter-spacing: 0.4px;
     white-space: nowrap;
+    backdrop-filter: blur(4px);
   }
 
-  /* ── Corpo ── */
+  /* Corpo */
   .mural-body {
-    max-width: 760px;
+    max-width: 780px;
     margin: 0 auto;
-    padding: 28px 24px 0;
+    padding: 32px 24px 0;
   }
 
-  /* ── Compose ── */
+  /* Compose */
   .compose-box {
     background: var(--surface);
-    border-radius: 18px;
+    border-radius: 20px;
     border: 1.5px solid var(--border);
     box-shadow: var(--shadow-md);
     margin-bottom: 32px;
@@ -131,11 +156,11 @@ const css = `
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 14px 16px 0;
+    padding: 16px 18px 0;
   }
   .compose-user-avatar {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -144,6 +169,7 @@ const css = `
     font-weight: 700;
     color: #fff;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   }
   .compose-label {
     font-size: 13px;
@@ -153,10 +179,11 @@ const css = `
   .compose-toolbar {
     display: flex;
     gap: 2px;
-    padding: 8px 14px;
+    padding: 8px 16px;
     flex-wrap: wrap;
     border-bottom: 1px solid var(--border);
     background: var(--surface2);
+    align-items: center;
   }
   .toolbar-btn {
     background: transparent;
@@ -171,11 +198,17 @@ const css = `
     transition: background 0.15s, color 0.15s;
   }
   .toolbar-btn:hover { background: rgba(108,59,255,0.12); color: var(--accent); }
+  .toolbar-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 4px;
+  }
 
   .compose-textarea {
     width: 100%;
     min-height: 100px;
-    padding: 14px 16px;
+    padding: 14px 18px;
     border: none;
     resize: vertical;
     font-size: 14.5px;
@@ -188,13 +221,103 @@ const css = `
     box-sizing: border-box;
   }
   .compose-textarea::placeholder { color: var(--ink-faint); }
+
+  /* Área de mídia no compose */
+  .compose-media-bar {
+    padding: 10px 16px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+  }
+  .media-thumb {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    cursor: default;
+  }
+  .media-thumb img,
+  .media-thumb video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .media-thumb-badge {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 20px;
+    pointer-events: none;
+  }
+  .media-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    z-index: 1;
+    transition: background 0.15s;
+  }
+  .media-thumb-remove:hover { background: rgba(200,0,0,0.75); }
+  .media-add-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 72px;
+    height: 72px;
+    border-radius: 10px;
+    border: 1.5px dashed rgba(108,59,255,0.4);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    text-align: center;
+  }
+  .media-add-label:hover {
+    background: rgba(108,59,255,0.07);
+    border-color: rgba(108,59,255,0.6);
+  }
+  .media-hint {
+    font-size: 11px;
+    color: var(--ink-faint);
+    align-self: center;
+    line-height: 1.4;
+  }
+
   .compose-footer {
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    padding: 10px 14px;
+    padding: 12px 16px;
     border-top: 1px solid var(--border);
     gap: 10px;
+    background: var(--surface2);
   }
   .char-hint { font-size: 11px; color: var(--ink-faint); }
   .publish-btn {
@@ -217,12 +340,12 @@ const css = `
   .publish-btn:hover { opacity: 0.9; transform: translateY(-1px); }
   .publish-btn:active { transform: translateY(0); }
 
-  /* ── Posts ── */
-  .posts-list { display: flex; flex-direction: column; gap: 16px; }
+  /* Posts */
+  .posts-list { display: flex; flex-direction: column; gap: 18px; }
 
   .post-card {
     background: var(--surface);
-    border-radius: 18px;
+    border-radius: 20px;
     border: 1.5px solid var(--border);
     box-shadow: var(--shadow);
     overflow: hidden;
@@ -234,24 +357,23 @@ const css = `
     to   { opacity: 1; transform: translateY(0); }
   }
   .post-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-  .post-card-featured { border-color: rgba(108,59,255,0.3); }
+  .post-card-featured { border-color: rgba(108,59,255,0.28); }
 
   .post-card-top {
     height: 4px;
-    border-radius: 18px 18px 0 0;
   }
 
-  .post-card-body { padding: 18px 20px 14px; }
+  .post-card-body { padding: 18px 20px 16px; }
 
   .post-meta {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
   .post-avatar {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -270,9 +392,10 @@ const css = `
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
   }
   .post-author-role {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-faint);
     font-weight: 400;
     margin-top: 1px;
@@ -296,7 +419,7 @@ const css = `
   .post-content {
     font-size: 14.5px;
     color: var(--ink-soft);
-    line-height: 1.7;
+    line-height: 1.72;
     font-weight: 400;
   }
   .post-content p  { margin: 0 0 8px; }
@@ -324,11 +447,101 @@ const css = `
     font-family: 'Fira Mono', 'Courier New', monospace;
   }
 
+  /* Galeria de imagens no post */
+  .post-gallery {
+    margin-top: 14px;
+    display: grid;
+    gap: 3px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .post-gallery-1 { grid-template-columns: 1fr; }
+  .post-gallery-2 { grid-template-columns: 1fr 1fr; }
+  .post-gallery-3 { grid-template-columns: 1fr 1fr; }
+  .post-gallery-3 .post-gallery-img:first-child { grid-column: span 2; }
+  .post-gallery-4 { grid-template-columns: 1fr 1fr; }
+
+  .post-gallery-img {
+    width: 100%;
+    aspect-ratio: 16/10;
+    object-fit: cover;
+    cursor: zoom-in;
+    transition: opacity 0.15s, transform 0.2s;
+    display: block;
+    background: var(--surface2);
+  }
+  .post-gallery-1 .post-gallery-img { aspect-ratio: 16/9; max-height: 420px; }
+  .post-gallery-img:hover { opacity: 0.92; transform: scale(1.01); }
+
+  .post-gallery-more {
+    position: relative;
+    aspect-ratio: 16/10;
+    background: var(--surface2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink-soft);
+  }
+  .post-gallery-more::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.08);
+    transition: background 0.15s;
+  }
+  .post-gallery-more:hover::after { background: rgba(0,0,0,0.14); }
+
+  /* Player de vídeo no post */
+  .post-video-wrap {
+    margin-top: 14px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #000;
+    position: relative;
+  }
+  .post-video-wrap video {
+    width: 100%;
+    display: block;
+    max-height: 380px;
+  }
+  .post-video-label {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+
+  /* Badge de mídia no card */
+  .post-media-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    background: var(--surface2);
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin-top: 10px;
+  }
+
   .post-actions {
     display: flex;
     gap: 6px;
     justify-content: flex-end;
-    padding: 10px 20px 12px;
+    padding: 10px 20px 14px;
     border-top: 1px solid var(--border);
     background: var(--surface2);
   }
@@ -346,12 +559,86 @@ const css = `
     transition: background 0.15s, transform 0.1s;
   }
   .action-btn:active { transform: scale(0.97); }
-  .btn-edit  { background: rgba(108,59,255,0.1); color: var(--accent); }
+  .btn-edit   { background: rgba(108,59,255,0.1); color: var(--accent); }
   .btn-edit:hover  { background: rgba(108,59,255,0.18); }
-  .btn-delete{ background: rgba(232,64,90,0.08); color: var(--accent2); }
+  .btn-delete { background: rgba(232,64,90,0.08); color: var(--accent2); }
   .btn-delete:hover{ background: rgba(232,64,90,0.16); }
 
-  /* ── Modais ── */
+  /* Lightbox */
+  .lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: fadeIn 0.15s ease;
+    padding: 20px;
+    cursor: zoom-out;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .lightbox-img {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    cursor: default;
+    animation: popIn 0.2s ease;
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .lightbox-close {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    font-size: 16px;
+    transition: background 0.15s;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.25); }
+  .lightbox-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255,255,255,0.12);
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #fff;
+    font-size: 18px;
+    transition: background 0.15s;
+  }
+  .lightbox-nav:hover { background: rgba(255,255,255,0.22); }
+  .lightbox-nav-prev { left: 16px; }
+  .lightbox-nav-next { right: 16px; }
+  .lightbox-counter {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.65);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Modais */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -364,21 +651,17 @@ const css = `
     animation: fadeIn 0.2s ease;
     padding: 16px;
   }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
   .modal-box {
     background: var(--surface);
     border-radius: 20px;
     overflow: hidden;
     min-width: 340px;
-    max-width: 540px;
+    max-width: 560px;
     width: 100%;
     box-shadow: 0 32px 64px rgba(40,20,90,0.28);
     animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
-  }
-  @keyframes popIn {
-    from { opacity: 0; transform: scale(0.92) translateY(8px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
+    max-height: 90vh;
+    overflow-y: auto;
   }
   .modal-header {
     background: linear-gradient(135deg, #5c2eff, #8b5cff);
@@ -386,6 +669,9 @@ const css = `
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
   .modal-title {
     font-family: 'Playfair Display', serif;
@@ -412,7 +698,7 @@ const css = `
 
   .modal-textarea {
     width: 100%;
-    min-height: 110px;
+    min-height: 120px;
     padding: 12px 14px;
     border-radius: 10px;
     border: 1.5px solid var(--border);
@@ -427,6 +713,26 @@ const css = `
     transition: border-color 0.15s;
   }
   .modal-textarea:focus { border-color: var(--accent); }
+
+  /* Mídia no modal de edição */
+  .edit-media-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .edit-media-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .edit-media-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
   .modal-btns {
     display: flex;
@@ -468,20 +774,26 @@ const css = `
   .btn-save:hover { opacity: 0.9; transform: translateY(-1px); }
   .btn-save-danger { background: linear-gradient(135deg, #e8405a, #ff7a8a) !important; box-shadow: 0 3px 10px rgba(232,64,90,0.3) !important; }
 
-  /* ── Empty state ── */
+  /* Empty state */
   .empty-state {
     text-align: center;
-    padding: 64px 20px;
+    padding: 72px 20px;
     color: var(--ink-faint);
   }
-  .empty-icon {
-    font-size: 44px;
-    margin-bottom: 12px;
-    filter: grayscale(0.3);
-  }
-  .empty-text { font-size: 15px; }
+  .empty-icon { font-size: 48px; margin-bottom: 14px; }
+  .empty-text { font-size: 15px; font-weight: 500; }
+  .empty-sub  { font-size: 13px; margin-top: 4px; opacity: 0.7; }
 
-  /* ── Tema escuro ── */
+  /* Skeleton loading */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--surface) 50%, var(--surface2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 8px;
+  }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+  /* Tema escuro */
   html[data-theme="dark"] .mural-root {
     --ink:      #ede8ff;
     --ink-soft: #c4b8f5;
@@ -498,8 +810,39 @@ const css = `
   html[data-theme="dark"] .mural-hero {
     background: linear-gradient(135deg, #1a0640 0%, #4a1fa8 55%, #6c3bff 100%);
   }
+  html[data-theme="dark"] .post-gallery-img { background: #17142b; }
 `;
 
+const ACCENT_TOPS = [
+  "linear-gradient(90deg, #6c3bff, #e8405a)",
+  "linear-gradient(90deg, #0e5a7a, #6c3bff)",
+  "linear-gradient(90deg, #1f7a3f, #0e5a7a)",
+  "linear-gradient(90deg, #ff9500, #e8405a)",
+  "linear-gradient(90deg, #9b1b5a, #6c3bff)",
+];
+
+// ── Miniaturas de mídia (fora do componente principal para evitar remount) ────
+function MidiaThumbs({ midias, onRemover }) {
+  return (
+    <>
+      {midias.map((m, i) => (
+        <div key={i} className="media-thumb">
+          {m.tipo === "imagem" ? (
+            <img src={m.dados} alt={m.nome} />
+          ) : (
+            <>
+              <video src={m.dados} />
+              <div className="media-thumb-badge">▶</div>
+            </>
+          )}
+          <button className="media-thumb-remove" onClick={() => onRemover(i)} title="Remover">✕</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function MuralPage() {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
@@ -509,62 +852,45 @@ export default function MuralPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function fetchPosts() {
-      setLoading(true);
-      try {
-        const res = await api.get("/mural");
-        setPosts(res.data || []);
-      } catch {
-        setError("Erro ao carregar mural");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPosts();
-  }, []);
+  // Compose
+  const [novoPost, setNovoPost] = useState("");
+  const [novasMidias, setNovasMidias] = useState([]);
+  const textAreaRef = useRef();
+  const fileInputRef = useRef();
 
+  // Edição
   const [editIndex, setEditIndex] = useState(null);
   const [editConteudo, setEditConteudo] = useState("");
-  const [novoPost, setNovoPost] = useState("");
+  const [editMidias, setEditMidias] = useState([]);
+  const editFileInputRef = useRef();
+
+  // Exclusão
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);
-  const textAreaRef = useRef();
 
-  function abrirModalEdicao(idx) {
-    setEditIndex(idx);
-    setEditConteudo(posts[idx].conteudo);
-  }
+  // Lightbox
+  const [lightbox, setLightbox] = useState(null); // { imagens: [...], idx: 0 }
 
-  async function salvarEdicao(e) {
-    e.preventDefault();
-    if (!editConteudo.trim()) return;
-    try {
-      const post = posts[editIndex];
-      const res = await api.put(`/mural/${post.id}`, { conteudo: editConteudo.trim() });
-      const novo = [...posts];
-      novo[editIndex] = res.data;
-      setPosts(novo);
-      setEditIndex(null);
-    } catch {
-      setError("Erro ao salvar edição");
-    }
-  }
+  useEffect(() => {
+    api.get("/mural")
+      .then(res => setPosts(res.data || []))
+      .catch(() => setError("Erro ao carregar mural"))
+      .finally(() => setLoading(false));
+  }, []);
 
+  // ── Formatação de texto ────────────────────────────────────────────────────
   const applyInlineFormat = (prefix, suffix = prefix) => {
     const node = textAreaRef.current;
     if (!node) return;
     const start = node.selectionStart ?? novoPost.length;
     const end = node.selectionEnd ?? novoPost.length;
     const selected = novoPost.slice(start, end) || "texto";
-    const formatted = `${prefix}${selected}${suffix}`;
-    const nextValue = `${novoPost.slice(0, start)}${formatted}${novoPost.slice(end)}`;
-    setNovoPost(nextValue);
+    const next = `${novoPost.slice(0, start)}${prefix}${selected}${suffix}${novoPost.slice(end)}`;
+    setNovoPost(next);
     requestAnimationFrame(() => {
       node.focus();
       node.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
     });
   };
-
   const applyLinePrefix = (prefix) => {
     const node = textAreaRef.current;
     if (!node) return;
@@ -572,31 +898,104 @@ export default function MuralPage() {
     const end = node.selectionEnd ?? novoPost.length;
     const block = novoPost.slice(start, end) || "item";
     const prefixed = block.split("\n").map(l => l.trim() ? `${prefix}${l}` : l).join("\n");
-    const nextValue = `${novoPost.slice(0, start)}${prefixed}${novoPost.slice(end)}`;
-    setNovoPost(nextValue);
-    requestAnimationFrame(() => {
-      node.focus();
-      node.setSelectionRange(start, start + prefixed.length);
-    });
+    const next = `${novoPost.slice(0, start)}${prefixed}${novoPost.slice(end)}`;
+    setNovoPost(next);
+    requestAnimationFrame(() => { node.focus(); node.setSelectionRange(start, start + prefixed.length); });
   };
 
+  const toolbarActions = [
+    { icon: <Bold size={14} />,         label: "Negrito",         action: () => applyInlineFormat("**") },
+    { icon: <Italic size={14} />,       label: "Itálico",         action: () => applyInlineFormat("*") },
+    { icon: <Quote size={14} />,        label: "Citação",         action: () => applyLinePrefix("> ") },
+    { icon: <List size={14} />,         label: "Lista",           action: () => applyLinePrefix("- ") },
+    { icon: <ListOrdered size={14} />,  label: "Lista numerada",  action: () => applyLinePrefix("1. ") },
+    { icon: <Code size={14} />,         label: "Código",          action: () => applyInlineFormat("`") },
+  ];
+
+  // ── Upload de mídia ────────────────────────────────────────────────────────
+  async function handleAdicionarMidias(e, setMidiasFn, midias) {
+    const arquivos = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!arquivos.length) return;
+
+    const imagens = midias.filter(m => m.tipo === "imagem");
+    const videos  = midias.filter(m => m.tipo === "video");
+    const novas = [];
+
+    for (const file of arquivos) {
+      const isVideo = file.type.startsWith("video/");
+      const isImagem = file.type.startsWith("image/");
+      if (!isImagem && !isVideo) continue;
+
+      const limiteMB = isVideo ? LIMITE_VIDEO_MB : LIMITE_IMAGEM_MB;
+      if (file.size > limiteMB * 1024 * 1024) {
+        alert(`"${file.name}" excede o limite de ${limiteMB}MB.`);
+        continue;
+      }
+      if (isImagem && imagens.length + novas.filter(n => n.tipo === "imagem").length >= MAX_IMAGENS) {
+        alert(`Máximo de ${MAX_IMAGENS} imagens por post.`);
+        break;
+      }
+      if (isVideo && videos.length + novas.filter(n => n.tipo === "video").length >= MAX_VIDEOS) {
+        alert(`Máximo de ${MAX_VIDEOS} vídeo por post.`);
+        break;
+      }
+      const dados = await lerArquivo(file);
+      novas.push({ tipo: isVideo ? "video" : "imagem", nome: file.name, dados });
+    }
+    if (novas.length) setMidiasFn(prev => [...prev, ...novas]);
+  }
+
+  function removerMidia(idx, setMidiasFn) {
+    setMidiasFn(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  // ── Publicar ───────────────────────────────────────────────────────────────
   async function publicar(e) {
     e.preventDefault();
-    if (!novoPost.trim()) return;
+    if (!novoPost.trim() && novasMidias.length === 0) return;
     try {
-      const res = await api.post("/mural", { autor: user?.nome || "Usuário", conteudo: novoPost });
-      setPosts([res.data, ...posts]);
+      const res = await api.post("/mural", {
+        autor: user?.nome || "Usuário",
+        conteudo: novoPost,
+        midias: novasMidias,
+      });
+      setPosts(prev => [res.data, ...prev]);
       setNovoPost("");
+      setNovasMidias([]);
     } catch {
       setError("Erro ao publicar comunicado");
     }
   }
 
-  async function excluirPostConfirmado(idx) {
-    const post = posts[idx];
+  // ── Edição ─────────────────────────────────────────────────────────────────
+  function abrirModalEdicao(idx) {
+    setEditIndex(idx);
+    setEditConteudo(posts[idx].conteudo);
+    setEditMidias(posts[idx].midias || []);
+  }
+
+  async function salvarEdicao(e) {
+    e.preventDefault();
+    if (!editConteudo.trim() && editMidias.length === 0) return;
     try {
-      await api.delete(`/mural/${post.id}`);
-      setPosts(posts.filter((_, i) => i !== idx));
+      const post = posts[editIndex];
+      const res = await api.put(`/mural/${post.id}`, {
+        conteudo: editConteudo.trim(),
+        midias: editMidias,
+      });
+      setPosts(prev => { const n = [...prev]; n[editIndex] = res.data; return n; });
+      setEditIndex(null);
+    } catch {
+      setError("Erro ao salvar edição");
+    }
+  }
+
+  // ── Exclusão ───────────────────────────────────────────────────────────────
+  async function excluirPostConfirmado(idx) {
+    try {
+      await api.delete(`/mural/${posts[idx].id}`);
+      setPosts(prev => prev.filter((_, i) => i !== idx));
       setConfirmDeleteIndex(null);
     } catch {
       setError("Erro ao excluir comunicado");
@@ -604,6 +1003,19 @@ export default function MuralPage() {
     }
   }
 
+  // ── Lightbox ───────────────────────────────────────────────────────────────
+  function abrirLightbox(imagens, idx) {
+    setLightbox({ imagens, idx });
+  }
+  function fecharLightbox() { setLightbox(null); }
+  function lightboxAnterior() {
+    setLightbox(prev => ({ ...prev, idx: (prev.idx - 1 + prev.imagens.length) % prev.imagens.length }));
+  }
+  function lightboxProximo() {
+    setLightbox(prev => ({ ...prev, idx: (prev.idx + 1) % prev.imagens.length }));
+  }
+
+  // ── Markdown components ────────────────────────────────────────────────────
   const markdownComponents = {
     p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.7 }}>{children}</p>,
     ul: ({ children }) => <ul style={{ margin: "8px 0", paddingLeft: 22 }}>{children}</ul>,
@@ -612,40 +1024,60 @@ export default function MuralPage() {
     strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
     em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
     blockquote: ({ children }) => (
-      <blockquote style={{ margin: "10px 0", padding: "8px 14px", borderLeft: "3px solid #6c3bff", background: "var(--surface2,#f0ebff)", borderRadius: "0 8px 8px 0", fontStyle: "italic" }}>{children}</blockquote>
+      <blockquote style={{ margin: "10px 0", padding: "8px 14px", borderLeft: "3px solid #6c3bff", background: "var(--surface2,#f0ebff)", borderRadius: "0 8px 8px 0", fontStyle: "italic" }}>
+        {children}
+      </blockquote>
     ),
     code: ({ children }) => (
-      <code style={{ background: "var(--surface2,#f0ebff)", border: "1px solid var(--border,rgba(100,80,160,0.14))", borderRadius: 5, padding: "1px 6px", fontSize: 12.5, color: "#6c3bff", fontFamily: "monospace" }}>{children}</code>
+      <code style={{ background: "var(--surface2,#f0ebff)", border: "1px solid var(--border)", borderRadius: 5, padding: "1px 6px", fontSize: 12.5, color: "#6c3bff", fontFamily: "monospace" }}>
+        {children}
+      </code>
     ),
   };
 
-  const toolbarActions = [
-    { icon: <Bold size={14} />, label: "Negrito",      action: () => applyInlineFormat("**") },
-    { icon: <Italic size={14} />, label: "Itálico",    action: () => applyInlineFormat("*") },
-    { icon: <Quote size={14} />, label: "Citação",     action: () => applyLinePrefix("> ") },
-    { icon: <List size={14} />, label: "Lista",        action: () => applyLinePrefix("- ") },
-    { icon: <ListOrdered size={14} />, label: "Lista numerada", action: () => applyLinePrefix("1. ") },
-    { icon: <Code size={14} />, label: "Código",       action: () => applyInlineFormat("`") },
-  ];
+  // ── Render da galeria de imagens de um post ────────────────────────────────
+  function renderGaleria(midias, postIdx) {
+    const imagens = (midias || []).filter(m => m.tipo === "imagem");
+    if (!imagens.length) return null;
+    const visiveis = imagens.slice(0, 4);
+    const extras = imagens.length - 4;
+    const cls = `post-gallery post-gallery-${Math.min(visiveis.length, 4)}`;
+    return (
+      <div className={cls}>
+        {visiveis.map((m, i) => {
+          const isUltima = i === 3 && extras > 0;
+          return isUltima ? (
+            <div key={i} className="post-gallery-more" onClick={() => abrirLightbox(imagens, i)}>
+              <img src={m.dados} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              <span style={{ position: "relative", zIndex: 1, fontSize: 22, fontWeight: 700, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>+{extras + 1}</span>
+            </div>
+          ) : (
+            <img
+              key={i}
+              src={m.dados}
+              alt={m.nome}
+              className="post-gallery-img"
+              onClick={() => abrirLightbox(imagens, i)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
 
-  const ACCENT_TOPS = [
-    "linear-gradient(90deg, #6c3bff, #e8405a)",
-    "linear-gradient(90deg, #0e5a7a, #6c3bff)",
-    "linear-gradient(90deg, #1f7a3f, #0e5a7a)",
-    "linear-gradient(90deg, #ff9500, #e8405a)",
-    "linear-gradient(90deg, #9b1b5a, #6c3bff)",
-  ];
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="mural-root">
       <style>{css}</style>
 
-      {/* ── Hero ── */}
+      {/* Hero */}
       <div className="mural-hero">
         <div className="mural-hero-inner">
           <div>
             <h1 className="mural-title">Mural Interno</h1>
-            <p className="mural-subtitle">{posts.length} comunicado{posts.length !== 1 ? "s" : ""} publicado{posts.length !== 1 ? "s" : ""}</p>
+            <p className="mural-subtitle">
+              {posts.length} comunicado{posts.length !== 1 ? "s" : ""} publicado{posts.length !== 1 ? "s" : ""}
+            </p>
           </div>
           <span className="mural-badge">
             <Pin size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
@@ -654,7 +1086,7 @@ export default function MuralPage() {
         </div>
       </div>
 
-      {/* ── Corpo ── */}
+      {/* Corpo */}
       <div className="mural-body">
 
         {error && (
@@ -663,7 +1095,7 @@ export default function MuralPage() {
           </div>
         )}
 
-        {/* ── Compose ── */}
+        {/* Compose */}
         {isGestorOuAdmin && (
           <form onSubmit={publicar} className="compose-box">
             <div className="compose-header">
@@ -672,13 +1104,34 @@ export default function MuralPage() {
               </div>
               <span className="compose-label">Novo comunicado</span>
             </div>
+
             <div className="compose-toolbar">
               {toolbarActions.map(({ icon, label, action }) => (
                 <button key={label} type="button" title={label} onClick={action} className="toolbar-btn">
                   {icon}
                 </button>
               ))}
+              <div className="toolbar-sep" />
+              <button
+                type="button"
+                title="Adicionar foto ou vídeo"
+                className="toolbar-btn"
+                onClick={() => fileInputRef.current?.click()}
+                style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "6px 10px" }}
+              >
+                <ImagePlus size={14} />
+                <span>Foto / Vídeo</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                style={{ display: "none" }}
+                onChange={e => handleAdicionarMidias(e, setNovasMidias, novasMidias)}
+              />
             </div>
+
             <textarea
               ref={textAreaRef}
               placeholder="Escreva um aviso, regra ou comunicado… (Markdown suportado)"
@@ -686,9 +1139,38 @@ export default function MuralPage() {
               onChange={e => setNovoPost(e.target.value)}
               className="compose-textarea"
             />
+
+            {/* Pré-visualização de mídia */}
+            {novasMidias.length > 0 && (
+              <div className="compose-media-bar">
+                <MidiaThumbs
+                  midias={novasMidias}
+                  onRemover={i => removerMidia(i, setNovasMidias)}
+                />
+                <label className="media-add-label" title="Adicionar mais">
+                  <ImagePlus size={18} />
+                  <span>Adicionar</span>
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={e => handleAdicionarMidias(e, setNovasMidias, novasMidias)}
+                  />
+                </label>
+                <span className="media-hint">
+                  Imagens até {LIMITE_IMAGEM_MB}MB · Vídeos até {LIMITE_VIDEO_MB}MB<br />
+                  Máx. {MAX_IMAGENS} fotos · {MAX_VIDEOS} vídeo
+                </span>
+              </div>
+            )}
+
             <div className="compose-footer">
-              {novoPost.length > 0 && (
-                <span className="char-hint">{novoPost.length} caracteres</span>
+              {(novoPost.length > 0 || novasMidias.length > 0) && (
+                <span className="char-hint">
+                  {novoPost.length > 0 && `${novoPost.length} car. `}
+                  {novasMidias.length > 0 && `· ${novasMidias.length} mídia${novasMidias.length > 1 ? "s" : ""}`}
+                </span>
               )}
               <button type="submit" className="publish-btn">
                 <Send size={13} /> Publicar
@@ -697,10 +1179,22 @@ export default function MuralPage() {
           </form>
         )}
 
-        {/* ── Posts ── */}
+        {/* Posts */}
         {loading ? (
-          <div style={{ textAlign: "center", padding: "48px 0", color: "var(--ink-faint)" }}>
-            Carregando comunicados…
+          <div className="posts-list">
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ background: "var(--surface)", borderRadius: 20, padding: 20, border: "1.5px solid var(--border)" }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+                  <div className="skeleton" style={{ width: 40, height: 40, borderRadius: "50%" }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton" style={{ height: 14, width: "30%", borderRadius: 6, marginBottom: 6 }} />
+                    <div className="skeleton" style={{ height: 11, width: "20%", borderRadius: 6 }} />
+                  </div>
+                </div>
+                <div className="skeleton" style={{ height: 13, borderRadius: 6, marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 13, width: "80%", borderRadius: 6 }} />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="posts-list">
@@ -708,55 +1202,109 @@ export default function MuralPage() {
               <div className="empty-state">
                 <div className="empty-icon">📋</div>
                 <div className="empty-text">Nenhum comunicado ainda.</div>
+                {isGestorOuAdmin && <div className="empty-sub">Use o formulário acima para publicar o primeiro.</div>}
               </div>
             )}
 
-            {posts.map((post, i) => (
-              <div key={post.id || i} className={`post-card${i === 0 ? " post-card-featured" : ""}`}>
-                {/* Topo colorido */}
-                <div className="post-card-top" style={{ background: ACCENT_TOPS[i % ACCENT_TOPS.length] }} />
+            {posts.map((post, i) => {
+              const midias = post.midias || [];
+              const imagens = midias.filter(m => m.tipo === "imagem");
+              const videos  = midias.filter(m => m.tipo === "video");
+              return (
+                <div key={post.id || i} className={`post-card${i === 0 ? " post-card-featured" : ""}`}>
+                  <div className="post-card-top" style={{ background: ACCENT_TOPS[i % ACCENT_TOPS.length] }} />
 
-                <div className="post-card-body">
-                  <div className="post-meta">
-                    <div className="post-avatar" style={{ background: avatarGradient(post.autor) }}>
-                      {initials(post.autor)}
-                    </div>
-                    <div className="post-author-block">
-                      <div className="post-author">
-                        {post.autor}
-                        {i === 0 && <span className="post-featured-badge">📌 Recente</span>}
+                  <div className="post-card-body">
+                    {/* Meta */}
+                    <div className="post-meta">
+                      <div className="post-avatar" style={{ background: avatarGradient(post.autor) }}>
+                        {initials(post.autor)}
                       </div>
-                      <div className="post-author-role">{relativeTime(post.data || post.createdAt)}</div>
+                      <div className="post-author-block">
+                        <div className="post-author">
+                          {post.autor}
+                          {i === 0 && <span className="post-featured-badge">📌 Recente</span>}
+                        </div>
+                        <div className="post-author-role">{relativeTime(post.data || post.createdAt)}</div>
+                      </div>
+                      <span className="post-date">
+                        {new Date(post.data || post.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                      </span>
                     </div>
-                    <span className="post-date">
-                      {new Date(post.data || post.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                    </span>
+
+                    {/* Conteúdo de texto */}
+                    {post.conteudo && (
+                      <div className="post-content">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                          {post.conteudo}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+
+                    {/* Galeria de imagens */}
+                    {renderGaleria(imagens, i)}
+
+                    {/* Player de vídeo */}
+                    {videos.map((v, vi) => (
+                      <div key={vi} className="post-video-wrap">
+                        <video controls src={v.dados} preload="metadata" />
+                        <div className="post-video-label">
+                          <Play size={10} /> {v.nome}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Badge de mídia (quando tem conteúdo + mídia) */}
+                    {post.conteudo && midias.length > 0 && (
+                      <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {imagens.length > 0 && (
+                          <span className="post-media-badge">🖼 {imagens.length} foto{imagens.length > 1 ? "s" : ""}</span>
+                        )}
+                        {videos.length > 0 && (
+                          <span className="post-media-badge">🎬 {videos.length} vídeo{videos.length > 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="post-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {post.conteudo}
-                    </ReactMarkdown>
-                  </div>
+                  {isGestorOuAdmin && (
+                    <div className="post-actions">
+                      <button className="action-btn btn-edit" onClick={() => abrirModalEdicao(i)}>
+                        <Pencil size={12} /> Editar
+                      </button>
+                      <button className="action-btn btn-delete" onClick={() => setConfirmDeleteIndex(i)}>
+                        <Trash2 size={12} /> Excluir
+                      </button>
+                    </div>
+                  )}
                 </div>
-
-                {isGestorOuAdmin && (
-                  <div className="post-actions">
-                    <button className="action-btn btn-edit" onClick={() => abrirModalEdicao(i)}>
-                      <Pencil size={12} /> Editar
-                    </button>
-                    <button className="action-btn btn-delete" onClick={() => setConfirmDeleteIndex(i)}>
-                      <Trash2 size={12} /> Excluir
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ── Modal editar ── */}
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="lightbox-overlay" onClick={fecharLightbox}>
+          <button className="lightbox-close" onClick={fecharLightbox}><X size={16} /></button>
+          <img
+            src={lightbox.imagens[lightbox.idx].dados}
+            alt=""
+            className="lightbox-img"
+            onClick={e => e.stopPropagation()}
+          />
+          {lightbox.imagens.length > 1 && (
+            <>
+              <button className="lightbox-nav lightbox-nav-prev" onClick={e => { e.stopPropagation(); lightboxAnterior(); }}>‹</button>
+              <button className="lightbox-nav lightbox-nav-next" onClick={e => { e.stopPropagation(); lightboxProximo(); }}>›</button>
+              <div className="lightbox-counter">{lightbox.idx + 1} / {lightbox.imagens.length}</div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Modal editar */}
       {editIndex !== null && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditIndex(null)}>
           <div className="modal-box">
@@ -766,7 +1314,41 @@ export default function MuralPage() {
             </div>
             <div className="modal-body">
               <form onSubmit={salvarEdicao}>
-                <textarea value={editConteudo} onChange={e => setEditConteudo(e.target.value)} className="modal-textarea" autoFocus />
+                <textarea
+                  value={editConteudo}
+                  onChange={e => setEditConteudo(e.target.value)}
+                  className="modal-textarea"
+                  autoFocus
+                  placeholder="Conteúdo do comunicado…"
+                />
+
+                {/* Mídias existentes */}
+                <div className="edit-media-section">
+                  <div className="edit-media-label">Mídias anexadas</div>
+                  <div className="edit-media-list">
+                    {editMidias.length === 0 ? (
+                      <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>Nenhuma mídia</span>
+                    ) : (
+                      <MidiaThumbs
+                        midias={editMidias}
+                        onRemover={i => removerMidia(i, setEditMidias)}
+                      />
+                    )}
+                    <label className="media-add-label" title="Adicionar mídia">
+                      <ImagePlus size={18} />
+                      <span>Adicionar</span>
+                      <input
+                        ref={editFileInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        style={{ display: "none" }}
+                        onChange={e => handleAdicionarMidias(e, setEditMidias, editMidias)}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="modal-btns">
                   <button type="button" onClick={() => setEditIndex(null)} className="btn-cancel">
                     <X size={12} /> Cancelar
@@ -781,7 +1363,7 @@ export default function MuralPage() {
         </div>
       )}
 
-      {/* ── Modal confirmar exclusão ── */}
+      {/* Modal confirmar exclusão */}
       {confirmDeleteIndex !== null && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setConfirmDeleteIndex(null)}>
           <div className="modal-box">
