@@ -770,22 +770,22 @@ const styles = {
     width: "max-content",
     minWidth: "100%",
     borderCollapse: "separate",
-    borderSpacing: "10px 0",
+    borderSpacing: "14px 0",
     tableLayout: "auto",
   },
   th: {
-    background: "var(--bg-card)",
+    background: "linear-gradient(170deg, #f5f0ff 0%, var(--bg-card) 55%)",
     color: "var(--text)",
-    padding: "12px 14px",
+    padding: "12px 14px 10px",
     textAlign: "left",
     fontSize: "12.5px",
     fontWeight: "700",
     letterSpacing: "0.3px",
     borderRadius: "14px 14px 0 0",
     border: "1px solid var(--border)",
-    borderBottom: "2px solid var(--border)",
+    borderTop: "3px solid #7c5cff",
+    borderBottom: "none",
     minWidth: "360px",
-    boxShadow: "0 -2px 8px rgba(76,29,149,0.05)",
   },
   td: {
     padding: "0",
@@ -801,7 +801,7 @@ const styles = {
     borderRadius: "12px",
     padding: "16px 14px",
     marginBottom: "8px",
-    boxShadow: "0 2px 8px rgba(76,29,149,0.07), 0 1px 2px rgba(76,29,149,0.04)",
+    boxShadow: "0 2px 10px rgba(76,29,149,0.09), 0 1px 3px rgba(76,29,149,0.05)",
     transition: "transform 160ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 160ms ease",
     cursor: "grab",
     borderWidth: "1px",
@@ -810,7 +810,7 @@ const styles = {
     borderRightColor: "var(--border)",
     borderBottomColor: "var(--border)",
     borderLeftColor: "#7c5cff",
-    borderLeftWidth: "3px",
+    borderLeftWidth: "4px",
     position: "relative",
     display: "flex",
     flexDirection: "column",
@@ -1270,11 +1270,11 @@ const styles = {
   densityGroup: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "6px",
-    background: "#efe8ff",
-    border: "1px solid #d8cbff",
+    gap: "4px",
+    background: "var(--bg-input)",
+    border: "1px solid var(--border)",
     borderRadius: "10px",
-    padding: "4px",
+    padding: "3px",
   },
   densityButton: {
     border: "none",
@@ -1303,13 +1303,13 @@ const DroppableColumn = memo(function DroppableColumn({ id, children, minHeight,
       ref={setNodeRef}
       style={{
         minHeight: minHeight || "540px",
-        background: isOver ? "var(--bg-input)" : "var(--bg-surface2, var(--bg-input))",
-        borderRadius: "0 0 14px 14px",
-        border: isOver ? "1px solid var(--purple-400, #7a4dff)" : "1px solid var(--border)",
+        background: isOver ? "var(--bg-surface2)" : "var(--bg-input)",
+        borderRadius: "0 0 16px 16px",
+        border: isOver ? "1.5px solid #9b7dff" : "1px solid var(--border)",
         borderTop: "none",
         transition: "background 160ms ease, border-color 160ms ease",
         padding: padding || "10px",
-        boxShadow: isOver ? "inset 0 2px 8px rgba(124,77,255,0.08)" : "none",
+        boxShadow: isOver ? "inset 0 3px 10px rgba(124,77,255,0.12)" : "none",
       }}
     >
       {children}
@@ -1831,6 +1831,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const navigate = useNavigate();
   const safeBoard = VALID_BOARDS.includes(board) ? board : "delivery";
   const boardLabel = BOARD_LABELS[safeBoard] || "Delivery";
+
+  // Visibilidade dos botões de ação no modal do card
+  const [showCardActions, setShowCardActions] = useState(false);
 
   // Estado para seleção múltipla
   const [multiSelectMode, setMultiSelectMode] = useState(false);
@@ -2769,6 +2772,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     setPendingAttachments([]); // Corrige: limpa anexos pendentes
     setPreviewImage(null);
     setPreviewZoom(1);
+    setShowCardActions(false);
   };
 
   useEffect(() => {
@@ -3690,9 +3694,108 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           100% { box-shadow: 0 0 0 12px rgba(127, 90, 240, 0), 0 8px 20px rgba(95, 61, 198, 0.18); }
         }`}
       </style>
-      <div style={styles.header}>
-        <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban {boardLabel}</h1>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ marginBottom: 20 }}>
+        {/* Linha 1: Título + ações de criação */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+          <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban {boardLabel}</h1>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              style={styles.addButton}
+              onClick={() => setIsModalOpen(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(90,48,255,0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(90,48,255,0.3)";
+              }}
+            >
+              <Plus size={15} /> Novo Card
+            </button>
+            <button
+              style={{ ...styles.addButton, background: "linear-gradient(135deg, #d5c9ff 0%, #8f75ff 100%)", color: "#2f1e70" }}
+              onClick={openAddColumn}
+            >
+              <Plus size={15} /> Nova Coluna
+            </button>
+            <div style={{ position: "relative" }}>
+              <button
+                style={{ ...styles.addButton, background: "linear-gradient(135deg, #cce5ff 0%, #8ec5ff 100%)", color: "#1a3f74" }}
+                onClick={() => setIsDataActionsOpen((prev) => !prev)}
+              >
+                <FileUp size={15} /> Dados
+              </button>
+              {isDataActionsOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    minWidth: "190px",
+                    background: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 10,
+                    boxShadow: "0 14px 28px rgba(56, 36, 138, 0.2)",
+                    padding: 8,
+                    zIndex: 20,
+                    display: "grid",
+                    gap: 6,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsImportModalOpen(true);
+                      setImportSummary("");
+                      setExternalExportSummary("");
+                      setError("");
+                      setIsDataActionsOpen(false);
+                    }}
+                    style={{ background: "#eef5ff", border: "1px solid #d0e0ff", color: "#1a3f74", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <FileUp size={14} /> Importar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsImportModalOpen(true);
+                      setImportSummary("");
+                      setExternalExportSummary("");
+                      setError("");
+                      setIsDataActionsOpen(false);
+                    }}
+                    style={{ background: "#e8f8ff", border: "1px solid #c9ebff", color: "#165d7a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Download size={14} /> Trello
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportExcel();
+                      setIsDataActionsOpen(false);
+                    }}
+                    style={{ background: "#e9faed", border: "1px solid #c8efd4", color: "#1f5b2e", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <FileSpreadsheet size={14} /> Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportCsv();
+                      setIsDataActionsOpen(false);
+                    }}
+                    style={{ background: "#eef4ff", border: "1px solid #d4e1ff", color: "#21468a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Download size={14} /> CSV
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Linha 2: Barra de controles unificada */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 12, padding: "5px 8px", boxShadow: "0 1px 4px rgba(76,29,149,0.06)" }}>
           <div style={styles.densityGroup}>
             {[
               { key: "mini", label: "Mini" },
@@ -3712,136 +3815,37 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
               </button>
             ))}
           </div>
-          {/* Botão para ativar/desativar seleção múltipla */}
+          <div style={{ width: 1, height: 22, background: "var(--border)", flexShrink: 0 }} />
           {!multiSelectMode ? (
             <button
-              style={{ background: '#ede6ff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "#5a30ff", fontWeight: 600, padding: "5px 12px", cursor: "pointer", fontSize: 12.5 }}
               onClick={() => setMultiSelectMode(true)}
             >
               Selecionar vários
             </button>
           ) : (
             <button
-              style={{ background: '#fff', border: '1px solid #d6d0ff', borderRadius: 10, color: '#5a30ff', fontWeight: 700, padding: '10px 22px', cursor: 'pointer', fontSize: 15 }}
+              style={{ background: "#ede6ff", border: "1px solid #d6d0ff", borderRadius: 8, color: "#5a30ff", fontWeight: 600, padding: "5px 12px", cursor: "pointer", fontSize: 12.5 }}
               onClick={clearSelectedCards}
             >
               Cancelar seleção
             </button>
           )}
-          {/* Atalhos para Arquivados e Lixeira */}
+          <div style={{ width: 1, height: 22, background: "var(--border)", flexShrink: 0 }} />
           <button
-            style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, color: '#16a34a', fontWeight: 600, padding: '10px 16px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: "transparent", border: "none", borderRadius: 8, color: "#16a34a", fontWeight: 600, padding: "5px 10px", cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 5 }}
             onClick={() => navigate('/arquivados')}
             title="Ver cards arquivados"
           >
             📦 Arquivados
           </button>
           <button
-            style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', fontWeight: 600, padding: '10px 16px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ background: "transparent", border: "none", borderRadius: 8, color: "#dc2626", fontWeight: 600, padding: "5px 10px", cursor: "pointer", fontSize: 12.5, display: "flex", alignItems: "center", gap: 5 }}
             onClick={() => navigate('/lixeira')}
             title="Ver cards na lixeira"
           >
             🗑️ Lixeira
           </button>
-          {/* Botão para criar novo card */}
-          <button
-            style={styles.addButton}
-            onClick={() => setIsModalOpen(true)}
-            onMouseEnter={(e) => { 
-              e.currentTarget.style.transform = "translateY(-2px)"; 
-              e.currentTarget.style.boxShadow = "0 6px 20px rgba(90,48,255,0.4)"; 
-            }}
-            onMouseLeave={(e) => { 
-              e.currentTarget.style.transform = "translateY(0)"; 
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(90,48,255,0.3)"; 
-            }}
-          >
-            <Plus size={15} /> Novo Card
-          </button>
-          {/* Botão para adicionar nova coluna */}
-          <button
-            style={{ ...styles.addButton, background: "linear-gradient(135deg, #d5c9ff 0%, #8f75ff 100%)", color: "#2f1e70" }}
-            onClick={openAddColumn}
-          >
-            <Plus size={15} /> Nova Coluna
-          </button>
-          <div style={{ position: "relative" }}>
-            <button
-              style={{ ...styles.addButton, background: "linear-gradient(135deg, #cce5ff 0%, #8ec5ff 100%)", color: "#1a3f74" }}
-              onClick={() => setIsDataActionsOpen((prev) => !prev)}
-            >
-              <FileUp size={15} /> Dados
-            </button>
-
-            {isDataActionsOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 8px)",
-                  right: 0,
-                  minWidth: "190px",
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 10,
-                  boxShadow: "0 14px 28px rgba(56, 36, 138, 0.2)",
-                  padding: 8,
-                  zIndex: 20,
-                  display: "grid",
-                  gap: 6,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsImportModalOpen(true);
-                    setImportSummary("");
-                    setExternalExportSummary("");
-                    setError("");
-                    setIsDataActionsOpen(false);
-                  }}
-                  style={{ background: "#eef5ff", border: "1px solid #d0e0ff", color: "#1a3f74", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <FileUp size={14} /> Importar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsImportModalOpen(true);
-                    setImportSummary("");
-                    setExternalExportSummary("");
-                    setError("");
-                    setIsDataActionsOpen(false);
-                  }}
-                  style={{ background: "#e8f8ff", border: "1px solid #c9ebff", color: "#165d7a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <Download size={14} /> Trello
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleExportExcel();
-                    setIsDataActionsOpen(false);
-                  }}
-                  style={{ background: "#e9faed", border: "1px solid #c8efd4", color: "#1f5b2e", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <FileSpreadsheet size={14} /> Excel
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleExportCsv();
-                    setIsDataActionsOpen(false);
-                  }}
-                  style={{ background: "#eef4ff", border: "1px solid #d4e1ff", color: "#21468a", borderRadius: 8, padding: "8px 10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <Download size={14} /> CSV
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -4120,79 +4124,72 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                         opacity: draggedColumnIndex === idx ? 0.65 : 1,
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                        {/* Checkbox de seleção de todos os cards da coluna */}
-                        {multiSelectMode && (
-                          <input
-                            type="checkbox"
-                            checked={columnCards.length > 0 && columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
-                            indeterminate={columnCards.some((card) => selectedCards.includes(getCardKey(card))) && !columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
-                            onChange={() => selectAllInColumn(column.id)}
-                            style={{ marginRight: 6, accentColor: '#5a30ff', width: 18, height: 18 }}
-                            title="Selecionar todos da coluna"
-                          />
-                        )}
-                        {/* Nome da coluna */}
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <GripVertical size={14} /> {col}
-                        </span>
-                        {/* Contador de cards na coluna (total real no banco) */}
-                        <span
-                          style={{ background: "#f4efff", padding: "2px 8px", borderRadius: "8px", fontSize: "12px", color: "#5f3dc6", border: "1px solid #d6c7ff" }}
-                          title={`${columnCards.length} carregados de ${Number(columnTotals[String(column.id)]) || 0} no banco`}
-                        >
-                          {Number(columnTotals[String(column.id)]) || columnCards.length}
-                        </span>
-                        {/* Botão para editar coluna */}
-                        <button 
-                          title="Excluir todos os cards da coluna" 
-                          disabled={isBulkDeletingCards || columnCards.length === 0}
-                          style={{
-                            background: "#fff7e8",
-                            border: "1px solid #ffe1b0",
-                            borderRadius: 6,
-                            color: "#9b5a10",
-                            cursor: isBulkDeletingCards || columnCards.length === 0 ? "not-allowed" : "pointer",
-                            fontSize: 14,
-                            padding: "2px 5px",
-                            marginLeft: 2,
-                            opacity: isBulkDeletingCards || columnCards.length === 0 ? 0.55 : 1,
-                          }} 
-                          onClick={() => handleDeleteAllCardsInColumn(column)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                        <button 
-                          title="Editar coluna" 
-                          style={{ background: "#efe8ff", border: "1px solid #d4c3ff", borderRadius: 6, color: "#6c3bff", cursor: "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2 }} 
-                          onClick={() => openEditColumn(column)}
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          title="Mover coluna para a esquerda"
-                          disabled={idx === 0}
-                          style={{ background: "#edf2ff", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === 0 ? "not-allowed" : "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2, opacity: idx === 0 ? 0.55 : 1 }}
-                          onClick={() => moveColumn(idx, idx - 1)}
-                        >
-                          ←
-                        </button>
-                        <button
-                          title="Mover coluna para a direita"
-                          disabled={idx === orderedColumnDefs.length - 1}
-                          style={{ background: "#edf2ff", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === orderedColumnDefs.length - 1 ? "not-allowed" : "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2, opacity: idx === orderedColumnDefs.length - 1 ? 0.55 : 1 }}
-                          onClick={() => moveColumn(idx, idx + 1)}
-                        >
-                          →
-                        </button>
-                        {/* Botão para excluir coluna */}
-                        <button 
-                          title="Excluir coluna" 
-                          style={{ background: "#fff1f1", border: "1px solid #ffd2d2", borderRadius: 6, color: "#b33524", cursor: "pointer", fontSize: 14, padding: "2px 5px", marginLeft: 2 }} 
-                          onClick={() => handleDeleteColumn(column)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {/* Linha 1: checkbox (multiselect) + grip + nome + badge de contagem */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {multiSelectMode && (
+                            <input
+                              type="checkbox"
+                              checked={columnCards.length > 0 && columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
+                              indeterminate={columnCards.some((card) => selectedCards.includes(getCardKey(card))) && !columnCards.every((card) => selectedCards.includes(getCardKey(card)))}
+                              onChange={() => selectAllInColumn(column.id)}
+                              style={{ marginRight: 2, accentColor: '#5a30ff', width: 16, height: 16, flexShrink: 0 }}
+                              title="Selecionar todos da coluna"
+                            />
+                          )}
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flex: 1, fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <GripVertical size={13} style={{ opacity: 0.35, flexShrink: 0 }} /> {col}
+                          </span>
+                          <span
+                            style={{ background: "#7c5cff", color: "#fff", padding: "2px 10px", borderRadius: "20px", fontSize: "11.5px", fontWeight: 700, flexShrink: 0 }}
+                            title={`${columnCards.length} carregados de ${Number(columnTotals[String(column.id)]) || 0} no banco`}
+                          >
+                            {Number(columnTotals[String(column.id)]) || columnCards.length}
+                          </span>
+                        </div>
+                        {/* Linha 2: botões de ação agrupados */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "flex-end" }}>
+                          <button
+                            title="Excluir todos os cards da coluna"
+                            disabled={isBulkDeletingCards || columnCards.length === 0}
+                            style={{ background: "transparent", border: "1px solid #ffd2d2", borderRadius: 6, color: "#c0392b", cursor: isBulkDeletingCards || columnCards.length === 0 ? "not-allowed" : "pointer", padding: "3px 6px", display: "flex", alignItems: "center", opacity: isBulkDeletingCards || columnCards.length === 0 ? 0.35 : 0.6, transition: "opacity 150ms" }}
+                            onClick={() => handleDeleteAllCardsInColumn(column)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                          <button
+                            title="Editar coluna"
+                            style={{ background: "transparent", border: "1px solid #d4c3ff", borderRadius: 6, color: "#6c3bff", cursor: "pointer", padding: "3px 6px", display: "flex", alignItems: "center", opacity: 0.6, transition: "opacity 150ms" }}
+                            onClick={() => openEditColumn(column)}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <div style={{ width: 1, height: 14, background: "rgba(0,0,0,0.1)", margin: "0 2px" }} />
+                          <button
+                            title="Mover coluna para a esquerda"
+                            disabled={idx === 0}
+                            style={{ background: "transparent", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === 0 ? "not-allowed" : "pointer", padding: "3px 7px", fontSize: 12, fontWeight: 700, opacity: idx === 0 ? 0.28 : 0.6, transition: "opacity 150ms" }}
+                            onClick={() => moveColumn(idx, idx - 1)}
+                          >
+                            ←
+                          </button>
+                          <button
+                            title="Mover coluna para a direita"
+                            disabled={idx === orderedColumnDefs.length - 1}
+                            style={{ background: "transparent", border: "1px solid #cad7ff", borderRadius: 6, color: "#3a4f97", cursor: idx === orderedColumnDefs.length - 1 ? "not-allowed" : "pointer", padding: "3px 7px", fontSize: 12, fontWeight: 700, opacity: idx === orderedColumnDefs.length - 1 ? 0.28 : 0.6, transition: "opacity 150ms" }}
+                            onClick={() => moveColumn(idx, idx + 1)}
+                          >
+                            →
+                          </button>
+                          <div style={{ width: 1, height: 14, background: "rgba(0,0,0,0.1)", margin: "0 2px" }} />
+                          <button
+                            title="Excluir coluna"
+                            style={{ background: "transparent", border: "1px solid #ffd2d2", borderRadius: 6, color: "#c0392b", cursor: "pointer", padding: "3px 6px", display: "flex", alignItems: "center", opacity: 0.6, transition: "opacity 150ms" }}
+                            onClick={() => handleDeleteColumn(column)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     </th>
                   );
@@ -4266,18 +4263,20 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                             <button
                               disabled={isLoadingMore}
                               style={{
-                                margin: '12px auto 0',
+                                margin: '10px 0 0',
                                 display: 'block',
-                                background: '#ede6ff',
-                                border: 'none',
-                                color: '#5b3ad1',
-                                fontSize: '13px',
+                                background: 'transparent',
+                                border: '1.5px dashed #c4b5fd',
+                                color: '#6c3bff',
+                                fontSize: '12.5px',
                                 fontWeight: 600,
                                 borderRadius: 8,
-                                padding: '8px 18px',
+                                padding: '8px 14px',
                                 cursor: isLoadingMore ? 'wait' : 'pointer',
-                                boxShadow: '0 2px 8px rgba(90,48,255,0.08)',
-                                opacity: isLoadingMore ? 0.7 : 1,
+                                opacity: isLoadingMore ? 0.6 : 1,
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                textAlign: 'center',
                               }}
                               onClick={() => loadMoreForColumn(column.id)}
                               title={`${loadedInColumn} de ${totalInColumn} cards carregados`}
@@ -4288,13 +4287,15 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                             </button>
                           )}
                           {columnCards.length === 0 && totalInColumn === 0 && (
-                            <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
+                            <div style={{ textAlign: "center", padding: "38px 16px", color: "#b9aee8", fontSize: "13px" }}>
+                              <div style={{ fontSize: 24, marginBottom: 8, opacity: 0.4 }}>▭</div>
                               Nenhum card
                             </div>
                           )}
                           {columnCards.length === 0 && totalInColumn > 0 && (
-                            <div style={{ textAlign: "center", padding: "42px 16px", color: "#8a79c2", fontSize: "13px" }}>
-                              {totalInColumn} card(s) ocultos pelos filtros atuais.
+                            <div style={{ textAlign: "center", padding: "38px 16px", color: "#b9aee8", fontSize: "12.5px" }}>
+                              <div style={{ fontSize: 24, marginBottom: 8, opacity: 0.4 }}>◎</div>
+                              {totalInColumn} card(s) ocultos pelos filtros ativos.
                             </div>
                           )}
                         </DroppableColumn>
@@ -4894,40 +4895,61 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
             )}
                 </div>
 
-            {/* Botões de ação do card */}
-            <div style={styles.detailsActions}>
-              <button 
-                onClick={() => { 
-                  setEditingCard(selectedCard); 
-                  setIsEditCardOpen(true); 
-                  setSelectedCard(null); 
-                }} 
-                style={{ ...styles.cancelBtn, background: "#e3f2fd", color: "#1565c0" }}
+            {/* Botões de ação do card — colapsáveis */}
+            <div style={{ marginTop: 12 }}>
+              <button
+                onClick={() => setShowCardActions((v) => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#7c6fb7", fontSize: 13, fontWeight: 600, padding: "4px 0",
+                }}
               >
-                <Pencil size={14} style={{ marginRight: 6, verticalAlign: "text-bottom" }} /> Editar
+                <span style={{
+                  display: "inline-block",
+                  transition: "transform 200ms",
+                  transform: showCardActions ? "rotate(90deg)" : "rotate(0deg)",
+                  fontSize: 11,
+                }}>▶</span>
+                Ações do card
               </button>
-              <button onClick={handleSaveCardChanges} style={styles.cancelBtn}>
-                Salvar alterações
-              </button>
-              <button onClick={handleDuplicateCard} style={{ ...styles.cancelBtn, background: "#ebf2ff", color: "#1f4baf" }}>
-                Duplicar
-              </button>
-              {canTransferTo.map((toBoard) => (
-                <button
-                  key={toBoard}
-                  onClick={() => openTransferDialog(selectedCard, toBoard)}
-                  style={{ ...styles.cancelBtn, background: "#f5edff", color: "#5a30ff" }}
-                  title={`Move este card para o Kanban ${BOARD_LABELS[toBoard]} (registra comentário de sistema).`}
-                >
-                  Transferir para {BOARD_LABELS[toBoard]}
-                </button>
-              ))}
-              <button onClick={handleArchiveCard} style={{ ...styles.cancelBtn, background: "#f0fdf4", color: "#16a34a" }}>
-                Arquivar
-              </button>
-              <button onClick={handleDeleteCard} style={{ ...styles.cancelBtn, background: "#ffe9e4", color: "#b33524" }}>
-                Excluir
-              </button>
+
+              {showCardActions && (
+                <div style={{ ...styles.detailsActions, marginTop: 8 }}>
+                  <button
+                    onClick={() => {
+                      setEditingCard(selectedCard);
+                      setIsEditCardOpen(true);
+                      setSelectedCard(null);
+                    }}
+                    style={{ ...styles.cancelBtn, background: "#e3f2fd", color: "#1565c0" }}
+                  >
+                    <Pencil size={14} style={{ marginRight: 6, verticalAlign: "text-bottom" }} /> Editar
+                  </button>
+                  <button onClick={handleSaveCardChanges} style={styles.cancelBtn}>
+                    Salvar alterações
+                  </button>
+                  <button onClick={handleDuplicateCard} style={{ ...styles.cancelBtn, background: "#ebf2ff", color: "#1f4baf" }}>
+                    Duplicar
+                  </button>
+                  {canTransferTo.map((toBoard) => (
+                    <button
+                      key={toBoard}
+                      onClick={() => openTransferDialog(selectedCard, toBoard)}
+                      style={{ ...styles.cancelBtn, background: "#f5edff", color: "#5a30ff" }}
+                      title={`Move este card para o Kanban ${BOARD_LABELS[toBoard]} (registra comentário de sistema).`}
+                    >
+                      Transferir para {BOARD_LABELS[toBoard]}
+                    </button>
+                  ))}
+                  <button onClick={handleArchiveCard} style={{ ...styles.cancelBtn, background: "#f0fdf4", color: "#16a34a" }}>
+                    Arquivar
+                  </button>
+                  <button onClick={handleDeleteCard} style={{ ...styles.cancelBtn, background: "#ffe9e4", color: "#b33524" }}>
+                    Excluir
+                  </button>
+                </div>
+              )}
             </div>
             </div>
             
