@@ -21,6 +21,7 @@ export default function Sidebar({ isOpen = true, onNavigate }) {
     ...(canSeeAgendaDelivery ? [{ name: "Agenda Team", icon: "⬡", path: "/agenda-delivery" }] : []),
     { name: "Ramais",          icon: "✆",  path: "/ramais" },
     { name: "Mural",           icon: "◈",  path: "/mural" },
+    { name: "Notas",           icon: "🗒️", path: "/notas" },
     { name: "Consulta IA",    icon: "🤖", path: "/buscar-provedores" },
     ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "◉", path: "/admin/users" }] : []),
   ];
@@ -33,6 +34,7 @@ export default function Sidebar({ isOpen = true, onNavigate }) {
     "/agenda-delivery": "🛵",
     "/ramais":          "📞",
     "/mural":              "📝",
+    "/notas":              "🗒️",
     "/buscar-provedores":  "🤖",
     "/admin/users":        "👥",
   };

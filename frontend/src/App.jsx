@@ -20,12 +20,13 @@ import BuscarProvedores from "./pages/BuscarProvedores";
 import AdminUsers from "./pages/AdminUsers";
 import Arquivados from "./pages/Arquivados";
 import Lixeira from "./pages/Lixeira";
+import Notas from "./pages/Notas";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users", "/buscar-provedores"];
+const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users", "/buscar-provedores", "/notas"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
@@ -168,6 +169,7 @@ function MainLayout() {
             <Route path="/agenda-delivery" element={<DeliveryAgendaRoute><AgendaDelivery /></DeliveryAgendaRoute>} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/notas" element={<Notas />} />
             <Route path="/arquivados" element={<Arquivados />} />
             <Route path="/lixeira" element={<AdminRoute><Lixeira /></AdminRoute>} />
             <Route path="/ramais" element={<RamaisPage />} />
