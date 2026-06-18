@@ -171,7 +171,7 @@ function MainLayout() {
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/notas" element={<Notas />} />
             <Route path="/arquivados" element={<Arquivados />} />
-            <Route path="/lixeira" element={<AdminRoute><Lixeira /></AdminRoute>} />
+            <Route path="/lixeira" element={<Lixeira />} />
             <Route path="/ramais" element={<RamaisPage />} />
             <Route path="/mural" element={<MuralPage />} />
             <Route path="/buscar-provedores" element={<BuscarProvedores />} />

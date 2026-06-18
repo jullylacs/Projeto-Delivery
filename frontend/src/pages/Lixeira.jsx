@@ -30,7 +30,7 @@ const BOARD_COLOR = {
   bko:       { bg: "#fef3c7", color: "#92400e" },
 };
 
-function CardLixeira({ card, onRestaurar, onExcluir, processando }) {
+function CardLixeira({ card, onRestaurar, onExcluir, processando, podeExcluirPermanente }) {
   const [confirmando, setConfirmando] = useState(false);
   const dias = diasRestantes(card.deleted_at);
   const cor = corDias(dias);
@@ -145,15 +145,17 @@ function CardLixeira({ card, onRestaurar, onExcluir, processando }) {
             >
               ↩ Restaurar
             </button>
-            <button
-              onClick={() => setConfirmando(true)}
-              disabled={processando}
-              style={btnStyle("#fff5f5", "#dc2626", "#fecaca")}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#fee2e2"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "#fff5f5"; }}
-            >
-              ✕ Excluir
-            </button>
+            {podeExcluirPermanente && (
+              <button
+                onClick={() => setConfirmando(true)}
+                disabled={processando}
+                style={btnStyle("#fff5f5", "#dc2626", "#fecaca")}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#fee2e2"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#fff5f5"; }}
+              >
+                ✕ Excluir
+              </button>
+            )}
           </>
         )}
       </div>
@@ -200,6 +202,9 @@ export default function Lixeira() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
   const [processandoId, setProcessandoId] = useState(null);
+
+  const userData = JSON.parse(localStorage.getItem("user") || "null");
+  const podeExcluirPermanente = ["admin", "gestor"].includes(userData?.perfil);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -394,6 +399,7 @@ export default function Lixeira() {
                     onRestaurar={restaurar}
                     onExcluir={excluirPermanente}
                     processando={processandoId === card.id}
+                    podeExcluirPermanente={podeExcluirPermanente}
                   />
                 ))}
               </div>

@@ -11,8 +11,8 @@ router.post("/", auth, controller.createCard);
 router.get("/board-summary", auth, controller.getBoardSummary);
 
 // ─── Lixeira (soft-delete) ───────────────────────────────────────────────────
-router.get("/trash", auth, requireManagerOrAdmin, controller.getTrash);
-router.post("/:id/restore", auth, requireManagerOrAdmin, controller.restoreCard);
+router.get("/trash", auth, controller.getTrash);
+router.post("/:id/restore", auth, controller.restoreCard);
 router.delete("/:id/permanent", auth, requireManagerOrAdmin, controller.permanentDeleteCard);
 
 // ─── Arquivo ─────────────────────────────────────────────────────────────────
