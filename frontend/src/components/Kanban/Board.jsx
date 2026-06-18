@@ -1,4 +1,5 @@
 ﻿import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -720,8 +721,9 @@ const styles = {
     marginBottom: "20px",
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "10px",
+    flexWrap: "wrap",
   },
   title: {
     color: "#3c2f9f",
@@ -1644,6 +1646,158 @@ const DraggableCard = memo(function DraggableCard({ card, onOpen, densityCfg, is
   );
 });
 
+// Input de edição de reply — estado local para não re-renderizar o Board a cada tecla.
+function ReplyEditTextarea({ initialText, onSave, onCancel }) {
+  const [text, setText] = useState(initialText);
+  return (
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onSave(text);
+          if (e.key === 'Escape') onCancel();
+        }}
+        placeholder="Edite a resposta… Ctrl+Enter para salvar"
+        rows={2}
+        autoFocus
+        style={{
+          width: '100%',
+          border: '1.5px solid #c4b5fd',
+          background: 'var(--bg-input)',
+          color: 'var(--text)',
+          borderRadius: 8,
+          fontSize: 12,
+          padding: '7px 9px',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+          lineHeight: 1.5,
+          boxSizing: 'border-box',
+          outline: 'none',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          type="button"
+          onClick={() => onSave(text)}
+          style={{ border: 'none', background: '#6f57e8', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px' }}
+        >
+          Salvar
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Input de nova reply — estado local para não re-renderizar o Board a cada tecla.
+function NewReplyInput({ commentId, onSubmit, onCancel, directoryUsers }) {
+  const [text, setText] = useState('');
+  const [mentionQuery, setMentionQuery] = useState(null);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setText(val);
+    const atIdx = val.lastIndexOf('@');
+    if (atIdx !== -1) {
+      const afterAt = val.slice(atIdx + 1);
+      if (!afterAt.includes(' ')) {
+        setMentionQuery(afterAt.toLowerCase());
+        return;
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') setMentionQuery(null);
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !mentionQuery) onSubmit(text);
+  };
+
+  const insertMention = (nome) => {
+    const atIdx = text.lastIndexOf('@');
+    const newText = text.slice(0, atIdx) + '@' + nome + ' ';
+    setText(newText);
+    setMentionQuery(null);
+  };
+
+  const filtered = mentionQuery !== null
+    ? (directoryUsers || [])
+        .filter((u) => u.nome?.toLowerCase().includes(mentionQuery) || u.email?.toLowerCase().includes(mentionQuery))
+        .slice(0, 6)
+    : [];
+
+  return (
+    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <textarea
+          value={text}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onBlur={() => setTimeout(() => setMentionQuery(null), 150)}
+          placeholder="Escreva uma resposta… use @ para mencionar · Ctrl+Enter para enviar"
+          rows={2}
+          style={{
+            width: '100%',
+            border: '1.5px solid var(--border)',
+            background: 'var(--bg-input)',
+            color: 'var(--text)',
+            borderRadius: 8,
+            fontSize: 12,
+            padding: '8px 10px',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'inherit',
+            lineHeight: 1.5,
+            outline: 'none',
+          }}
+        />
+        {filtered.length > 0 && (
+          <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#fff', border: '1px solid #d8cdfd', borderRadius: 10, boxShadow: '0 4px 16px rgba(90,60,180,0.14)', zIndex: 9999, overflow: 'hidden' }}>
+            {filtered.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); insertMention(u.nome); }}
+                style={{ width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: '#3f3292', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f0ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6c3bff', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                  {u.nome?.charAt(0)?.toUpperCase()}
+                </span>
+                {u.nome}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={() => onSubmit(text)}
+          style={{ border: 'none', background: '#6f57e8', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px' }}
+        >
+          Responder
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Zona de drop flutuante para transferir um card entre Kanbans.
 // Visível apenas durante o drag de um card e quando há outro board acessível.
 function TransferDropZone({ toBoard }) {
@@ -1674,6 +1828,7 @@ function TransferDropZone({ toBoard }) {
 
 // Componente principal do Kanban Board
 export default function Board({ board = "delivery", canTransferTo = [], onTransferred }) {
+  const navigate = useNavigate();
   const safeBoard = VALID_BOARDS.includes(board) ? board : "delivery";
   const boardLabel = BOARD_LABELS[safeBoard] || "Delivery";
 
@@ -1692,11 +1847,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   // Remover o estado global do comentário para evitar re-renderizações pesadas
   // O estado do texto do comentário será controlado apenas dentro do CommentInput
   const [isCommentComposerOpen, setIsCommentComposerOpen] = useState(false);
-  const [replyDraftByCommentId, setReplyDraftByCommentId] = useState({});
   const [activeReplyCommentId, setActiveReplyCommentId] = useState(null);
   const [editingReplyKey, setEditingReplyKey] = useState(null);
-  const [editingReplyText, setEditingReplyText] = useState("");
-  const [replyMentionQueryByCommentId, setReplyMentionQueryByCommentId] = useState({});
   const [hoveredReactionKey, setHoveredReactionKey] = useState(null);
   const [vendorEdit, setVendorEdit] = useState("");
   const [vendorSearchCreate, setVendorSearchCreate] = useState("");
@@ -1885,7 +2037,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
           const updatedCard = response.data;
 
           // Atualiza o estado local com o card modificado
-          promoteUpdatedCardToTop(updatedCard);
+          // skipColumnAdjust=true pois os totais já foram ajustados otimisticamente acima
+          promoteUpdatedCardToTop(updatedCard, { skipColumnAdjust: true });
 
           // Se o card selecionado foi movido, atualiza também no modal de detalhes
           if (selectedCard && getCardKey(selectedCard) === getCardKey(updatedCard)) {
@@ -2611,10 +2764,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     setVendorSearchDetails("");
     // setCommentText removido (não existe mais)
     setIsCommentComposerOpen(false);
-    setReplyDraftByCommentId({});
     setActiveReplyCommentId(null);
     setEditingReplyKey(null);
-    setEditingReplyText("");
     setPendingAttachments([]); // Corrige: limpa anexos pendentes
     setPreviewImage(null);
     setPreviewZoom(1);
@@ -2661,9 +2812,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     }
   };
 
-  const handleAddReply = async (commentId) => {
+  const handleAddReply = async (commentId, text) => {
     if (!selectedCard) return;
-    const rawReply = String(replyDraftByCommentId?.[commentId] || "").trim();
+    const rawReply = String(text || "").trim();
     if (!rawReply) return;
 
     try {
@@ -2672,7 +2823,6 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
         { text: rawReply }
       );
       applyServerCard(res.data);
-      setReplyDraftByCommentId((prev) => ({ ...prev, [commentId]: "" }));
       setActiveReplyCommentId(null);
     } catch {
       setError("Erro ao responder comentário");
@@ -2683,17 +2833,15 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
 
   const handleStartEditReply = (commentId, reply) => {
     setEditingReplyKey(getReplyEditKey(commentId, reply?.id));
-    setEditingReplyText(String(reply?.text || ""));
   };
 
   const handleCancelEditReply = () => {
     setEditingReplyKey(null);
-    setEditingReplyText("");
   };
 
-  const handleSaveEditReply = async (commentId, replyId) => {
+  const handleSaveEditReply = async (commentId, replyId, text) => {
     if (!selectedCard) return;
-    const nextText = String(editingReplyText || "").trim();
+    const nextText = String(text || "").trim();
     if (!nextText) return;
 
     try {
@@ -2879,7 +3027,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     }
   };
 
-  // Exclui card permanentemente
+  // Move card para a lixeira (soft-delete)
   const handleDeleteCard = async () => {
     if (!selectedCard) return;
 
@@ -2888,10 +3036,25 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       await api.delete(`/cards/${getCardKey(selectedCard)}`);
       setCards((prev) => prev.filter((c) => getCardKey(c) !== getCardKey(selectedCard)));
       adjustColumnTotal(deletedColumnId, -1);
-      handleCloseCard(); // Fecha modal após exclusão
+      handleCloseCard();
     } catch (err) {
       console.error("Erro ao deletar card", err);
       setError("Erro ao deletar card");
+    }
+  };
+
+  // Arquiva card (some do Kanban, fica em Arquivados)
+  const handleArchiveCard = async () => {
+    if (!selectedCard) return;
+    const archivedColumnId = getCardColumnId(selectedCard);
+    try {
+      await api.post(`/cards/${getCardKey(selectedCard)}/archive`);
+      setCards((prev) => prev.filter((c) => getCardKey(c) !== getCardKey(selectedCard)));
+      adjustColumnTotal(archivedColumnId, -1);
+      handleCloseCard();
+    } catch (err) {
+      console.error("Erro ao arquivar card", err);
+      setError("Erro ao arquivar card");
     }
   };
 
@@ -3408,19 +3571,23 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     [cards, activeId]
   );
 
-  const promoteUpdatedCardToTop = (updatedCard) => {
+  const promoteUpdatedCardToTop = (updatedCard, { skipColumnAdjust = false } = {}) => {
     const enriched = enrichCardWithUpdater(updatedCard);
     const updatedId = getCardKey(enriched);
 
     // Detecta mudança de coluna fora do setCards para evitar side-effects duplos
     // causados pelo StrictMode (React 18 invoca updaters duas vezes em dev).
-    const previous = cards.find((card) => getCardKey(card) === updatedId);
-    if (previous) {
-      const prevCol = getCardColumnId(previous);
-      const newCol = getCardColumnId(enriched);
-      if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
-        adjustColumnTotal(prevCol, -1);
-        adjustColumnTotal(newCol, +1);
+    // skipColumnAdjust=true quando o chamador já ajustou os totais otimisticamente
+    // (ex: handleDragEnd), para evitar duplo ajuste por stale closure.
+    if (!skipColumnAdjust) {
+      const previous = cards.find((card) => getCardKey(card) === updatedId);
+      if (previous) {
+        const prevCol = getCardColumnId(previous);
+        const newCol = getCardColumnId(enriched);
+        if (Number.isFinite(prevCol) && Number.isFinite(newCol) && prevCol !== newCol) {
+          adjustColumnTotal(prevCol, -1);
+          adjustColumnTotal(newCol, +1);
+        }
       }
     }
 
@@ -3525,7 +3692,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
       </style>
       <div style={styles.header}>
         <h1 style={styles.title}><ClipboardList size={24} style={{ marginRight: 8, verticalAlign: "text-bottom" }} />Kanban {boardLabel}</h1>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <div style={styles.densityGroup}>
             {[
               { key: "mini", label: "Mini" },
@@ -3561,6 +3728,21 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
               Cancelar seleção
             </button>
           )}
+          {/* Atalhos para Arquivados e Lixeira */}
+          <button
+            style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, color: '#16a34a', fontWeight: 600, padding: '10px 16px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => navigate('/arquivados')}
+            title="Ver cards arquivados"
+          >
+            📦 Arquivados
+          </button>
+          <button
+            style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', fontWeight: 600, padding: '10px 16px', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => navigate('/lixeira')}
+            title="Ver cards na lixeira"
+          >
+            🗑️ Lixeira
+          </button>
           {/* Botão para criar novo card */}
           <button
             style={styles.addButton}
@@ -4133,8 +4315,10 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
             </div>
           ) : null}
         </DragOverlay>
-        {/* Zonas de transferência entre Kanbans — só aparecem durante drag de um card. */}
-        {canTransferTo.length > 0 && !!activeId && (
+        {/* Zonas de transferência entre Kanbans — sempre montadas para evitar problema
+            de timing no DnD-kit: se renderizadas apenas quando activeId está set,
+            o useDroppable pode não registrar a zona antes do usuário soltar o card. */}
+        {canTransferTo.length > 0 && (
           <div style={{
             position: "fixed",
             bottom: 24,
@@ -4144,6 +4328,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
             display: "flex",
             gap: 12,
             pointerEvents: "none",
+            opacity: activeId ? 1 : 0,
+            visibility: activeId ? "visible" : "hidden",
+            transition: "opacity 150ms ease",
           }}>
             {canTransferTo.map((toBoard) => (
               <TransferDropZone key={toBoard} toBoard={toBoard} />
@@ -4735,6 +4922,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   Transferir para {BOARD_LABELS[toBoard]}
                 </button>
               ))}
+              <button onClick={handleArchiveCard} style={{ ...styles.cancelBtn, background: "#f0fdf4", color: "#16a34a" }}>
+                Arquivar
+              </button>
               <button onClick={handleDeleteCard} style={{ ...styles.cancelBtn, background: "#ffe9e4", color: "#b33524" }}>
                 Excluir
               </button>
@@ -5030,48 +5220,11 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                                   </div>
 
                                   {isEditingThisReply ? (
-                                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                      <textarea
-                                        value={editingReplyText}
-                                        onChange={(e) => setEditingReplyText(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveEditReply(comment.id, reply.id);
-                                          if (e.key === 'Escape') handleCancelEditReply();
-                                        }}
-                                        placeholder="Edite a resposta… Ctrl+Enter para salvar"
-                                        rows={2}
-                                        style={{
-                                          width: '100%',
-                                          border: '1.5px solid #c4b5fd',
-                                          background: 'var(--bg-input)',
-                                          color: 'var(--text)',
-                                          borderRadius: 8,
-                                          fontSize: 12,
-                                          padding: '7px 9px',
-                                          resize: 'vertical',
-                                          fontFamily: 'inherit',
-                                          lineHeight: 1.5,
-                                          boxSizing: 'border-box',
-                                          outline: 'none',
-                                        }}
-                                      />
-                                      <div style={{ display: 'flex', gap: 6 }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSaveEditReply(comment.id, reply.id)}
-                                          style={{ border: 'none', background: '#6f57e8', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px' }}
-                                        >
-                                          Salvar
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={handleCancelEditReply}
-                                          style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
-                                        >
-                                          Cancelar
-                                        </button>
-                                      </div>
-                                    </div>
+                                    <ReplyEditTextarea
+                                      initialText={reply.text || ''}
+                                      onSave={(text) => handleSaveEditReply(comment.id, reply.id, text)}
+                                      onCancel={handleCancelEditReply}
+                                    />
                                   ) : (
                                     <div style={{ fontSize: 13, color: 'var(--text)', marginTop: 6, lineHeight: 1.55 }}>{renderCommentMarkdownWithMentions(reply.text, mentionProfileLookup)}</div>
                                   )}
@@ -5082,98 +5235,13 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       )}
 
                       {String(activeReplyCommentId) === String(comment.id) && (
-                        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <div style={{ flex: 1, position: 'relative' }}>
-                            <textarea
-                              value={replyDraftByCommentId?.[comment.id] || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: val }));
-                                const atIdx = val.lastIndexOf('@');
-                                if (atIdx !== -1) {
-                                  const afterAt = val.slice(atIdx + 1);
-                                  if (!afterAt.includes(' ')) {
-                                    setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: afterAt.toLowerCase() }));
-                                    return;
-                                  }
-                                }
-                                setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Escape') setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
-                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !replyMentionQueryByCommentId?.[comment.id]) handleAddReply(comment.id);
-                              }}
-                              onBlur={() => setTimeout(() => setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null })), 150)}
-                              placeholder="Escreva uma resposta… use @ para mencionar · Ctrl+Enter para enviar"
-                              rows={2}
-                              style={{
-                                width: '100%',
-                                border: '1.5px solid var(--border)',
-                                background: 'var(--bg-input)',
-                                color: 'var(--text)',
-                                borderRadius: 8,
-                                fontSize: 12,
-                                padding: '8px 10px',
-                                boxSizing: 'border-box',
-                                resize: 'vertical',
-                                fontFamily: 'inherit',
-                                lineHeight: 1.5,
-                                outline: 'none',
-                              }}
-                            />
-                            {/* Dropdown de menção */}
-                            {replyMentionQueryByCommentId?.[comment.id] !== null &&
-                             replyMentionQueryByCommentId?.[comment.id] !== undefined && (() => {
-                              const query = replyMentionQueryByCommentId[comment.id] || '';
-                              const filtered = (directoryUsers || [])
-                                .filter((u) => u.nome?.toLowerCase().includes(query) || u.email?.toLowerCase().includes(query))
-                                .slice(0, 6);
-                              if (!filtered.length) return null;
-                              return (
-                                <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#fff', border: '1px solid #d8cdfd', borderRadius: 10, boxShadow: '0 4px 16px rgba(90,60,180,0.14)', zIndex: 9999, overflow: 'hidden' }}>
-                                  {filtered.map((u) => (
-                                    <button
-                                      key={u.id}
-                                      type="button"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        const current = replyDraftByCommentId?.[comment.id] || '';
-                                        const atIdx = current.lastIndexOf('@');
-                                        const newText = current.slice(0, atIdx) + '@' + u.nome + ' ';
-                                        setReplyDraftByCommentId((prev) => ({ ...prev, [comment.id]: newText }));
-                                        setReplyMentionQueryByCommentId((prev) => ({ ...prev, [comment.id]: null }));
-                                      }}
-                                      style={{ width: '100%', padding: '7px 12px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontSize: 12, color: '#3f3292', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
-                                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f0ff'; }}
-                                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                                    >
-                                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#6c3bff', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
-                                        {u.nome?.charAt(0)?.toUpperCase()}
-                                      </span>
-                                      {u.nome}
-                                    </button>
-                                  ))}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                            <button
-                              type="button"
-                              onClick={() => setActiveReplyCommentId(null)}
-                              style={{ border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '6px 12px' }}
-                            >
-                              Cancelar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAddReply(comment.id)}
-                              style={{ border: 'none', background: 'linear-gradient(135deg, #6c3bff, #9b6dff)', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', padding: '6px 14px', boxShadow: '0 2px 8px rgba(108,59,255,0.25)' }}
-                            >
-                              Responder
-                            </button>
-                          </div>
-                        </div>
+                        <NewReplyInput
+                          key={comment.id}
+                          commentId={comment.id}
+                          onSubmit={(text) => handleAddReply(comment.id, text)}
+                          onCancel={() => setActiveReplyCommentId(null)}
+                          directoryUsers={directoryUsers}
+                        />
                       )}
 
                       {/* Exibe múltiplos anexos se houver attachments (array), senão exibe attachment único */}

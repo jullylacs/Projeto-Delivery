@@ -393,3 +393,36 @@ html[data-theme="dark"] .badge-pinned {
 .agenda-btn-nav:hover {
   background: #f0eaff !important;
 }
+
+/* ============================================================
+   RESPONSIVIDADE
+   ============================================================ */
+
+/* Tablet e mobile: padding menor na área de conteúdo */
+@media (max-width: 768px) {
+  .content-area {
+    padding: 12px !important;
+  }
+
+  /* Kanban: scroll horizontal na tabela */
+  .kanban-scroll-area {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Títulos de página menores */
+  h1 { font-size: 18px !important; }
+  h2 { font-size: 16px !important; }
+}
+
+/* Mobile pequeno */
+@media (max-width: 480px) {
+  .content-area {
+    padding: 8px !important;
+  }
+
+  /* Notificações em tela cheia no mobile */
+  .notifications-panel {
+    width: 100vw !important;
+  }
+}

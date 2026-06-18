@@ -878,13 +878,15 @@ export default function MuralPage() {
   }, []);
 
   // ── Formatação de texto ────────────────────────────────────────────────────
+  // Lê node.value diretamente do DOM para evitar stale closure com React Compiler.
   const applyInlineFormat = (prefix, suffix = prefix) => {
     const node = textAreaRef.current;
     if (!node) return;
-    const start = node.selectionStart ?? novoPost.length;
-    const end = node.selectionEnd ?? novoPost.length;
-    const selected = novoPost.slice(start, end) || "texto";
-    const next = `${novoPost.slice(0, start)}${prefix}${selected}${suffix}${novoPost.slice(end)}`;
+    const text = node.value;
+    const start = node.selectionStart ?? text.length;
+    const end = node.selectionEnd ?? text.length;
+    const selected = text.slice(start, end) || "texto";
+    const next = `${text.slice(0, start)}${prefix}${selected}${suffix}${text.slice(end)}`;
     setNovoPost(next);
     requestAnimationFrame(() => {
       node.focus();
@@ -894,11 +896,12 @@ export default function MuralPage() {
   const applyLinePrefix = (prefix) => {
     const node = textAreaRef.current;
     if (!node) return;
-    const start = node.selectionStart ?? novoPost.length;
-    const end = node.selectionEnd ?? novoPost.length;
-    const block = novoPost.slice(start, end) || "item";
+    const text = node.value;
+    const start = node.selectionStart ?? text.length;
+    const end = node.selectionEnd ?? text.length;
+    const block = text.slice(start, end) || "item";
     const prefixed = block.split("\n").map(l => l.trim() ? `${prefix}${l}` : l).join("\n");
-    const next = `${novoPost.slice(0, start)}${prefixed}${novoPost.slice(end)}`;
+    const next = `${text.slice(0, start)}${prefixed}${text.slice(end)}`;
     setNovoPost(next);
     requestAnimationFrame(() => { node.focus(); node.setSelectionRange(start, start + prefixed.length); });
   };

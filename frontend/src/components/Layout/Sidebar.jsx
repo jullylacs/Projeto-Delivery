@@ -1,12 +1,17 @@
 import { useNavigate, useLocation } from "react-router-dom";
 
-export default function Sidebar({ isOpen = true }) {
+export default function Sidebar({ isOpen = true, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   const canSeeAgendaDelivery = ["delivery", "admin", "noc"].includes(user?.perfil);
+
+  function handleNav(path) {
+    navigate(path);
+    onNavigate?.();
+  }
 
   const menuItems = [
     { name: "Dashboard",       icon: "⊞",  path: "/dashboard" },
@@ -55,7 +60,7 @@ export default function Sidebar({ isOpen = true }) {
     >
       {/* Logo */}
       <div
-        onClick={() => navigate("/dashboard")}
+        onClick={() => handleNav("/dashboard")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -99,7 +104,7 @@ export default function Sidebar({ isOpen = true }) {
           return (
             <div
               key={index}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               style={{
                 display: "flex",
                 alignItems: "center",

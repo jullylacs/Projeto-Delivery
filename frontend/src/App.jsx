@@ -1,24 +1,25 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import useWindowWidth from "./hooks/useWindowWidth";
 
 // Aplica o tema salvo antes de qualquer render
 const savedTheme = localStorage.getItem("theme");
 if (savedTheme) document.documentElement.dataset.theme = savedTheme;
-// Importa componentes do React Router para controle de rotas
 
-import Sidebar from "./components/Layout/Sidebar"; // Barra lateral do layout
-import Header from "./components/Layout/Header";   // Cabeçalho do layout
-import Dashboard from "./pages/Dashboard";        // Página Dashboard
-import Graficos from "./pages/Graficos";           // Página Gráficos
-import Kanban from "./pages/Kanban";              // Página Kanban
-import Agenda from "./pages/Agenda";              // Página Agenda
-import AgendaDelivery from "./pages/AgendaDelivery"; // Página Agenda Delivery
-import Profile from "./pages/Profile";            // Página Profile
+import Sidebar from "./components/Layout/Sidebar";
+import Header from "./components/Layout/Header";
+import Dashboard from "./pages/Dashboard";
+import Graficos from "./pages/Graficos";
+import Kanban from "./pages/Kanban";
+import Agenda from "./pages/Agenda";
+import AgendaDelivery from "./pages/AgendaDelivery";
+import Profile from "./pages/Profile";
 import RamaisPage from "./pages/Ramais";
 import MuralPage from "./pages/Mural";
 import BuscarProvedores from "./pages/BuscarProvedores";
-
 import AdminUsers from "./pages/AdminUsers";
+import Arquivados from "./pages/Arquivados";
+import Lixeira from "./pages/Lixeira";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
@@ -29,24 +30,19 @@ const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agend
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
-
   if (!user || !["admin", "gestor"].includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
-
   return children;
 }
 
-// Libera a rota apenas para quem pode acessar a Agenda Delivery.
 function DeliveryAgendaRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
   const allowed = ["delivery", "admin", "noc"];
-
   if (!user || !allowed.includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
-
   return children;
 }
 
@@ -57,52 +53,106 @@ function getLastPrivateRoute() {
 
 function LastRouteTracker() {
   const location = useLocation();
-
   useEffect(() => {
     if (PRIVATE_ROUTES.includes(location.pathname)) {
       localStorage.setItem(LAST_PRIVATE_ROUTE_KEY, location.pathname);
     }
   }, [location.pathname]);
-
   return null;
 }
 
 function MainLayout() {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 768;
   const restoreRoute = getLastPrivateRoute();
+  const location = useLocation();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (window.innerWidth < 768) return false;
     const saved = localStorage.getItem(SIDEBAR_OPEN_KEY);
     return saved === null ? true : saved === "true";
   });
 
+  // Persiste preferência só no desktop
   useEffect(() => {
-    localStorage.setItem(SIDEBAR_OPEN_KEY, String(isSidebarOpen));
-  }, [isSidebarOpen]);
+    if (!isMobile) {
+      localStorage.setItem(SIDEBAR_OPEN_KEY, String(isSidebarOpen));
+    }
+  }, [isSidebarOpen, isMobile]);
+
+  // Fecha sidebar ao navegar no mobile
+  useEffect(() => {
+    if (isMobile) setIsSidebarOpen(false);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ao redimensionar para desktop, restaura preferência salva
+  const prevIsMobile = useRef(isMobile);
+  useEffect(() => {
+    if (prevIsMobile.current && !isMobile) {
+      const saved = localStorage.getItem(SIDEBAR_OPEN_KEY);
+      setIsSidebarOpen(saved === null ? true : saved === "true");
+    }
+    if (!prevIsMobile.current && isMobile) {
+      setIsSidebarOpen(false);
+    }
+    prevIsMobile.current = isMobile;
+  }, [isMobile]);
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "#f2efff", color: "#1f2b46", width: "100%", minWidth: 0, overflow: "hidden", position: "relative" }}>
       <LastRouteTracker />
-      {/* Layout principal: sidebar à esquerda e conteúdo à direita */}
 
-      <div
-        style={{
+      {/* ── Desktop: sidebar empurra o conteúdo ── */}
+      {!isMobile && (
+        <div style={{
           width: isSidebarOpen ? 250 : 0,
           minWidth: 0,
           transition: "width 320ms ease",
           overflow: "hidden",
           flexShrink: 0,
-        }}
-      >
-        <Sidebar isOpen={isSidebarOpen} />
-      </div>
+        }}>
+          <Sidebar isOpen={isSidebarOpen} />
+        </div>
+      )}
 
+      {/* ── Mobile: sidebar como overlay ── */}
+      {isMobile && (
+        <>
+          {/* Backdrop */}
+          {isSidebarOpen && (
+            <div
+              onClick={() => setIsSidebarOpen(false)}
+              style={{
+                position: "fixed", inset: 0,
+                background: "rgba(0,0,0,0.5)",
+                zIndex: 998,
+              }}
+            />
+          )}
+          {/* Sidebar deslizante */}
+          <div style={{
+            position: "fixed", top: 0, left: 0,
+            height: "100vh", zIndex: 999,
+            transform: isSidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 320ms cubic-bezier(0.4,0,0.2,1)",
+          }}>
+            <Sidebar isOpen={true} onNavigate={() => setIsSidebarOpen(false)} />
+          </div>
+        </>
+      )}
+
+      {/* Área principal */}
       <div style={{ flex: 1, minWidth: 0, background: "#f2efff", color: "#1f2b46", overflow: "hidden" }}>
-        {/* Área principal: Header no topo e conteúdo abaixo */}
-        <Header onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
+        <Header
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          isSidebarOpen={isSidebarOpen}
+          isMobile={isMobile}
+        />
 
         <div
           className="content-area"
           style={{
-            padding: "20px",
+            padding: isMobile ? "12px" : "20px",
             overflowY: "auto",
             overflowX: "hidden",
             height: "calc(100vh - 62px)",
@@ -110,23 +160,19 @@ function MainLayout() {
             minWidth: 0,
           }}
         >
-          {/* Sub-rotas dentro do layout principal */}
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/graficos" element={<Graficos />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/agenda" element={<Agenda />} />
-            <Route
-              path="/agenda-delivery"
-              element={<DeliveryAgendaRoute><AgendaDelivery /></DeliveryAgendaRoute>}
-            />
+            <Route path="/agenda-delivery" element={<DeliveryAgendaRoute><AgendaDelivery /></DeliveryAgendaRoute>} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/arquivados" element={<Arquivados />} />
+            <Route path="/lixeira" element={<AdminRoute><Lixeira /></AdminRoute>} />
             <Route path="/ramais" element={<RamaisPage />} />
             <Route path="/mural" element={<MuralPage />} />
             <Route path="/buscar-provedores" element={<BuscarProvedores />} />
-
-            {/* Redireciona "/" para última rota privada */}
             <Route path="/" element={<Navigate to={restoreRoute} replace />} />
           </Routes>
         </div>
@@ -138,19 +184,10 @@ function MainLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      {/* BrowserRouter envolve toda a aplicação e permite navegação via URL */}
       <Routes>
-        {/* Define todas as rotas da aplicação */}
-
-        {/* Rotas públicas (sem layout de sidebar/header) */}
-        <Route path="/login" element={<Login />} /> 
-        <Route path="/register" element={<Register />} /> 
-
-        {/* Rotas protegidas / principais da aplicação */}
-        <Route
-          path="/*"
-          element={<MainLayout />}
-        />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/*" element={<MainLayout />} />
       </Routes>
     </BrowserRouter>
   );

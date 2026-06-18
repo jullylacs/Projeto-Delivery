@@ -96,9 +96,32 @@ const Card = sequelize.define("Card", {
     defaultValue: null,
   },
 
+  // Nome do usuário que enviou o card para a lixeira
+  excluido_por_nome: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+  },
+
+  // Data em que o card foi arquivado
+  arquivado_em: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+  },
+
+  // Nome do usuário que arquivou o card
+  arquivado_por_nome: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+  },
+
 }, {
   tableName: "cards",
-  timestamps: true // createdAt e updatedAt automáticos
+  timestamps: true, // createdAt e updatedAt automáticos
+  paranoid: true,   // soft-delete: DELETE vira UPDATE deleted_at = NOW()
+  deletedAt: "deleted_at",
 });
 
 module.exports = Card;

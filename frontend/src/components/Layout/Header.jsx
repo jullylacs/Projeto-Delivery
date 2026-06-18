@@ -18,7 +18,7 @@ const normalizeAvatar = (value) => {
 
 
 // Componente de cabeçalho da aplicação com navegação, busca e menu do usuário
-export default function Header({ onToggleSidebar, isSidebarOpen }) {
+export default function Header({ onToggleSidebar, isSidebarOpen, isMobile = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
@@ -477,21 +477,15 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
             </span>
           </button>
         )}
-        <h2
-          style={{
-            margin: 0,
-            fontWeight: "600",
-            fontSize: "16px",
-            letterSpacing: "0.4px",
-            opacity: 0.95,
-          }}
-        >
-          🚀 NVX Networks
-        </h2>
+        {!isMobile && (
+          <h2 style={{ margin: 0, fontWeight: "600", fontSize: "16px", letterSpacing: "0.4px", opacity: 0.95 }}>
+            🚀 NVX Networks
+          </h2>
+        )}
       </div>
 
       {/* Área direita contendo notificações e menu do usuário */}
-      <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "20px" }}>
 
         {/* Toggle tema claro/escuro */}
         <button
@@ -619,8 +613,10 @@ export default function Header({ onToggleSidebar, isSidebarOpen }) {
               {!showAvatarImage && getInitials(user?.nome)}
             </div>
 
-            {/* Nome do usuário */}
-            <span style={{ fontSize: "14px" }}>{user?.nome || "Usuário"}</span>
+            {/* Nome do usuário — oculto no mobile */}
+            {!isMobile && (
+              <span style={{ fontSize: "14px" }}>{user?.nome || "Usuário"}</span>
+            )}
           </div>
 
           {/* Menu Dropdown */}
