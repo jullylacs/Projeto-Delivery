@@ -982,6 +982,18 @@ exports.deleteComment = async (req, res) => {
     const commentId = String(req.params.commentId || "");
     if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
 
+    // Verifica se o comentário alvo é de sistema antes de mutate
+    const card = await Card.findByPk(cardId, { attributes: ["comments"] });
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    const allComments = Array.isArray(card.comments) ? card.comments : [];
+    const target = allComments.find((c) => String(c.id) === commentId);
+    if (target?.isSystem) {
+      const requester = await User.findByPk(req.userId, { attributes: ["perfil"] });
+      if (!requester || requester.perfil !== "admin") {
+        return res.status(403).json({ error: "Apenas administradores podem excluir comentários do sistema" });
+      }
+    }
+
     const deleterName = await resolveAuthorName(req);
     let found = false;
     await mutateCardComments(cardId, (comments) => {

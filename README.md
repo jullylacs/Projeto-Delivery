@@ -1,6 +1,6 @@
 # NVX Networks — Plataforma Operacional
 
-Plataforma web para gestão operacional e comercial com Kanban multi-board, Agenda, Mural, Ramais, Gráficos e colaboração em tempo real.
+Plataforma web para gestão operacional e comercial com Kanban multi-board, Agenda, Mural, Ramais, Gráficos, Notas Pessoais e colaboração em tempo real.
 
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-4c1d95)
 ![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2B%20Vite-2563eb)
@@ -83,6 +83,21 @@ Sistema que centraliza o fluxo operacional da empresa em múltiplas frentes:
 - Ação "Excluir todos os cards da coluna".
 - Deep-link para card por ID (URL hash e localStorage).
 - Abertura automática do card correto ao clicar em notificação (mesmo em outro board).
+- **Ações do card recolhíveis**: Editar, Salvar, Duplicar, Transferir, Arquivar e Excluir ficam ocultas e aparecem ao clicar no botão de ações — reduz poluição visual.
+- **Header reorganizado**: botões agrupados em toolbar unificada com separadores visuais.
+
+### Lixeira de Cards
+- Ao excluir um card ele vai para a Lixeira em vez de ser apagado imediatamente (soft-delete via campo `deleted_at`).
+- Cards na lixeira são **automaticamente removidos após 30 dias**.
+- Página dedicada (`/lixeira`) acessível apenas por gestor/admin.
+- Suporte a busca por nome, filtro por tipo (Delivery/Comercial/BKO) e restauração individual.
+- Exclusão permanente manual disponível para gestor/admin.
+
+### Arquivar Cards
+- Opção "Arquivar card" nos detalhes do card (campo `arquivado` na tabela `cards`).
+- Cards arquivados saem do board principal sem serem excluídos.
+- Página dedicada (`/arquivados`) acessível a todos os perfis com acesso ao board.
+- Busca e filtro por tipo; possibilidade de desarquivar individual.
 
 ### Comentários e colaboração
 - Formatação rica: **negrito**, *itálico*, listas, citação, código.
@@ -118,6 +133,7 @@ Sistema que centraliza o fluxo operacional da empresa em múltiplas frentes:
 - Donut de status geral (Concluído, Em andamento, Retorno B2B, Retorno Comercial, SLA alerta/vencido).
 - Barras verticais por coluna.
 - Filtro por board.
+- **Auto-refresh silencioso a cada 30 segundos** — dados sempre atualizados sem reload manual; indicador de horário da última atualização no header.
 
 ### Mural Interno
 - Comunicados com formatação Markdown (negrito, itálico, listas, citação, código).
@@ -144,8 +160,17 @@ Sistema que centraliza o fluxo operacional da empresa em múltiplas frentes:
 - Persistência em localStorage.
 - Paleta escura elegante com tintes azul-roxo profundos, sombras corretas para fundo escuro e glow em elementos interativos.
 
+### Notas Pessoais
+- Editor rico estilo Notion com TipTap (negrito, itálico, sublinhado, listas, títulos H1–H3, citação, código, etc.).
+- Auto-save com debounce: título salva em 600 ms, conteúdo em 800 ms — indicador "Salvando…" / "✓ HH:MM".
+- Organização por cores (padrão, amarelo, rosa, verde, azul, roxo) e marcação de favoritas (⭐).
+- Sidebar de notas com busca instantânea, grupo de favoritas e prévia de conteúdo.
+- Conteúdo sanitizado no backend (`sanitize-html`) antes de persistir.
+- Cada usuário vê e edita apenas as próprias notas.
+
 ### UX geral
 - Sidebar recolhível com toggle no header.
+- **Layout responsivo completo**: sidebar se torna overlay deslizante em telas < 768 px; backdrop fecha ao clicar fora; padding e espaçamentos ajustados para mobile.
 - Skeleton loading nas telas principais.
 - Toast de sucesso ao atualizar status de card.
 - Toasts e feedbacks em todas as ações críticas.
@@ -160,7 +185,7 @@ Projeto-Delivery/
 │   ├── src/
 │   │   ├── controllers/       # lógica de negócio
 │   │   │   └── middleware/    # auth, requireAdmin, requireManagerOrAdmin
-│   │   ├── models/            # Sequelize (User, Card, Column, Comment, Notification, AgendaEvento…)
+│   │   ├── models/            # Sequelize (User, Card, Column, Comment, Notification, AgendaEvento, Nota…)
 │   │   ├── routes/            # Express routers versionados
 │   │   ├── database/
 │   │   │   ├── migrations/    # ALTER/CREATE TABLE (histórico completo)
@@ -177,7 +202,8 @@ Projeto-Delivery/
 │   │   │   ├── Layout/        # Header.jsx, Sidebar.jsx
 │   │   │   ├── Modal/
 │   │   │   └── UI/            # RichTextEditor.jsx
-│   │   ├── pages/             # Dashboard, Kanban, Agenda, AgendaDelivery, Graficos, Mural, Ramais, Profile, AdminUsers…
+│   │   ├── pages/             # Dashboard, Kanban, Agenda, AgendaDelivery, Graficos, Mural, Ramais, Profile, AdminUsers, Lixeira, Arquivados, Notas…
+│   │   ├── hooks/             # useWindowWidth.js (responsividade)
 │   │   ├── services/
 │   │   │   └── api.js         # Axios + interceptor de refresh automático
 │   │   └── main.jsx
@@ -310,6 +336,9 @@ npm run db:undo:all       # reverte todas
 | `20260519-create-agenda-eventos.js` | Tabela de eventos da Agenda Delivery |
 | `20260603-alter-agenda-eventos-add-mencoes.js` | Campo `mencoes` (JSONB) nos eventos |
 | `20260603-alter-cards-add-atualizado-por-nome.js` | Quem atualizou o card por último |
+| `20260618-add-trash-to-cards.js` | Adiciona campo `deleted_at` (soft-delete / Lixeira) à tabela `cards` |
+| `20260618b-add-archived-to-cards.js` | Adiciona campo `arquivado` (boolean) à tabela `cards` |
+| `20260618c-create-notas.js` | Cria tabela `notas` (id, usuario_id FK, titulo, conteudo TEXT, cor, favorita) |
 
 ---
 
@@ -339,8 +368,14 @@ npm run db:undo:all       # reverte todas
 | `POST` | `/api/v1/cards` | Criar card |
 | `GET` | `/api/v1/cards/:id` | Buscar card por ID (incluindo board — usado para deep-link de notificação) |
 | `PUT` | `/api/v1/cards/:id` | Atualizar card (grava `atualizado_por_nome`) |
-| `DELETE` | `/api/v1/cards/:id` | Excluir card |
+| `DELETE` | `/api/v1/cards/:id` | Mover card para a Lixeira (soft-delete) |
 | `POST` | `/api/v1/cards/:id/transfer` | Transferir card entre boards |
+| `GET` | `/api/v1/cards/trash` | Listar cards na lixeira (gestor/admin) |
+| `POST` | `/api/v1/cards/:id/restore` | Restaurar card da lixeira |
+| `DELETE` | `/api/v1/cards/:id/permanent` | Excluir card permanentemente (gestor/admin) |
+| `POST` | `/api/v1/cards/:id/archive` | Arquivar card |
+| `POST` | `/api/v1/cards/:id/unarchive` | Desarquivar card |
+| `GET` | `/api/v1/cards/archived` | Listar cards arquivados |
 
 ### Comentários
 | Método | Rota | Descrição |
@@ -407,6 +442,15 @@ npm run db:undo:all       # reverte todas
 | `GET/POST/PUT/DELETE` | `/api/v1/schedules` | CRUD de agendamentos |
 | `GET` | `/api/v1/technicians` | Listar técnicos |
 
+### Notas Pessoais
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/notas` | Listar notas do usuário logado (favoritas primeiro) |
+| `GET` | `/api/v1/notas/:id` | Buscar nota por ID |
+| `POST` | `/api/v1/notas` | Criar nota |
+| `PUT` | `/api/v1/notas/:id` | Atualizar nota (titulo, conteudo, cor, favorita) |
+| `DELETE` | `/api/v1/notas/:id` | Excluir nota |
+
 ### Outros
 | Método | Rota | Descrição |
 |---|---|---|
@@ -451,6 +495,8 @@ Para integrações M2M, definir `SYSTEM_API_TOKEN` no `.env`. Requests com esse 
 | `bko` | Acesso ao board BKO |
 | `noc` | Acesso ao Kanban Delivery e Agenda Delivery |
 | `convidado` | Acesso mínimo |
+
+> **Lixeira**: apenas `gestor` e `admin` podem acessar a página `/lixeira` e realizar exclusões permanentes.
 
 O acesso a cada board Kanban é configurado por flags booleanas (`acesso_kanban_delivery`, `acesso_kanban_comercial`, `acesso_kanban_bko`) independentes do perfil.
 
@@ -600,7 +646,8 @@ npm run db:migrate    # reaplicar do zero
 - **Refresh tokens** são persistidos na tabela `refresh_tokens` e revogados no logout.
 - **`requireAdmin`** e **`requireManagerOrAdmin`** revalidam o perfil no banco a cada request (não confiam no payload do token).
 - **Soft-delete** em notificações: nunca `DELETE`, apenas `limpa = true`. Histórico preservado.
-- **Sanitização HTML**: `descricao_html` da Agenda é sanitizado via `sanitize-html` antes de salvar.
+- **Soft-delete na Lixeira**: cards excluídos recebem `deleted_at`; queries do board filtram `deleted_at IS NULL`. Remoção definitiva manual ou automática após 30 dias.
+- **Sanitização HTML**: `descricao_html` da Agenda e `conteudo` das Notas são sanitizados via `sanitize-html` antes de salvar.
 - **Rate limiting**: configurável via `GLOBAL_RATE_LIMIT_*`; padrão 5000 req/15min em dev, reduzir em produção.
 - **Helmet**: CSP configurada para permitir apenas recursos confiáveis (`self` + `unpkg.com` para Swagger).
 - **CORS**: configurado seletivamente; documentação com `*`, dados protegidos com restrição de origem.

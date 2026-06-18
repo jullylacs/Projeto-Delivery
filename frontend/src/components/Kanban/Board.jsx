@@ -5063,31 +5063,31 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                               📌
                             </button>
                           )}
+                          {(!isSystem || userData?.perfil === 'admin') && (
+                            <button
+                              style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
+                              title="Excluir comentário"
+                              onClick={() => handleDeleteComment(comment.id)}
+                              onMouseEnter={e => e.currentTarget.style.background = '#fff0ee'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                           {!isSystem && (
-                            <>
-                              <button
-                                style={{ background: 'none', border: 'none', color: '#c0392b', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
-                                title="Excluir comentário"
-                                onClick={() => handleDeleteComment(comment.id)}
-                                onMouseEnter={e => e.currentTarget.style.background = '#fff0ee'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                              <button
-                                style={{ background: 'none', border: 'none', color: '#5a30ff', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
-                                title="Editar comentário"
-                                onClick={() => {
-                                  setEditingCommentId(comment.id);
-                                  setCommentText(comment.text || "");
-                                  setIsCommentComposerOpen(true);
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                            </>
+                            <button
+                              style={{ background: 'none', border: 'none', color: '#5a30ff', cursor: 'pointer', padding: '3px 5px', borderRadius: 6, transition: 'background 0.12s', display: 'flex', alignItems: 'center' }}
+                              title="Editar comentário"
+                              onClick={() => {
+                                setEditingCommentId(comment.id);
+                                setCommentText(comment.text || "");
+                                setIsCommentComposerOpen(true);
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f3f0ff'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <Pencil size={14} />
+                            </button>
                           )}
                         </div>
                       </div>
