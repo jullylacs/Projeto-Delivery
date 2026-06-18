@@ -91,26 +91,36 @@ function LoadingSkeleton() {
 // Componente principal
 // ===========================================================================
 export default function Graficos() {
-  const [data,    setData]    = useState(null);
-  const [board,   setBoard]   = useState("");
-  const [error,   setError]   = useState("");
-  const [loading, setLoading] = useState(true);
+  const [data,        setData]        = useState(null);
+  const [board,       setBoard]       = useState("");
+  const [error,       setError]       = useState("");
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     setError("");
     try {
       const params = board ? { board } : {};
       const res = await api.get("/dashboard/summary", { params });
       setData(res.data || null);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || "Erro ao carregar dados");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      else setRefreshing(false);
     }
   }, [board]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    const id = setInterval(() => fetchData(true), 30_000);
+    return () => clearInterval(id);
+  }, [fetchData]);
 
   if (loading) return <LoadingSkeleton />;
   if (error || !data) {
@@ -161,11 +171,18 @@ export default function Graficos() {
             {selectedLabel} · {total} cards no total
           </p>
         </div>
-        <select value={board} onChange={(e) => setBoard(e.target.value)} style={selectSt}>
-          {BOARD_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {lastUpdated && (
+            <span style={{ fontSize: 11, color: refreshing ? "#7c5cff" : "#9b8fd8", transition: "color 300ms", whiteSpace: "nowrap" }}>
+              {refreshing ? "Atualizando…" : `↻ ${lastUpdated.toLocaleTimeString("pt-BR")}`}
+            </span>
+          )}
+          <select value={board} onChange={(e) => setBoard(e.target.value)} style={selectSt}>
+            {BOARD_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Linha 1 — Donut + Barras verticais por coluna */}

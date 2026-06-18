@@ -1,12 +1,17 @@
 import { useNavigate, useLocation } from "react-router-dom";
 
-export default function Sidebar({ isOpen = true }) {
+export default function Sidebar({ isOpen = true, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   const canSeeAgendaDelivery = ["delivery", "admin", "noc"].includes(user?.perfil);
+
+  function handleNav(path) {
+    navigate(path);
+    onNavigate?.();
+  }
 
   const menuItems = [
     { name: "Dashboard",       icon: "⊞",  path: "/dashboard" },
@@ -16,6 +21,7 @@ export default function Sidebar({ isOpen = true }) {
     ...(canSeeAgendaDelivery ? [{ name: "Agenda Team", icon: "⬡", path: "/agenda-delivery" }] : []),
     { name: "Ramais",          icon: "✆",  path: "/ramais" },
     { name: "Mural",           icon: "◈",  path: "/mural" },
+    { name: "Notas",           icon: "🗒️", path: "/notas" },
     { name: "Consulta IA",    icon: "🤖", path: "/buscar-provedores" },
     ...(["admin", "gestor"].includes(user?.perfil) ? [{ name: "Usuários", icon: "◉", path: "/admin/users" }] : []),
   ];
@@ -28,6 +34,7 @@ export default function Sidebar({ isOpen = true }) {
     "/agenda-delivery": "🛵",
     "/ramais":          "📞",
     "/mural":              "📝",
+    "/notas":              "🗒️",
     "/buscar-provedores":  "🤖",
     "/admin/users":        "👥",
   };
@@ -55,7 +62,7 @@ export default function Sidebar({ isOpen = true }) {
     >
       {/* Logo */}
       <div
-        onClick={() => navigate("/dashboard")}
+        onClick={() => handleNav("/dashboard")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -99,7 +106,7 @@ export default function Sidebar({ isOpen = true }) {
           return (
             <div
               key={index}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path)}
               style={{
                 display: "flex",
                 alignItems: "center",

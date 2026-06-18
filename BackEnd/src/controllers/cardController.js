@@ -269,7 +269,7 @@ exports.getCards = async (req, res) => {
       const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 20));
 
       const cards = await Card.findAll({
-        where: { coluna_id: colunaId },
+        where: { coluna_id: colunaId, arquivado_em: null },
         include: [
           { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
           { model: Column, as: "column" },
@@ -291,6 +291,7 @@ exports.getCards = async (req, res) => {
     };
 
     const cards = await Card.findAll({
+      where: { arquivado_em: null },
       include: [
         { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
         columnInclude,
@@ -336,7 +337,7 @@ exports.getBoardSummary = async (req, res) => {
     if (isFiltered) {
       const limit = Math.min(2000, Math.max(1, Number(req.query?.limit) || 500));
 
-      const cardWhere = {};
+      const cardWhere = { arquivado_em: null };
       if (hasVendor) cardWhere.vendedor_id = vendorId;
       if (hasColumnFilter) cardWhere.coluna_id = columnFilterId;
       if (hasSearch) {
@@ -390,6 +391,8 @@ exports.getBoardSummary = async (req, res) => {
              FROM cards c
              JOIN columns col ON col.id = c.coluna_id
             WHERE col.board = :board
+              AND c.deleted_at IS NULL
+              AND c.arquivado_em IS NULL
          ) sub
         WHERE sub.rn <= :perColumn`,
       {
@@ -416,6 +419,8 @@ exports.getBoardSummary = async (req, res) => {
          FROM cards c
          JOIN columns col ON col.id = c.coluna_id
         WHERE col.board = :board
+          AND c.deleted_at IS NULL
+          AND c.arquivado_em IS NULL
         GROUP BY c.coluna_id`,
       {
         replacements: { board },
@@ -553,6 +558,38 @@ exports.updateCard = async (req, res) => {
       { replacements: { id: Number(req.userId) || 0 }, type: QueryTypes.SELECT }
     );
     const atualizadoPorNome = _userRow?.nome || _userRow?.email || userName || null;
+
+    // Rótulos em português por campo
+    const FIELD_LABELS = {
+      titulo: "Título",
+      cliente: "Cliente",
+      telefone: "Telefone",
+      endereco: "Endereço",
+      coordenadas: "Coordenadas",
+      tipoServico: "Serviço",
+      mensalidade: "Mensalidade",
+      instalacao: "Instalação",
+      tipo_card: "Tipo do Card",
+      sla: "SLA (dias)",
+      prazo: "Prazo",
+      tempoContratual: "Tempo Contratual (meses)",
+      observacoes: "Observações",
+    };
+
+    const formatVal = (field, value) => {
+      if (value === null || value === undefined || value === "") return "(vazio)";
+      if (field === "coordenadas" && typeof value === "object") {
+        return `${value.lat ?? ""},${value.lng ?? ""}`;
+      }
+      if (field === "prazo") {
+        const d = new Date(value);
+        if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("pt-BR");
+      }
+      const str = String(value);
+      // Trunca campos longos (ex: observacoes) para não poluir o comentário
+      return str.length > 80 ? `${str.slice(0, 77)}…` : str;
+    };
+
     // Mudança de coluna
     if (existing.coluna_id !== payload.coluna_id) {
       const ColumnModel = require("../models/Column");
@@ -562,19 +599,55 @@ exports.updateCard = async (req, res) => {
       const toName = toColumn?.nome || "(desconhecida)";
       systemComment = buildSystemComment(`${userName} moveu o card de "${fromName}" para "${toName}"`);
     } else {
-      // Mudança de detalhes (exceto coluna)
-      const fieldsToCheck = [
-        "titulo", "cliente", "telefone", "endereco", "coordenadas", "tipoServico",
-        "mensalidade", "instalacao", "tipo_card", "sla", "prazo", "tempoContratual",
-        "observacoes", "vendedor_id"
-      ];
-      const changed = fieldsToCheck.some(field => {
-        const oldVal = JSON.stringify(existing[field] ?? null);
-        const newVal = JSON.stringify(payload[field] ?? null);
-        return oldVal !== newVal;
-      });
-      if (changed) {
-        systemComment = buildSystemComment(`${userName} editou os detalhes do card.`);
+      // Normaliza valor para comparação canônica, evitando falsos positivos
+      // causados por diferenças de tipo entre banco e payload (Decimal vs number,
+      // JSONB {lat,lng} vs string, data ISO completa vs YYYY-MM-DD, etc.)
+      const normalizeForCompare = (field, value) => {
+        if (value === null || value === undefined || value === "") return null;
+        if (field === "coordenadas") {
+          if (typeof value === "object") return `${value.lat ?? ""},${value.lng ?? ""}`.trim();
+          return String(value).trim();
+        }
+        if (field === "mensalidade" || field === "instalacao") {
+          const n = parseFloat(value);
+          return Number.isFinite(n) ? n : null;
+        }
+        if (field === "prazo") {
+          const d = new Date(value);
+          return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+        }
+        return String(value).trim();
+      };
+
+      // Coleta linha por linha quais campos mudaram
+      // Formato: { label, oldStr, newStr }
+      const changes = [];
+
+      for (const [field, label] of Object.entries(FIELD_LABELS)) {
+        const oldRaw = existing[field] ?? null;
+        const newRaw = payload[field] ?? null;
+        if (normalizeForCompare(field, oldRaw) === normalizeForCompare(field, newRaw)) continue;
+        changes.push({ label, oldStr: formatVal(field, oldRaw), newStr: formatVal(field, newRaw) });
+      }
+
+      // Responsável (vendedor_id): resolve nomes legíveis
+      if ((existing.vendedor_id ?? null) !== (payload.vendedor_id ?? null)) {
+        const oldUser = existing.vendedor_id ? await User.findByPk(existing.vendedor_id, { attributes: ["nome"] }) : null;
+        const newUser = payload.vendedor_id ? await User.findByPk(payload.vendedor_id, { attributes: ["nome"] }) : null;
+        changes.push({
+          label: "Responsável",
+          oldStr: oldUser?.nome || "(sem responsável)",
+          newStr: newUser?.nome || "(sem responsável)",
+        });
+      }
+
+      if (changes.length > 0) {
+        const lines = changes.map(({ label, oldStr, newStr }) =>
+          `**${label}:** "${oldStr}" → "${newStr}"`
+        );
+        // Primeira linha inclui quem editou; demais ficam alinhadas abaixo
+        lines[0] = `${userName} editou ${lines[0]}`;
+        systemComment = buildSystemComment(lines.join("\n"));
       }
     }
 
@@ -622,20 +695,179 @@ exports.updateCard = async (req, res) => {
   }
 };
 
-// 🔹 Exclusão de um card
+// 🔹 Move o card para a lixeira (soft-delete via paranoid)
 exports.deleteCard = async (req, res) => {
   try {
-    const targetId = req.params.id;
+    const targetId = Number(req.params.id);
+    const card = await Card.findByPk(targetId);
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
 
-    // Remove o card do banco pelo ID informado
-    // Equivalente ao findByIdAndDelete do Mongoose
-    await Card.destroy({ where: { id: targetId } });
+    const nome = await resolveAuthorName(req);
 
-    // Retorna mensagem de confirmação
-    res.json({ message: "Deletado" });
+    // Um único UPDATE atômico: seta deleted_at + registra quem excluiu
+    await sequelize.query(
+      `UPDATE cards SET deleted_at = NOW(), excluido_por_nome = :nome WHERE id = :id AND deleted_at IS NULL`,
+      { replacements: { nome: nome || null, id: targetId }, type: QueryTypes.UPDATE }
+    );
+
+    res.json({ message: "Card movido para a lixeira" });
   } catch (err) {
-    // Em caso de erro (ex: falha no banco), retorna status 500
     res.status(500).json({ error: err?.message || err?.name || "Erro ao deletar card" });
+  }
+};
+
+// 🔹 Lista cards na lixeira. Purga automaticamente os com > 30 dias.
+exports.getTrash = async (req, res) => {
+  try {
+    const TRINTA_DIAS = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Purga permanente de cards expirados (> 30 dias)
+    await sequelize.query(
+      `DELETE FROM cards WHERE deleted_at IS NOT NULL AND deleted_at < :expiry`,
+      { replacements: { expiry: TRINTA_DIAS } }
+    );
+
+    const cards = await Card.findAll({
+      paranoid: false,
+      where: { deleted_at: { [Op.ne]: null } },
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+      order: [["deleted_at", "DESC"]],
+    });
+
+    return res.json(
+      cards.map((c) => {
+        const normalized = normalizeCard(c);
+        normalized.deleted_at = c.deleted_at;
+        normalized.excluido_por_nome = c.excluido_por_nome;
+        return normalized;
+      })
+    );
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao buscar lixeira" });
+  }
+};
+
+// 🔹 Restaura um card da lixeira
+exports.restoreCard = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const card = await Card.findOne({ where: { id }, paranoid: false });
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    if (!card.deleted_at) return res.status(400).json({ error: "Card não está na lixeira" });
+
+    await sequelize.query(
+      `UPDATE cards SET deleted_at = NULL, excluido_por_nome = NULL WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+
+    const restored = await Card.findByPk(id, {
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+    });
+
+    return res.json(normalizeCard(restored));
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao restaurar card" });
+  }
+};
+
+// 🔹 Exclusão permanente de um card da lixeira
+exports.permanentDeleteCard = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const card = await Card.findOne({ where: { id }, paranoid: false });
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    if (!card.deleted_at) return res.status(400).json({ error: "Card não está na lixeira" });
+
+    await sequelize.query(`DELETE FROM cards WHERE id = :id`, { replacements: { id } });
+
+    return res.json({ message: "Card excluído permanentemente" });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao excluir permanentemente" });
+  }
+};
+
+// 🔹 Arquiva um card (some do Kanban mas não vai para a lixeira)
+exports.archiveCard = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const card = await Card.findByPk(id);
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+
+    const nome = await resolveAuthorName(req);
+
+    await sequelize.query(
+      `UPDATE cards SET arquivado_em = NOW(), arquivado_por_nome = :nome WHERE id = :id AND arquivado_em IS NULL`,
+      { replacements: { nome: nome || null, id }, type: QueryTypes.UPDATE }
+    );
+
+    return res.json({ message: "Card arquivado" });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao arquivar card" });
+  }
+};
+
+// 🔹 Restaura um card arquivado de volta ao Kanban
+exports.unarchiveCard = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const card = await Card.findOne({
+      where: { id },
+      paranoid: false,
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+    });
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    if (!card.arquivado_em) return res.status(400).json({ error: "Card não está arquivado" });
+
+    await sequelize.query(
+      `UPDATE cards SET arquivado_em = NULL, arquivado_por_nome = NULL WHERE id = :id`,
+      { replacements: { id }, type: QueryTypes.UPDATE }
+    );
+
+    const restored = await Card.findByPk(id, {
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+    });
+
+    return res.json(normalizeCard(restored));
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao desarquivar card" });
+  }
+};
+
+// 🔹 Lista cards arquivados
+exports.getArchived = async (req, res) => {
+  try {
+    const cards = await Card.findAll({
+      where: { arquivado_em: { [Op.ne]: null }, deleted_at: null },
+      paranoid: false,
+      include: [
+        { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
+        { model: Column, as: "column" },
+      ],
+      order: [["arquivado_em", "DESC"]],
+    });
+
+    return res.json(
+      cards.map((c) => {
+        const normalized = normalizeCard(c);
+        normalized.arquivado_em = c.arquivado_em;
+        normalized.arquivado_por_nome = c.arquivado_por_nome;
+        return normalized;
+      })
+    );
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao listar arquivados" });
   }
 };
 
@@ -749,6 +981,18 @@ exports.deleteComment = async (req, res) => {
     const cardId = parseCardId(req.params.id);
     const commentId = String(req.params.commentId || "");
     if (!cardId || !commentId) return res.status(400).json({ error: "Parâmetros inválidos" });
+
+    // Verifica se o comentário alvo é de sistema antes de mutate
+    const card = await Card.findByPk(cardId, { attributes: ["comments"] });
+    if (!card) return res.status(404).json({ error: "Card não encontrado" });
+    const allComments = Array.isArray(card.comments) ? card.comments : [];
+    const target = allComments.find((c) => String(c.id) === commentId);
+    if (target?.isSystem) {
+      const requester = await User.findByPk(req.userId, { attributes: ["perfil"] });
+      if (!requester || requester.perfil !== "admin") {
+        return res.status(403).json({ error: "Apenas administradores podem excluir comentários do sistema" });
+      }
+    }
 
     const deleterName = await resolveAuthorName(req);
     let found = false;

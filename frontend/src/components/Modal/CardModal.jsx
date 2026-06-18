@@ -180,21 +180,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
 
   // Função para atualizar campos do formulário
   const handleChange = (field, value) => {
-    if (field === "lat" || field === "lng") {
-      // Campos de coordenadas atualizam o objeto interno 'coordenadas'
-      setFormData(prev => ({
-        ...prev,
-        coordenadas: {
-          ...prev.coordenadas,
-          [field]: value,
-        },
-      }));
-    } else {
-      // Campos normais atualizam diretamente a chave no formData
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
-
-    // Limpa erro do campo ao digitar
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: null }));
     }
@@ -298,7 +284,7 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
 
           {/* Endereço e Coordenadas juntos/opcionais */}
           <div style={styles.formGroup}>
-            <label style={styles.label}>Endereço ou Coordenadas</label>
+            <label style={styles.label}>Endereço</label>
             <input
               style={{ ...styles.input, borderColor: errors.endereco ? "#ff4444" : "#e2e0f0" }}
               value={formData.endereco}
@@ -306,22 +292,20 @@ export default function CardModal({ card, onSave, onClose, vendorOptions = [] })
               onFocus={handleFieldFocus}
               onBlur={handleFieldBlur}
               data-error={errors.endereco ? "true" : "false"}
-              placeholder="Rua, número, bairro, cidade OU latitude,longitude"
+              placeholder="Rua, número, bairro, cidade"
             />
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input
-                style={{ ...styles.input, flex: 1 }}
-                value={formData.coordenadas.lat}
-                onChange={e => handleChange("lat", e.target.value)}
-                placeholder="Latitude (opcional)"
-              />
-              <input
-                style={{ ...styles.input, flex: 1 }}
-                value={formData.coordenadas.lng}
-                onChange={e => handleChange("lng", e.target.value)}
-                placeholder="Longitude (opcional)"
-              />
-            </div>
+          </div>
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Coordenadas</label>
+            <input
+              style={styles.input}
+              value={formData.coordenadas}
+              onChange={e => handleChange("coordenadas", e.target.value)}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+              data-error="false"
+              placeholder="Latitude,Longitude (ex: -23.55,-46.63)"
+            />
             <span style={{ color: "var(--text-label)", fontSize: 12 }}>
               Preencha endereço, coordenadas ou ambos. Nenhum campo é obrigatório.
             </span>

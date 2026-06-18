@@ -1,5 +1,5 @@
 const { randomUUID } = require("crypto");
-const { User, RefreshToken } = require("../models");
+const { User, RefreshToken, sequelize } = require("../models");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const xss = require("xss");
@@ -573,26 +573,32 @@ exports.adminUpdateUser = async (req, res) => {
 // 🔹 Exclui um usuário pelo ID (rota exclusiva para admin, não pode excluir a si mesmo)
 exports.adminDeleteUser = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const userId = Number(req.params.id);
 
-    if (!userId) {
-      return res.status(400).json({ message: "ID inválido" });
-    }
-
-    if (Number(req.userId) === Number(userId)) {
+    if (!userId) return res.status(400).json({ message: "ID inválido" });
+    if (Number(req.userId) === userId) {
       return res.status(400).json({ message: "Você não pode excluir o próprio usuário" });
     }
 
-    const deletedRows = await User.destroy({ where: { id: userId } });
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
-    if (!deletedRows) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
-    }
+    // Limpa FKs antes de excluir para evitar violação de constraint no PostgreSQL.
+    // A ordem importa: tabelas com NOT NULL no FK são deletadas; as com allowNull são zeradas.
+    const rp = { replacements: { uid: userId } };
+    await sequelize.query(`DELETE FROM refresh_tokens WHERE usuario_id = :uid`, rp);
+    await sequelize.query(`DELETE FROM notifications  WHERE usuario_id = :uid`, rp);
+    await sequelize.query(`DELETE FROM agenda_eventos WHERE usuario_id = :uid`, rp);
+    await sequelize.query(`UPDATE comments  SET usuario_id  = NULL WHERE usuario_id  = :uid`, rp);
+    await sequelize.query(`UPDATE cards     SET vendedor_id = NULL WHERE vendedor_id = :uid`, rp);
+    await sequelize.query(`UPDATE schedules SET tecnico_id  = NULL WHERE tecnico_id  = :uid`, rp);
+
+    await User.destroy({ where: { id: userId } });
 
     return res.status(204).send();
   } catch (err) {
     console.error("Erro ao excluir usuário (admin):", err);
-    return res.status(500).json({ message: "Erro ao excluir usuário" });
+    return res.status(500).json({ message: err?.message || "Erro ao excluir usuário" });
   }
 };
 

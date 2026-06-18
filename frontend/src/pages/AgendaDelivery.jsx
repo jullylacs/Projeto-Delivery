@@ -42,6 +42,11 @@ const PALETTE = [
 
 const DEFAULT_COLOR = PALETTE[0].value;
 
+// Layout de bandas multi-dia
+const BAND_HEIGHT = 20;  // px por linha de banda
+const BAND_GAP = 2;      // px entre linhas de banda
+const BAND_START_TOP = 35; // px do topo do week-row até a primeira banda (padding 8 + badge 24 + gap 3)
+
 // ===========================================================================
 // Helpers de data (Date nativo, sem libs externas)
 // ===========================================================================
@@ -86,6 +91,67 @@ const parseDateSafe = (value) => {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isMultiDayEvent = (evt) => {
+  const inicio = parseDateSafe(evt.inicio);
+  const fim = parseDateSafe(evt.fim);
+  if (!inicio || !fim) return false;
+  return !isSameDay(inicio, fim);
+};
+
+// Calcula as bandas multi-dia para uma semana de 7 dias.
+// Retorna array de { event, startCol, endCol, spanCols, row, startsHere, endsHere }
+const computeWeekBands = (week, allEvents) => {
+  const validDay = week.find(Boolean);
+  if (!validDay) return [];
+  const weekSunday = startOfWeek(validDay);
+  const weekSaturday = shiftDate(weekSunday, 6);
+  const weekStart = startOfDay(weekSunday);
+  const weekEnd = endOfDay(weekSaturday);
+
+  const multiDayEvts = allEvents.filter((evt) => {
+    if (!isMultiDayEvent(evt)) return false;
+    const inicio = parseDateSafe(evt.inicio);
+    const fim = parseDateSafe(evt.fim);
+    return inicio <= weekEnd && startOfDay(fim) >= weekStart;
+  });
+
+  multiDayEvts.sort((a, b) => {
+    const diff = parseDateSafe(a.inicio) - parseDateSafe(b.inicio);
+    if (diff !== 0) return diff;
+    return parseDateSafe(b.fim) - parseDateSafe(a.fim); // maior duração primeiro
+  });
+
+  const bands = multiDayEvts.map((evt) => {
+    const inicio = parseDateSafe(evt.inicio);
+    const fim = parseDateSafe(evt.fim);
+    const startsHere = inicio >= weekStart;
+    const endsHere = startOfDay(fim) <= startOfDay(weekSaturday);
+    const startCol = startsHere ? inicio.getDay() : 0;
+    const endCol = endsHere ? fim.getDay() : 6;
+    return { event: evt, startCol, endCol, spanCols: endCol - startCol + 1, startsHere, endsHere, row: -1 };
+  });
+
+  // Alocação greedy de linhas (sem sobreposição)
+  const rowEndCols = [];
+  for (const band of bands) {
+    let placed = false;
+    for (let r = 0; r < rowEndCols.length; r++) {
+      if (rowEndCols[r] < band.startCol) {
+        band.row = r;
+        rowEndCols[r] = band.endCol;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      band.row = rowEndCols.length;
+      rowEndCols.push(band.endCol);
+    }
+  }
+
+  return bands;
 };
 
 const toDateInput = (date) => {
@@ -267,16 +333,28 @@ export default function AgendaDelivery() {
   }, [scope, visibleRange.inicio, visibleRange.fim]);
 
   // ---- Agrupa eventos por dia (chave YYYY-MM-DD local) ----
+  // Eventos multi-dia são adicionados em TODOS os dias que cobrem.
   const eventsByDay = useMemo(() => {
     const map = {};
     events.forEach((evt) => {
       const inicio = parseDateSafe(evt.inicio);
+      const fim = parseDateSafe(evt.fim);
       if (!inicio) return;
-      const key = toDateInput(inicio);
-      if (!map[key]) map[key] = [];
-      map[key].push(evt);
+      if (fim && !isSameDay(inicio, fim)) {
+        let d = startOfDay(inicio);
+        const lastDay = startOfDay(fim);
+        while (d <= lastDay) {
+          const key = toDateInput(d);
+          if (!map[key]) map[key] = [];
+          map[key].push(evt);
+          d = shiftDate(d, 1);
+        }
+      } else {
+        const key = toDateInput(inicio);
+        if (!map[key]) map[key] = [];
+        map[key].push(evt);
+      }
     });
-    // Ordena por horário dentro do dia
     Object.values(map).forEach((list) =>
       list.sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
     );
@@ -558,13 +636,14 @@ export default function AgendaDelivery() {
     );
   };
 
-  const renderDayCell = (day, idx, isInCurrentMonth = true) => {
+  const renderDayCell = (day, idx, isInCurrentMonth = true, numBandRows = 0) => {
+    const cellMinHeight = Math.max(120, 82 + numBandRows * (BAND_HEIGHT + BAND_GAP));
     if (!day) {
       return (
         <div
           key={`empty-${idx}`}
           style={{
-            minHeight: 120,
+            minHeight: cellMinHeight,
             borderRight: idx % 7 !== 6 ? "1px solid #ede7ff" : "none",
             borderBottom: "1px solid #ede7ff",
             background: "#faf7ff",
@@ -573,10 +652,11 @@ export default function AgendaDelivery() {
       );
     }
     const key = toDateInput(day);
-    const dayEvents = eventsByDay[key] || [];
+    const allEventsOnDay = eventsByDay[key] || [];
+    // Chips mostram apenas eventos de um dia; multi-dia ficam nas bandas da semana
+    const singleDayEvents = allEventsOnDay.filter((evt) => !isMultiDayEvent(evt));
     const today = new Date();
     const isToday = isSameDay(day, today);
-
     const canCreateHere = scope === SCOPE.individual || canEditGeral;
 
     return (
@@ -587,7 +667,7 @@ export default function AgendaDelivery() {
           if (canCreateHere) openCreateModal(day);
         }}
         style={{
-          minHeight: 120,
+          minHeight: cellMinHeight,
           padding: "8px 6px 6px",
           background: isToday ? "#ede7ff" : isInCurrentMonth ? "#fff" : "#faf7ff",
           borderRight: viewMode === VIEW_MODE.month && idx % 7 !== 6 ? "1px solid #ede7ff" : viewMode === VIEW_MODE.week && idx !== 6 ? "1px solid #ede7ff" : "none",
@@ -600,7 +680,7 @@ export default function AgendaDelivery() {
         }}
         title={canCreateHere ? "Duplo clique para criar evento" : ""}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{
             display: "inline-flex",
             alignItems: "center",
@@ -616,7 +696,7 @@ export default function AgendaDelivery() {
           }}>
             {viewMode === VIEW_MODE.month ? day.getDate() : day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
           </span>
-          {dayEvents.length > 0 && (
+          {allEventsOnDay.length > 0 && (
             <span style={{
               fontSize: 10,
               color: "#fff",
@@ -626,14 +706,19 @@ export default function AgendaDelivery() {
               padding: "1px 6px",
               lineHeight: 1.5,
             }}>
-              {dayEvents.length}
+              {allEventsOnDay.length}
             </span>
           )}
         </div>
 
+        {/* Espaço reservado para as bandas multi-dia posicionadas na semana */}
+        {numBandRows > 0 && (
+          <div style={{ height: numBandRows * (BAND_HEIGHT + BAND_GAP), flexShrink: 0 }} />
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {dayEvents.slice(0, 4).map(renderEventChip)}
-          {dayEvents.length > 4 && (
+          {singleDayEvents.slice(0, 4).map(renderEventChip)}
+          {singleDayEvents.length > 4 && (
             <button
               type="button"
               onClick={(ev) => {
@@ -652,10 +737,73 @@ export default function AgendaDelivery() {
                 textAlign: "left",
               }}
             >
-              +{dayEvents.length - 4} mais
+              +{singleDayEvents.length - 4} mais
             </button>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // Renderiza uma linha de semana com bandas multi-dia sobrepostas
+  const renderWeekRowWithBands = (week, weekIdx) => {
+    const bands = computeWeekBands(week, events);
+    const numBandRows = bands.length === 0 ? 0 : Math.max(...bands.map((b) => b.row)) + 1;
+    const isWeekView = viewMode === VIEW_MODE.week;
+
+    return (
+      <div key={`week-${weekIdx}`} style={{ position: "relative" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
+          {week.map((day, idx) => renderDayCell(day, idx, isWeekView || !!day, numBandRows))}
+        </div>
+
+        {bands.map((band, bIdx) => {
+          const cor = band.event.cor || DEFAULT_COLOR;
+          const topPx = BAND_START_TOP + band.row * (BAND_HEIGHT + BAND_GAP);
+          const leftPct = (band.startCol / 7) * 100;
+          const widthPct = (band.spanCols / 7) * 100;
+          const br = `${band.startsHere ? 4 : 0}px ${band.endsHere ? 4 : 0}px ${band.endsHere ? 4 : 0}px ${band.startsHere ? 4 : 0}px`;
+
+          return (
+            <div
+              key={bIdx}
+              className="agenda-event-chip"
+              onClick={(e) => { e.stopPropagation(); openEditModal(band.event); }}
+              title={band.event.titulo}
+              style={{
+                position: "absolute",
+                top: topPx,
+                left: `${leftPct}%`,
+                width: `calc(${widthPct}% - 3px)`,
+                height: BAND_HEIGHT,
+                background: cor,
+                borderRadius: br,
+                display: "flex",
+                alignItems: "center",
+                padding: "0 6px",
+                gap: 3,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#fff",
+                cursor: "pointer",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
+                zIndex: 3,
+                userSelect: "none",
+              }}
+            >
+              {!band.startsHere && <span style={{ fontSize: 9, opacity: 0.8, flexShrink: 0 }}>◀</span>}
+              {!band.event.all_day && band.startsHere && (
+                <span style={{ opacity: 0.85, flexShrink: 0 }}>
+                  {new Date(band.event.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{band.event.titulo}</span>
+              {!band.endsHere && <span style={{ fontSize: 9, opacity: 0.8, flexShrink: 0, marginLeft: "auto" }}>▶</span>}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -844,16 +992,14 @@ export default function AgendaDelivery() {
         )}
 
         {viewMode === VIEW_MODE.month && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
-            {monthDays.map((day, idx) => renderDayCell(day, idx, !!day))}
+          <div>
+            {Array.from({ length: monthDays.length / 7 }, (_, weekIdx) =>
+              renderWeekRowWithBands(monthDays.slice(weekIdx * 7, weekIdx * 7 + 7), weekIdx)
+            )}
           </div>
         )}
 
-        {viewMode === VIEW_MODE.week && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
-            {weekDays.map((day, idx) => renderDayCell(day, idx, true))}
-          </div>
-        )}
+        {viewMode === VIEW_MODE.week && renderWeekRowWithBands(weekDays, 0)}
 
         {viewMode === VIEW_MODE.day && renderDayList()}
       </div>

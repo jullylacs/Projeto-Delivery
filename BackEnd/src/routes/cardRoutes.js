@@ -2,12 +2,23 @@
 const router = require("express").Router();
 const controller = require("../controllers/cardController");
 const auth = require("../controllers/middleware/auth");
+const requireManagerOrAdmin = require("../controllers/middleware/requireManagerOrAdmin");
 
 // POST /cards — cria um novo card
 router.post("/", auth, controller.createCard);
 
 // GET /cards/board-summary — snapshot inicial do Kanban (top N por coluna + totals). Aceita ?board= e ?perColumn=.
 router.get("/board-summary", auth, controller.getBoardSummary);
+
+// ─── Lixeira (soft-delete) ───────────────────────────────────────────────────
+router.get("/trash", auth, controller.getTrash);
+router.post("/:id/restore", auth, controller.restoreCard);
+router.delete("/:id/permanent", auth, requireManagerOrAdmin, controller.permanentDeleteCard);
+
+// ─── Arquivo ─────────────────────────────────────────────────────────────────
+router.get("/archived", auth, controller.getArchived);
+router.post("/:id/archive", auth, controller.archiveCard);
+router.post("/:id/unarchive", auth, controller.unarchiveCard);
 
 // GET /cards — lista de cards. Modos:
 //  - ?coluna_id=X&offset=N&limit=M → paginação dentro de uma coluna (usado pelo "Ver mais")
