@@ -2,11 +2,15 @@ const { randomUUID } = require("crypto");
 const { Card, User, Column, sequelize } = require("../models"); // Importa o model de Card (Sequelize/PostgreSQL)
 const { fn, col, where, QueryTypes, Op } = require("sequelize");
 
-const VALID_BOARDS = ["delivery", "comercial", "bko"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;
 };
+
+// Rótulos amigáveis dos boards — usados nos comentários de sistema de transferência.
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras" };
+const boardLabel = (board) => BOARD_LABELS[board] || "Delivery";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers de comentários — todos os updates de comments passam por aqui para
@@ -255,7 +259,7 @@ exports.createCard = async (req, res) => {
 
 // 🔹 Listagem de cards. Três modos:
 //  1) ?coluna_id=X[&offset=N&limit=M]  → paginação dentro de uma coluna (usado pelo "Ver mais")
-//  2) ?board=delivery|comercial         → filtra cards via join na Column.board
+//  2) ?board=delivery|comercial|bko|compras → filtra cards via join na Column.board
 //  3) sem parâmetros                    → retorna todos os cards (compat antigo)
 exports.getCards = async (req, res) => {
   try {
@@ -447,8 +451,8 @@ exports.getBoardSummary = async (req, res) => {
   }
 };
 
-// 🔹 Transfere um card entre Kanbans (delivery ↔ comercial).
-// Body: { coluna_id } — coluna alvo no outro board. Cria comentário de sistema.
+// 🔹 Transfere um card entre Kanbans (delivery / comercial / bko / compras).
+// Body: { coluna_id } — coluna alvo em outro board. Cria comentário de sistema.
 exports.transferCard = async (req, res) => {
   try {
     const targetId = req.params.id;
@@ -488,8 +492,8 @@ exports.transferCard = async (req, res) => {
       userName = user.email || `Usuário ${user.id || "?"}`;
     }
 
-    const fromBoardLabel = fromBoard === "comercial" ? "Comercial" : "Delivery";
-    const toBoardLabel = toBoard === "comercial" ? "Comercial" : "Delivery";
+    const fromBoardLabel = boardLabel(fromBoard);
+    const toBoardLabel = boardLabel(toBoard);
 
     const systemComment = {
       id: `sys-${Date.now()}`,
@@ -544,7 +548,7 @@ exports.updateCard = async (req, res) => {
       const toColumn = await Column.findByPk(payload.coluna_id);
       if (fromColumn?.board && toColumn?.board && fromColumn.board !== toColumn.board) {
         return res.status(400).json({
-          error: "Para mover um card entre Delivery e Comercial use POST /cards/:id/transfer.",
+          error: "Para mover um card entre boards diferentes use POST /cards/:id/transfer.",
         });
       }
     }

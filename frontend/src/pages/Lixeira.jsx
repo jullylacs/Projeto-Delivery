@@ -23,11 +23,12 @@ function formatarData(iso) {
   });
 }
 
-const BOARD_LABEL = { delivery: "Delivery", comercial: "Comercial", bko: "BKO" };
+const BOARD_LABEL = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras" };
 const BOARD_COLOR = {
   delivery:  { bg: "#dbeafe", color: "#1d4ed8" },
   comercial: { bg: "#d1fae5", color: "#065f46" },
   bko:       { bg: "#fef3c7", color: "#92400e" },
+  compras:   { bg: "#cffafe", color: "#0e7490" },
 };
 
 function CardLixeira({ card, onRestaurar, onExcluir, processando, podeExcluirPermanente }) {
@@ -312,6 +313,7 @@ export default function Lixeira() {
               { valor: "delivery",  label: "Delivery",  bg: "#dbeafe", cor: "#1d4ed8", borda: "#93c5fd" },
               { valor: "comercial", label: "Comercial", bg: "#d1fae5", cor: "#065f46", borda: "#6ee7b7" },
               { valor: "bko",       label: "BKO",       bg: "#fef3c7", cor: "#92400e", borda: "#fcd34d" },
+              { valor: "compras",   label: "Compras",   bg: "#cffafe", cor: "#0e7490", borda: "#67e8f9" },
             ].map(({ valor, label, bg, cor, borda }) => {
               const ativo = boardFiltro === valor;
               return (

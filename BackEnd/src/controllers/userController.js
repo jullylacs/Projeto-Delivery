@@ -69,7 +69,7 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 // Detecta se a senha já é um hash bcrypt (evita re-hash acidental)
 const isBcryptHash = (value) => typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
 // Perfis válidos aceitos pelo sistema
-const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin", "bko", "noc"];
+const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin", "bko", "noc", "compras"];
 // Aceita avatar como data URL de imagem ou URL http/https
 const sanitizeAvatar = (value) => {
   if (typeof value !== "string") return undefined;
@@ -120,6 +120,7 @@ exports.register = async (req, res) => {
       acesso_kanban_delivery: false,
       acesso_kanban_comercial: false,
       acesso_kanban_bko: false,
+      acesso_kanban_compras: false,
     };
 
     const user = await User.create(userData);
@@ -479,6 +480,7 @@ exports.adminUpdateUser = async (req, res) => {
       acesso_kanban_delivery,
       acesso_kanban_comercial,
       acesso_kanban_bko,
+      acesso_kanban_compras,
       nova_senha,
     } = req.body;
 
@@ -527,6 +529,13 @@ exports.adminUpdateUser = async (req, res) => {
         return res.status(400).json({ message: "Campo 'acesso_kanban_bko' inválido" });
       }
       updateData.acesso_kanban_bko = acesso_kanban_bko;
+    }
+
+    if (acesso_kanban_compras !== undefined) {
+      if (typeof acesso_kanban_compras !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_compras' inválido" });
+      }
+      updateData.acesso_kanban_compras = acesso_kanban_compras;
     }
 
     if (aprovado !== undefined) {

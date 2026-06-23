@@ -21,7 +21,7 @@ const Column = sequelize.define("Column", {
     allowNull: false,
     defaultValue: "delivery",
     validate: {
-      isIn: [["delivery", "comercial", "bko"]],
+      isIn: [["delivery", "comercial", "bko", "compras"]],
     },
   },
 

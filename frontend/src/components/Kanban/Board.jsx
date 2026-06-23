@@ -46,11 +46,11 @@ const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
 
-const VALID_BOARDS = ["delivery", "comercial", "bko"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
 
 const getKanbanPrefsKey = (board) => `${KANBAN_PREFS_KEY}:${board || "delivery"}`;
 
-const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO" };
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras" };
 
 const normalizeColumnEntity = (item, index = 0) => ({
   id: Number(item?.id ?? item?._id ?? index + 1),
@@ -270,6 +270,7 @@ const profileBadgePalette = {
   tecnico: { bg: "#fff3e8", text: "#b45309", border: "#fed7aa" },
   gestor: { bg: "#f1ecff", text: "#6d28d9", border: "#ddd6fe" },
   admin: { bg: "#ffecec", text: "#b91c1c", border: "#fecaca" },
+  compras: { bg: "#cffafe", text: "#0e7490", border: "#67e8f9" },
   default: { bg: "#efe8ff", text: "#5135b0", border: "#d6c8ff" },
 };
 

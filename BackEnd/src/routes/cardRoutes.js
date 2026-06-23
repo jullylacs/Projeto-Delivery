@@ -22,10 +22,10 @@ router.post("/:id/unarchive", auth, controller.unarchiveCard);
 
 // GET /cards — lista de cards. Modos:
 //  - ?coluna_id=X&offset=N&limit=M → paginação dentro de uma coluna (usado pelo "Ver mais")
-//  - ?board=delivery|comercial      → lista global do board (evite em produção, prefira board-summary)
+//  - ?board=delivery|comercial|bko|compras → lista global do board (evite em produção, prefira board-summary)
 router.get("/", auth, controller.getCards);
 
-// POST /cards/:id/transfer — move um card entre Delivery e Comercial (audita via comentário).
+// POST /cards/:id/transfer — move um card entre boards diferentes (audita via comentário).
 router.post("/:id/transfer", auth, controller.transferCard);
 
 // ─── Comentários (operações atômicas no JSONB) ──────────────────────────────

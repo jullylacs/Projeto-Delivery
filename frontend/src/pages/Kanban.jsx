@@ -3,7 +3,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 const Board = lazy(() => import("../components/Kanban/Board"));
 
 const BOARD_TAB_KEY = "kanbanBoardTab";
-const VALID_BOARDS = ["delivery", "comercial", "bko"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
 
 function readPreferredBoard() {
   try {
@@ -112,6 +112,11 @@ function BoardTabs({ activeBoard, onChange, availableBoards }) {
           🗂️ BKO
         </button>
       )}
+      {availableBoards.includes("compras") && (
+        <button type="button" style={tabStyle(activeBoard === "compras")} onClick={() => onChange("compras")}>
+          🛒 Compras
+        </button>
+      )}
     </div>
   );
 }
@@ -144,14 +149,16 @@ export default function Kanban() {
   const canDelivery = Boolean(user?.acesso_kanban_delivery);
   const canComercial = Boolean(user?.acesso_kanban_comercial);
   const canBko = Boolean(user?.acesso_kanban_bko);
+  const canCompras = Boolean(user?.acesso_kanban_compras);
 
   const availableBoards = useMemo(() => {
     const list = [];
     if (canDelivery) list.push("delivery");
     if (canComercial) list.push("comercial");
     if (canBko) list.push("bko");
+    if (canCompras) list.push("compras");
     return list;
-  }, [canDelivery, canComercial, canBko]);
+  }, [canDelivery, canComercial, canBko, canCompras]);
 
   const [activeBoard, setActiveBoard] = useState(() => {
     const preferred = readPreferredBoard();

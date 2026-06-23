@@ -1,13 +1,13 @@
 const { sequelize } = require("../models");
 const { QueryTypes } = require("sequelize");
 
-const VALID_BOARDS = ["delivery", "comercial", "bko"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;
 };
 
-// 🔹 GET /dashboard/summary[?board=delivery|comercial]
+// 🔹 GET /dashboard/summary[?board=delivery|comercial|bko|compras]
 //
 // Substitui as 3 chamadas pesadas que o Dashboard fazia (/cards + /columns +
 // /users/admin) — antes trazia TODOS os cards e usuários para o cliente computar

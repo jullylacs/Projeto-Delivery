@@ -237,6 +237,7 @@ export default function Profile() {
     admin:          { label: "Admin",              color: "#dc2626" },
     bko:            { label: "BKO",                color: "#1a56aa" },
     noc:            { label: "NOC",                color: "#0e6b3a" },
+    compras:        { label: "Compras",            color: "#0e7490" },
     convidado:      { label: "Convidado",          color: "#7a5b00" },
   };
 

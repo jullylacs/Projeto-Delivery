@@ -128,6 +128,7 @@ const profileBadgePalette = {
   tecnico: { bg: "#fff3e8", text: "#b45309", border: "#fed7aa" },
   gestor: { bg: "#f1ecff", text: "#6d28d9", border: "#ddd6fe" },
   admin: { bg: "#ffecec", text: "#b91c1c", border: "#fecaca" },
+  compras: { bg: "#cffafe", text: "#0e7490", border: "#67e8f9" },
   default: { bg: "#efe8ff", text: "#5135b0", border: "#d6c8ff" },
 };
 

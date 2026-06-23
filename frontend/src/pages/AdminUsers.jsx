@@ -4,7 +4,7 @@ import api from "../services/api";
 // Cargos disponíveis para atribuição no painel.
 // Valores legados (gestor, operacional, etc.) são mantidos fora da lista
 // para não quebrar usuários existentes — aparecem apenas na exibição.
-const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc"];
+const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc", "compras"];
 
 // Mapeia o valor do enum para um rótulo amigável exibido nos selects e badges.
 const PERFIL_LABELS = {
@@ -14,6 +14,7 @@ const PERFIL_LABELS = {
   delivery: "Delivery",
   comercial: "Comercial",
   noc: "NOC",
+  compras: "Compras",
   // legados — exibição somente
   operacional: "Operacional",
   tecnico: "Técnico",
@@ -30,6 +31,7 @@ const ROLE_STYLES = {
   delivery:       { bg: "#fff0f6", fg: "#9b1b5a",  label: "Delivery" },
   comercial:      { bg: "#f6ecff", fg: "#6b2cb3",  label: "Comercial" },
   noc:            { bg: "#e8fff0", fg: "#0e6b3a",  label: "NOC" },
+  compras:        { bg: "#cffafe", fg: "#0e7490",  label: "Compras" },
   // legados — exibição somente
   gestor:         { bg: "#e8ecff", fg: "#2f3d99",  label: "Gestor" },
   gestor_delivery:{ bg: "#ffe7f3", fg: "#9b1b5a",  label: "Gestora de Delivery" },
@@ -359,6 +361,7 @@ export default function AdminUsers() {
     acesso_kanban_delivery: false,
     acesso_kanban_comercial: false,
     acesso_kanban_bko: false,
+    acesso_kanban_compras: false,
     nova_senha: "",
   });
 
@@ -522,6 +525,7 @@ export default function AdminUsers() {
       acesso_kanban_delivery: Boolean(user.acesso_kanban_delivery),
       acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
       acesso_kanban_bko: Boolean(user.acesso_kanban_bko),
+      acesso_kanban_compras: Boolean(user.acesso_kanban_compras),
       nova_senha: "",
     });
   };
@@ -536,6 +540,7 @@ export default function AdminUsers() {
       acesso_kanban_delivery: false,
       acesso_kanban_comercial: false,
       acesso_kanban_bko: false,
+      acesso_kanban_compras: false,
       nova_senha: "",
     });
   };
@@ -886,6 +891,16 @@ export default function AdminUsers() {
                           />
                           BKO
                         </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_compras}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_compras: e.target.checked }))
+                            }
+                          />
+                          Compras
+                        </label>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -898,7 +913,10 @@ export default function AdminUsers() {
                         {user.acesso_kanban_bko && (
                           <span style={{ ...styles.badge, background: "#edf4ff", color: "#1a56aa" }}>BKO</span>
                         )}
-                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && (
+                        {user.acesso_kanban_compras && (
+                          <span style={{ ...styles.badge, background: "#cffafe", color: "#0e7490" }}>Compras</span>
+                        )}
+                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && !user.acesso_kanban_compras && (
                           <span style={{ color: "#7a73a1", fontSize: 13 }}>—</span>
                         )}
                       </div>
