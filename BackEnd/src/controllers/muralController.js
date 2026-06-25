@@ -1,4 +1,5 @@
 const MuralPost = require("../models/MuralPost");
+const { sanitizeRichHtml } = require("../utils/sanitizeHtml");
 
 // Lista todos os posts do mural (mais recentes primeiro)
 exports.getPosts = async (req, res) => {
@@ -13,9 +14,11 @@ exports.getPosts = async (req, res) => {
 // Cria um novo post no mural
 exports.createPost = async (req, res) => {
   try {
-    const { autor, conteudo, midias } = req.body;
-    if (!autor || !conteudo) {
-      return res.status(400).json({ error: "Autor e conteúdo são obrigatórios" });
+    const { autor, midias } = req.body;
+    const conteudo = sanitizeRichHtml(req.body.conteudo) || "";
+    const temMidia = Array.isArray(midias) && midias.length > 0;
+    if (!autor || (!conteudo && !temMidia)) {
+      return res.status(400).json({ error: "Informe conteúdo ou pelo menos uma mídia" });
     }
     const data = new Date().toISOString().slice(0, 10);
     const post = await MuralPost.create({ autor, conteudo, data, midias: midias || [] });
@@ -29,7 +32,8 @@ exports.createPost = async (req, res) => {
 exports.updatePost = async (req, res) => {
   try {
     const { id } = req.params;
-    const { conteudo, midias } = req.body;
+    const { midias } = req.body;
+    const conteudo = sanitizeRichHtml(req.body.conteudo) ?? "";
     const post = await MuralPost.findByPk(id);
     if (!post) return res.status(404).json({ error: "Post não encontrado" });
     post.conteudo = conteudo;

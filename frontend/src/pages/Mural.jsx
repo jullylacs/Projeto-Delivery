@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import api from "../services/api";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Bold, Italic, List, ListOrdered, Quote, Code, Pin, Pencil, Trash2, Send, X, Check, ImagePlus, Play } from "lucide-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import { Pin, Pencil, Trash2, X, Check, ImagePlus, Play } from "lucide-react";
 
 // ── Utilitários ───────────────────────────────────────────────────────────────
 const AVATAR_PALETTE = [
@@ -31,7 +32,7 @@ const relativeTime = (dateStr) => {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 };
 
-// Lê arquivo como data URL (base64)
+// Lê arquivo como data URL (base64) — usado na edição de posts
 function lerArquivo(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -41,7 +42,6 @@ function lerArquivo(file) {
   });
 }
 
-// Limites de tamanho
 const LIMITE_IMAGEM_MB = 3;
 const LIMITE_VIDEO_MB = 8;
 const MAX_IMAGENS = 5;
@@ -198,6 +198,7 @@ const css = `
     transition: background 0.15s, color 0.15s;
   }
   .toolbar-btn:hover { background: rgba(108,59,255,0.12); color: var(--accent); }
+  .toolbar-btn.active { background: rgba(108,59,255,0.14); color: var(--accent); border-color: rgba(108,59,255,0.3); }
   .toolbar-sep {
     width: 1px;
     height: 18px;
@@ -811,6 +812,109 @@ const css = `
     background: linear-gradient(135deg, #1a0640 0%, #4a1fa8 55%, #6c3bff 100%);
   }
   html[data-theme="dark"] .post-gallery-img { background: #17142b; }
+
+  /* TipTap no compose */
+  .compose-tiptap .ProseMirror {
+    outline: none;
+    min-height: 100px;
+    font-size: 14.5px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.65;
+    padding: 14px 18px;
+    cursor: text;
+  }
+  .compose-tiptap .ProseMirror > * + * { margin-top: 0.4em; }
+  .compose-tiptap .ProseMirror p { margin: 0 0 4px; }
+  .compose-tiptap .ProseMirror p.is-editor-empty:first-child::before {
+    content: "Escreva um aviso, regra ou comunicado…";
+    color: var(--ink-faint);
+    opacity: 0.7;
+    pointer-events: none;
+    float: left;
+    height: 0;
+  }
+  .compose-tiptap .ProseMirror h1 { font-size: 24px; font-weight: 800; margin: 12px 0 6px; color: var(--ink); }
+  .compose-tiptap .ProseMirror h2 { font-size: 19px; font-weight: 700; margin: 10px 0 4px; color: var(--ink); }
+  .compose-tiptap .ProseMirror h3 { font-size: 16px; font-weight: 700; margin: 8px 0 4px; color: var(--ink); }
+  .compose-tiptap .ProseMirror ul,
+  .compose-tiptap .ProseMirror ol { padding-left: 22px; margin: 6px 0; }
+  .compose-tiptap .ProseMirror li { margin-bottom: 3px; }
+  .compose-tiptap .ProseMirror pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; overflow-x: auto; margin: 6px 0; }
+  .compose-tiptap .ProseMirror pre code { background: none; border: none; padding: 0; color: var(--ink); }
+  .compose-tiptap .ProseMirror hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .compose-tiptap .ProseMirror blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 8px 0;
+    padding: 4px 14px;
+    color: var(--ink-soft);
+    background: var(--surface2);
+    border-radius: 0 8px 8px 0;
+    font-style: italic;
+  }
+  .compose-tiptap .ProseMirror code {
+    background: var(--surface2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: 12.5px;
+    color: var(--accent);
+  }
+
+  /* TipTap no modal de edição */
+  .edit-tiptap .ProseMirror {
+    outline: none;
+    min-height: 120px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    line-height: 1.65;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+  }
+  .edit-tiptap .ProseMirror:focus { border-color: var(--accent); }
+  .edit-tiptap .ProseMirror > * + * { margin-top: 0.4em; }
+  .edit-tiptap .ProseMirror p { margin: 0 0 4px; }
+  .edit-tiptap .ProseMirror h1 { font-size: 22px; font-weight: 800; margin: 10px 0 4px; color: var(--ink); }
+  .edit-tiptap .ProseMirror h2 { font-size: 18px; font-weight: 700; margin: 8px 0 4px; color: var(--ink); }
+  .edit-tiptap .ProseMirror h3 { font-size: 15px; font-weight: 700; margin: 6px 0 4px; color: var(--ink); }
+  .edit-tiptap .ProseMirror ul,
+  .edit-tiptap .ProseMirror ol { padding-left: 22px; margin: 6px 0; }
+  .edit-tiptap .ProseMirror pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; overflow-x: auto; margin: 6px 0; }
+  .edit-tiptap .ProseMirror pre code { background: none; border: none; padding: 0; color: var(--ink); }
+  .edit-tiptap .ProseMirror hr { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+  .edit-tiptap .ProseMirror blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 8px 0;
+    padding: 4px 14px;
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  .edit-tiptap .ProseMirror code { background: var(--surface2); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; color: var(--accent); }
+
+  /* HTML renderizado nos posts */
+  .post-html-content { font-size: 14.5px; color: var(--ink-soft); line-height: 1.72; font-weight: 400; }
+  .post-html-content p { margin: 0 0 8px; }
+  .post-html-content p:last-child { margin-bottom: 0; }
+  .post-html-content ul, .post-html-content ol { margin: 8px 0; padding-left: 22px; }
+  .post-html-content li { margin-bottom: 4px; }
+  .post-html-content strong { font-weight: 600; color: var(--ink); }
+  .post-html-content em { font-style: italic; }
+  .post-html-content blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid var(--accent); color: var(--ink-soft); background: var(--surface2); border-radius: 0 8px 8px 0; font-style: italic; }
+  .post-html-content h1 { font-size: 26px; font-weight: 800; margin: 14px 0 6px; color: var(--ink); }
+  .post-html-content h2 { font-size: 20px; font-weight: 700; margin: 12px 0 4px; color: var(--ink); }
+  .post-html-content h3 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; color: var(--ink); }
+  .post-html-content code { background: var(--surface2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 12.5px; color: var(--accent); font-family: 'Fira Mono', 'Courier New', monospace; }
+  .post-html-content pre { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; overflow-x: auto; margin: 10px 0; }
+  .post-html-content pre code { background: none; border: none; padding: 0; color: var(--ink-soft); }
+  .post-html-content hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  html[data-theme="dark"] .compose-tiptap .ProseMirror,
+  html[data-theme="dark"] .edit-tiptap .ProseMirror { color: #ede8ff !important; }
 `;
 
 const ACCENT_TOPS = [
@@ -846,23 +950,33 @@ function MidiaThumbs({ midias, onRemover }) {
 export default function MuralPage() {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
-  const isGestorOuAdmin = ["admin", "gestor", "gestor_delivery"].includes(user?.perfil);
+  const isAdmin = user?.perfil === "admin";
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [usuarios, setUsuarios] = useState([]);
 
   // Compose
-  const [novoPost, setNovoPost] = useState("");
-  const [novasMidias, setNovasMidias] = useState([]);
-  const textAreaRef = useRef();
-  const fileInputRef = useRef();
+  const [composeMidias, setComposeMidias] = useState([]);
+  const [publicando, setPublicando] = useState(false);
+  const composeFileInputRef = useRef();
 
   // Edição
   const [editIndex, setEditIndex] = useState(null);
-  const [editConteudo, setEditConteudo] = useState("");
   const [editMidias, setEditMidias] = useState([]);
   const editFileInputRef = useRef();
+
+  // Editores TipTap
+  const composeEditor = useEditor({ extensions: [StarterKit, Underline], content: "" });
+  const editEditor    = useEditor({ extensions: [StarterKit, Underline], content: "" });
+
+  useEffect(() => {
+    if (editIndex !== null && editEditor) {
+      editEditor.commands.setContent(posts[editIndex]?.conteudo || "", false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editIndex, editEditor]);
 
   // Exclusão
   const [confirmDeleteIndex, setConfirmDeleteIndex] = useState(null);
@@ -875,116 +989,69 @@ export default function MuralPage() {
       .then(res => setPosts(res.data || []))
       .catch(() => setError("Erro ao carregar mural"))
       .finally(() => setLoading(false));
+    api.get("/users/assignable")
+      .then(res => setUsuarios(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
   }, []);
 
-  // ── Formatação de texto ────────────────────────────────────────────────────
-  // Lê node.value diretamente do DOM para evitar stale closure com React Compiler.
-  const applyInlineFormat = (prefix, suffix = prefix) => {
-    const node = textAreaRef.current;
-    if (!node) return;
-    const text = node.value;
-    const start = node.selectionStart ?? text.length;
-    const end = node.selectionEnd ?? text.length;
-    const selected = text.slice(start, end) || "texto";
-    const next = `${text.slice(0, start)}${prefix}${selected}${suffix}${text.slice(end)}`;
-    setNovoPost(next);
-    requestAnimationFrame(() => {
-      node.focus();
-      node.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-    });
-  };
-  const applyLinePrefix = (prefix) => {
-    const node = textAreaRef.current;
-    if (!node) return;
-    const text = node.value;
-    const start = node.selectionStart ?? text.length;
-    const end = node.selectionEnd ?? text.length;
-    const block = text.slice(start, end) || "item";
-    const prefixed = block.split("\n").map(l => l.trim() ? `${prefix}${l}` : l).join("\n");
-    const next = `${text.slice(0, start)}${prefixed}${text.slice(end)}`;
-    setNovoPost(next);
-    requestAnimationFrame(() => { node.focus(); node.setSelectionRange(start, start + prefixed.length); });
-  };
-
-  const toolbarActions = [
-    { icon: <Bold size={14} />,         label: "Negrito",         action: () => applyInlineFormat("**") },
-    { icon: <Italic size={14} />,       label: "Itálico",         action: () => applyInlineFormat("*") },
-    { icon: <Quote size={14} />,        label: "Citação",         action: () => applyLinePrefix("> ") },
-    { icon: <List size={14} />,         label: "Lista",           action: () => applyLinePrefix("- ") },
-    { icon: <ListOrdered size={14} />,  label: "Lista numerada",  action: () => applyLinePrefix("1. ") },
-    { icon: <Code size={14} />,         label: "Código",          action: () => applyInlineFormat("`") },
-  ];
-
-  // ── Upload de mídia ────────────────────────────────────────────────────────
-  async function handleAdicionarMidias(e, setMidiasFn, midias) {
-    const arquivos = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!arquivos.length) return;
-
-    const imagens = midias.filter(m => m.tipo === "imagem");
-    const videos  = midias.filter(m => m.tipo === "video");
-    const novas = [];
-
-    for (const file of arquivos) {
-      const isVideo = file.type.startsWith("video/");
-      const isImagem = file.type.startsWith("image/");
-      if (!isImagem && !isVideo) continue;
-
-      const limiteMB = isVideo ? LIMITE_VIDEO_MB : LIMITE_IMAGEM_MB;
-      if (file.size > limiteMB * 1024 * 1024) {
-        alert(`"${file.name}" excede o limite de ${limiteMB}MB.`);
-        continue;
-      }
-      if (isImagem && imagens.length + novas.filter(n => n.tipo === "imagem").length >= MAX_IMAGENS) {
-        alert(`Máximo de ${MAX_IMAGENS} imagens por post.`);
-        break;
-      }
-      if (isVideo && videos.length + novas.filter(n => n.tipo === "video").length >= MAX_VIDEOS) {
-        alert(`Máximo de ${MAX_VIDEOS} vídeo por post.`);
-        break;
-      }
-      const dados = await lerArquivo(file);
-      novas.push({ tipo: isVideo ? "video" : "imagem", nome: file.name, dados });
+  // ── Publicar ───────────────────────────────────────────────────────────────
+  async function handlePublicar() {
+    const texto = composeEditor?.getHTML() || "";
+    const isVazio = !texto || texto === "<p></p>";
+    if (isVazio && composeMidias.length === 0) return;
+    setPublicando(true);
+    try {
+      const res = await api.post("/mural", {
+        autor: user?.nome || "Usuário",
+        conteudo: isVazio ? "" : texto,
+        midias: composeMidias,
+      });
+      setPosts(prev => [res.data, ...prev]);
+      composeEditor?.commands.clearContent();
+      setComposeMidias([]);
+    } catch {
+      setError("Erro ao publicar comunicado");
+    } finally {
+      setPublicando(false);
     }
-    if (novas.length) setMidiasFn(prev => [...prev, ...novas]);
   }
 
   function removerMidia(idx, setMidiasFn) {
     setMidiasFn(prev => prev.filter((_, i) => i !== idx));
   }
 
-  // ── Publicar ───────────────────────────────────────────────────────────────
-  async function publicar(e) {
-    e.preventDefault();
-    if (!novoPost.trim() && novasMidias.length === 0) return;
-    try {
-      const res = await api.post("/mural", {
-        autor: user?.nome || "Usuário",
-        conteudo: novoPost,
-        midias: novasMidias,
-      });
-      setPosts(prev => [res.data, ...prev]);
-      setNovoPost("");
-      setNovasMidias([]);
-    } catch {
-      setError("Erro ao publicar comunicado");
+  async function handleAdicionarMidias(e, setMidiasFn, midiaAtual) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    for (const file of files) {
+      const isVideo  = file.type.startsWith("video/");
+      const isImagem = file.type.startsWith("image/");
+      const limiteMB = isVideo ? LIMITE_VIDEO_MB : LIMITE_IMAGEM_MB;
+      if (file.size > limiteMB * 1024 * 1024) { setError(`"${file.name}" excede ${limiteMB} MB.`); continue; }
+      if (isImagem && midiaAtual.filter(m => m.tipo === "imagem").length >= MAX_IMAGENS) { setError(`Máximo de ${MAX_IMAGENS} imagens.`); continue; }
+      if (isVideo  && midiaAtual.filter(m => m.tipo === "video").length  >= MAX_VIDEOS)  { setError(`Máximo de ${MAX_VIDEOS} vídeo.`);   continue; }
+      try {
+        const dados = await lerArquivo(file);
+        setMidiasFn(prev => [...prev, { tipo: isVideo ? "video" : isImagem ? "imagem" : "arquivo", nome: file.name, dados, mimeType: file.type }]);
+      } catch { setError("Erro ao ler arquivo."); }
     }
   }
 
   // ── Edição ─────────────────────────────────────────────────────────────────
   function abrirModalEdicao(idx) {
     setEditIndex(idx);
-    setEditConteudo(posts[idx].conteudo);
     setEditMidias(posts[idx].midias || []);
   }
 
   async function salvarEdicao(e) {
     e.preventDefault();
-    if (!editConteudo.trim() && editMidias.length === 0) return;
+    const texto = editEditor?.getHTML() || "";
+    const isVazio = !texto || texto === "<p></p>";
+    if (isVazio && editMidias.length === 0) return;
     try {
       const post = posts[editIndex];
       const res = await api.put(`/mural/${post.id}`, {
-        conteudo: editConteudo.trim(),
+        conteudo: isVazio ? "" : texto,
         midias: editMidias,
       });
       setPosts(prev => { const n = [...prev]; n[editIndex] = res.data; return n; });
@@ -1017,26 +1084,6 @@ export default function MuralPage() {
   function lightboxProximo() {
     setLightbox(prev => ({ ...prev, idx: (prev.idx + 1) % prev.imagens.length }));
   }
-
-  // ── Markdown components ────────────────────────────────────────────────────
-  const markdownComponents = {
-    p: ({ children }) => <p style={{ margin: "0 0 8px", lineHeight: 1.7 }}>{children}</p>,
-    ul: ({ children }) => <ul style={{ margin: "8px 0", paddingLeft: 22 }}>{children}</ul>,
-    ol: ({ children }) => <ol style={{ margin: "8px 0", paddingLeft: 22 }}>{children}</ol>,
-    li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-    em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
-    blockquote: ({ children }) => (
-      <blockquote style={{ margin: "10px 0", padding: "8px 14px", borderLeft: "3px solid #6c3bff", background: "var(--surface2,#f0ebff)", borderRadius: "0 8px 8px 0", fontStyle: "italic" }}>
-        {children}
-      </blockquote>
-    ),
-    code: ({ children }) => (
-      <code style={{ background: "var(--surface2,#f0ebff)", border: "1px solid var(--border)", borderRadius: 5, padding: "1px 6px", fontSize: 12.5, color: "#6c3bff", fontFamily: "monospace" }}>
-        {children}
-      </code>
-    ),
-  };
 
   // ── Render da galeria de imagens de um post ────────────────────────────────
   function renderGaleria(midias, postIdx) {
@@ -1099,87 +1146,68 @@ export default function MuralPage() {
         )}
 
         {/* Compose */}
-        {isGestorOuAdmin && (
-          <form onSubmit={publicar} className="compose-box">
+        {isAdmin && (
+          <div className="compose-box">
             <div className="compose-header">
               <div className="compose-user-avatar" style={{ background: avatarGradient(user?.nome) }}>
                 {initials(user?.nome)}
               </div>
-              <span className="compose-label">Novo comunicado</span>
+              <span className="compose-label">Escrever comunicado</span>
             </div>
 
             <div className="compose-toolbar">
-              {toolbarActions.map(({ icon, label, action }) => (
-                <button key={label} type="button" title={label} onClick={action} className="toolbar-btn">
-                  {icon}
-                </button>
-              ))}
-              <div className="toolbar-sep" />
-              <button
-                type="button"
-                title="Adicionar foto ou vídeo"
-                className="toolbar-btn"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "6px 10px" }}
-              >
-                <ImagePlus size={14} />
-                <span>Foto / Vídeo</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                style={{ display: "none" }}
-                onChange={e => handleAdicionarMidias(e, setNovasMidias, novasMidias)}
-              />
+              {composeEditor && (
+                <>
+                  <button className={`toolbar-btn${composeEditor.isActive("bold")      ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleBold().run(); }}      title="Negrito"><b>B</b></button>
+                  <button className={`toolbar-btn${composeEditor.isActive("italic")    ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleItalic().run(); }}    title="Itálico"><i>I</i></button>
+                  <button className={`toolbar-btn${composeEditor.isActive("underline") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleUnderline().run(); }} title="Sublinhado"><u>U</u></button>
+                  <button className={`toolbar-btn${composeEditor.isActive("strike")    ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleStrike().run(); }}    title="Tachado"><s>S</s></button>
+                  <div className="toolbar-sep" />
+                  <button className={`toolbar-btn${composeEditor.isActive("heading", { level: 1 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleHeading({ level: 1 }).run(); }} title="Título 1">H1</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("heading", { level: 2 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleHeading({ level: 2 }).run(); }} title="Título 2">H2</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("heading", { level: 3 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleHeading({ level: 3 }).run(); }} title="Título 3">H3</button>
+                  <div className="toolbar-sep" />
+                  <button className={`toolbar-btn${composeEditor.isActive("bulletList")  ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleBulletList().run(); }}  title="Lista com marcadores">• —</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("orderedList") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleOrderedList().run(); }} title="Lista numerada">1.</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("blockquote") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleBlockquote().run(); }} title="Citação">"</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("code")       ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleCode().run(); }}       title="Código inline">`</button>
+                  <button className={`toolbar-btn${composeEditor.isActive("codeBlock")  ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().toggleCodeBlock().run(); }}  title="Bloco de código">{"</>"}</button>
+                  <button className="toolbar-btn"                                                            onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().setHorizontalRule().run(); }} title="Separador">—</button>
+                  <div className="toolbar-sep" />
+                  <button className="toolbar-btn" onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().undo().run(); }} title="Desfazer">↩</button>
+                  <button className="toolbar-btn" onMouseDown={e => { e.preventDefault(); composeEditor.chain().focus().redo().run(); }} title="Refazer">↪</button>
+                </>
+              )}
             </div>
 
-            <textarea
-              ref={textAreaRef}
-              placeholder="Escreva um aviso, regra ou comunicado… (Markdown suportado)"
-              value={novoPost}
-              onChange={e => setNovoPost(e.target.value)}
-              className="compose-textarea"
-            />
+            <div className="compose-tiptap" onClick={() => composeEditor?.commands.focus()}>
+              <EditorContent editor={composeEditor} />
+            </div>
 
-            {/* Pré-visualização de mídia */}
-            {novasMidias.length > 0 && (
+            {composeMidias.length > 0 && (
               <div className="compose-media-bar">
-                <MidiaThumbs
-                  midias={novasMidias}
-                  onRemover={i => removerMidia(i, setNovasMidias)}
-                />
-                <label className="media-add-label" title="Adicionar mais">
-                  <ImagePlus size={18} />
-                  <span>Adicionar</span>
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    multiple
-                    style={{ display: "none" }}
-                    onChange={e => handleAdicionarMidias(e, setNovasMidias, novasMidias)}
-                  />
-                </label>
-                <span className="media-hint">
-                  Imagens até {LIMITE_IMAGEM_MB}MB · Vídeos até {LIMITE_VIDEO_MB}MB<br />
-                  Máx. {MAX_IMAGENS} fotos · {MAX_VIDEOS} vídeo
-                </span>
+                <MidiaThumbs midias={composeMidias} onRemover={i => removerMidia(i, setComposeMidias)} />
               </div>
             )}
 
             <div className="compose-footer">
-              {(novoPost.length > 0 || novasMidias.length > 0) && (
-                <span className="char-hint">
-                  {novoPost.length > 0 && `${novoPost.length} car. `}
-                  {novasMidias.length > 0 && `· ${novasMidias.length} mídia${novasMidias.length > 1 ? "s" : ""}`}
-                </span>
-              )}
-              <button type="submit" className="publish-btn">
-                <Send size={13} /> Publicar
+              <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--ink-faint)", marginRight: "auto" }} title="Adicionar imagem/vídeo">
+                <ImagePlus size={15} />
+                Foto/Vídeo
+                <input
+                  ref={composeFileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  style={{ display: "none" }}
+                  onChange={e => handleAdicionarMidias(e, setComposeMidias, composeMidias)}
+                />
+              </label>
+              <button className="publish-btn" onClick={handlePublicar} disabled={publicando} style={{ opacity: publicando ? 0.7 : 1, cursor: publicando ? "not-allowed" : "pointer" }}>
+                {publicando ? "Publicando…" : <><Pin size={13} /> Publicar</>}
               </button>
             </div>
-          </form>
+          </div>
         )}
 
         {/* Posts */}
@@ -1205,7 +1233,7 @@ export default function MuralPage() {
               <div className="empty-state">
                 <div className="empty-icon">📋</div>
                 <div className="empty-text">Nenhum comunicado ainda.</div>
-                {isGestorOuAdmin && <div className="empty-sub">Use o formulário acima para publicar o primeiro.</div>}
+                {isAdmin && <div className="empty-sub">Use o formulário acima para publicar o primeiro.</div>}
               </div>
             )}
 
@@ -1237,10 +1265,11 @@ export default function MuralPage() {
 
                     {/* Conteúdo de texto */}
                     {post.conteudo && (
-                      <div className="post-content">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                          {post.conteudo}
-                        </ReactMarkdown>
+                      <div className="post-html-content">
+                        {post.conteudo.trimStart().startsWith("<")
+                          ? <span dangerouslySetInnerHTML={{ __html: post.conteudo }} />
+                          : <span style={{ whiteSpace: "pre-wrap" }}>{post.conteudo}</span>
+                        }
                       </div>
                     )}
 
@@ -1257,6 +1286,31 @@ export default function MuralPage() {
                       </div>
                     ))}
 
+                    {/* Arquivos para download */}
+                    {midias.filter(m => m.tipo === "arquivo").length > 0 && (
+                      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {midias.filter(m => m.tipo === "arquivo").map((arq, ai) => (
+                          <a
+                            key={ai}
+                            href={arq.dados}
+                            download={arq.nome}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 8,
+                              padding: "8px 14px", borderRadius: 9,
+                              border: "1.5px solid var(--border)", background: "var(--surface2)",
+                              color: "var(--accent)", fontSize: 13, fontWeight: 600,
+                              textDecoration: "none", width: "fit-content",
+                              transition: "background 0.15s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = "rgba(108,59,255,0.08)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "var(--surface2)"}
+                          >
+                            📎 {arq.nome}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Badge de mídia (quando tem conteúdo + mídia) */}
                     {post.conteudo && midias.length > 0 && (
                       <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1270,7 +1324,7 @@ export default function MuralPage() {
                     )}
                   </div>
 
-                  {isGestorOuAdmin && (
+                  {isAdmin && (
                     <div className="post-actions">
                       <button className="action-btn btn-edit" onClick={() => abrirModalEdicao(i)}>
                         <Pencil size={12} /> Editar
@@ -1317,13 +1371,33 @@ export default function MuralPage() {
             </div>
             <div className="modal-body">
               <form onSubmit={salvarEdicao}>
-                <textarea
-                  value={editConteudo}
-                  onChange={e => setEditConteudo(e.target.value)}
-                  className="modal-textarea"
-                  autoFocus
-                  placeholder="Conteúdo do comunicado…"
-                />
+                <div style={{ display: "flex", gap: 3, marginBottom: 10, flexWrap: "wrap", padding: "6px 10px", background: "var(--surface2)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                  {editEditor && (
+                    <>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("bold")      ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleBold().run(); }}      title="Negrito"><b>B</b></button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("italic")    ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleItalic().run(); }}    title="Itálico"><i>I</i></button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("underline") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleUnderline().run(); }} title="Sublinhado"><u>U</u></button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("strike")    ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleStrike().run(); }}    title="Tachado"><s>S</s></button>
+                      <div className="toolbar-sep" />
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("heading", { level: 1 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleHeading({ level: 1 }).run(); }} title="Título 1">H1</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("heading", { level: 2 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleHeading({ level: 2 }).run(); }} title="Título 2">H2</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("heading", { level: 3 }) ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleHeading({ level: 3 }).run(); }} title="Título 3">H3</button>
+                      <div className="toolbar-sep" />
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("bulletList")  ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleBulletList().run(); }}  title="Lista com marcadores">• —</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("orderedList") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleOrderedList().run(); }} title="Lista numerada">1.</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("blockquote") ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleBlockquote().run(); }} title="Citação">"</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("code")       ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleCode().run(); }}       title="Código inline">`</button>
+                      <button type="button" className={`toolbar-btn${editEditor.isActive("codeBlock")  ? " active" : ""}`} onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().toggleCodeBlock().run(); }}  title="Bloco de código">{"</>"}</button>
+                      <button type="button" className="toolbar-btn"                                                         onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().setHorizontalRule().run(); }} title="Separador">—</button>
+                      <div className="toolbar-sep" />
+                      <button type="button" className="toolbar-btn" onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().undo().run(); }} title="Desfazer">↩</button>
+                      <button type="button" className="toolbar-btn" onMouseDown={e => { e.preventDefault(); editEditor.chain().focus().redo().run(); }} title="Refazer">↪</button>
+                    </>
+                  )}
+                </div>
+                <div className="edit-tiptap">
+                  <EditorContent editor={editEditor} />
+                </div>
 
                 {/* Mídias existentes */}
                 <div className="edit-media-section">
