@@ -1,4 +1,5 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import api from "../services/api";
 
 const Board = lazy(() => import("../components/Kanban/Board"));
 
@@ -145,26 +146,56 @@ function NoAccessNotice() {
 }
 
 export default function Kanban() {
-  const user = useMemo(() => readUserFromStorage(), []);
+  const [user, setUser] = useState(() => readUserFromStorage());
+
+  // Busca perfil atualizado do servidor para garantir permissões corretas
+  useEffect(() => {
+    const stored = readUserFromStorage();
+    if (!stored?.id) return;
+    api.get(`/users/${stored.id}`)
+      .then(res => {
+        const fresh = res.data;
+        if (!fresh?.id) return;
+        const merged = { ...stored, ...fresh };
+        localStorage.setItem("user", JSON.stringify(merged));
+        setUser(merged);
+      })
+      .catch(() => {}); // falha silenciosa — usa dados do localStorage
+  }, []);
+
   const canDelivery = Boolean(user?.acesso_kanban_delivery);
   const canComercial = Boolean(user?.acesso_kanban_comercial);
   const canBko = Boolean(user?.acesso_kanban_bko);
   const canCompras = Boolean(user?.acesso_kanban_compras);
 
-  const availableBoards = useMemo(() => {
+  const availableBoards = (() => {
     const list = [];
     if (canDelivery) list.push("delivery");
     if (canComercial) list.push("comercial");
     if (canBko) list.push("bko");
     if (canCompras) list.push("compras");
     return list;
-  }, [canDelivery, canComercial, canBko, canCompras]);
+  })();
 
   const [activeBoard, setActiveBoard] = useState(() => {
     const preferred = readPreferredBoard();
-    if (preferred && availableBoards.includes(preferred)) return preferred;
-    return availableBoards[0] ?? null;
+    const initial = readUserFromStorage();
+    const boards = [];
+    if (initial?.acesso_kanban_delivery) boards.push("delivery");
+    if (initial?.acesso_kanban_comercial) boards.push("comercial");
+    if (initial?.acesso_kanban_bko) boards.push("bko");
+    if (initial?.acesso_kanban_compras) boards.push("compras");
+    if (preferred && boards.includes(preferred)) return preferred;
+    return boards[0] ?? null;
   });
+
+  // Ajusta aba ativa se o fetch revelar novos boards disponíveis
+  useEffect(() => {
+    if (!activeBoard && availableBoards.length > 0) {
+      const preferred = readPreferredBoard();
+      setActiveBoard(availableBoards.includes(preferred) ? preferred : availableBoards[0]);
+    }
+  }, [availableBoards, activeBoard]);
 
   useEffect(() => {
     if (activeBoard) {

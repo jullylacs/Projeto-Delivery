@@ -1841,6 +1841,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const [selectedCards, setSelectedCards] = useState([]);
   // Estado do dialog de transferência (drag-and-drop e botão de ação)
   const [transferDialog, setTransferDialog] = useState(null);
+  // Estado do dialog de transferência em lote para outro board
+  const [bulkTransferDialog, setBulkTransferDialog] = useState(null);
   // { card, toBoard, columns: [], loading: bool, error: "", submitting: bool, targetColumnId: number|null }
   const trelloPrefs = readTrelloPrefs();
   // Estados principais
@@ -2115,6 +2117,46 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   }, [safeBoard]);
 
   const closeTransferDialog = useCallback(() => setTransferDialog(null), []);
+
+  const openBulkTransferDialog = useCallback(async (toBoard) => {
+    if (!VALID_BOARDS.includes(toBoard) || toBoard === safeBoard) return;
+    setBulkTransferDialog({ toBoard, columns: [], loading: true, error: "", submitting: false, targetColumnId: null });
+    try {
+      const res = await api.get("/columns", { params: { board: toBoard } });
+      const normalized = (Array.isArray(res.data) ? res.data : [])
+        .map((item, i) => normalizeColumnEntity(item, i))
+        .filter((item) => item.nome);
+      setBulkTransferDialog((prev) => prev ? { ...prev, columns: normalized, loading: false, targetColumnId: normalized[0]?.id || null } : prev);
+    } catch {
+      setBulkTransferDialog((prev) => prev ? { ...prev, loading: false, error: "Não foi possível carregar as colunas do board de destino." } : prev);
+    }
+  }, [safeBoard]);
+
+  const confirmBulkTransfer = useCallback(async () => {
+    if (!bulkTransferDialog?.targetColumnId || !selectedCards.length) return;
+    setBulkTransferDialog((prev) => prev ? { ...prev, submitting: true, error: "" } : prev);
+    const originCols = new Map();
+    for (const card of cards) {
+      const key = getCardKey(card);
+      if (selectedCards.includes(key)) originCols.set(key, getCardColumnId(card));
+    }
+    try {
+      await Promise.all(
+        selectedCards.map((cardId) =>
+          api.post(`/cards/${cardId}/transfer`, { coluna_id: bulkTransferDialog.targetColumnId })
+        )
+      );
+      setCards((prev) => prev.filter((c) => !selectedCards.includes(getCardKey(c))));
+      for (const [, fromCol] of originCols) {
+        if (Number.isFinite(fromCol)) adjustColumnTotal(fromCol, -1);
+      }
+      setBulkTransferDialog(null);
+      clearSelectedCards();
+    } catch {
+      setBulkTransferDialog((prev) => prev ? { ...prev, submitting: false, error: "Erro ao transferir cards. Tente novamente." } : prev);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkTransferDialog, selectedCards, cards, adjustColumnTotal]);
 
   const confirmTransfer = useCallback(async () => {
     if (!transferDialog || !transferDialog.targetColumnId) return;
@@ -3890,6 +3932,22 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
               <option key={col.id} value={col.id}>{col.nome}</option>
             ))}
           </select>
+          {/* Transferência para outro board */}
+          {VALID_BOARDS.filter(b => b !== safeBoard).length > 0 && (
+            <>
+              <div style={{ width: 1, height: 28, background: '#d6d0ff', flexShrink: 0, margin: '0 4px' }} />
+              <span style={{ color: '#7b68cc', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>Mover para outro Kanban:</span>
+              {VALID_BOARDS.filter(b => b !== safeBoard).map(toBoard => (
+                <button
+                  key={toBoard}
+                  style={{ background: '#fff', border: '1px solid #c4b5fd', borderRadius: 8, color: '#5a30ff', fontWeight: 700, padding: '7px 14px', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  onClick={() => openBulkTransferDialog(toBoard)}
+                >
+                  → {BOARD_LABELS[toBoard]}
+                </button>
+              ))}
+            </>
+          )}
           <button
             style={{
               background: '#fff',
@@ -5665,6 +5723,65 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 setEditingCard(null);
               }}
             />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de transferência em lote para outro board */}
+      {bulkTransferDialog && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(20,8,48,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5100, padding: 16 }}
+          onClick={(e) => { if (e.target === e.currentTarget && !bulkTransferDialog.submitting) setBulkTransferDialog(null); }}
+        >
+          <div style={{ width: "100%", maxWidth: 460, background: "var(--bg-card)", borderRadius: 16, boxShadow: "0 20px 50px rgba(45,18,87,0.35)", padding: 24, border: "1px solid var(--border)" }}>
+            <h2 style={{ margin: 0, color: "var(--text)", fontSize: 20 }}>
+              Transferir para {BOARD_LABELS[bulkTransferDialog.toBoard] || bulkTransferDialog.toBoard}
+            </h2>
+            <p style={{ margin: "8px 0 16px 0", color: "var(--text-label)", fontSize: 14 }}>
+              <strong style={{ color: "#2f1e70" }}>{selectedCards.length} card(s)</strong> serão movidos do Kanban {boardLabel}.
+            </p>
+            {bulkTransferDialog.loading && (
+              <p style={{ margin: 0, color: "#7159a8", fontSize: 13 }}>Carregando colunas de destino…</p>
+            )}
+            {!bulkTransferDialog.loading && bulkTransferDialog.columns.length === 0 && !bulkTransferDialog.error && (
+              <p style={{ margin: 0, color: "#b33524", fontSize: 13 }}>Nenhuma coluna encontrada no board de destino.</p>
+            )}
+            {bulkTransferDialog.columns.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#4b3b9a" }}>Coluna de destino</label>
+                <select
+                  value={bulkTransferDialog.targetColumnId || ""}
+                  onChange={(e) => setBulkTransferDialog((prev) => prev ? { ...prev, targetColumnId: Number(e.target.value) || null } : prev)}
+                  disabled={bulkTransferDialog.submitting}
+                  style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg-input)", fontSize: 14, color: "var(--text)" }}
+                >
+                  {bulkTransferDialog.columns.map((col) => (
+                    <option key={col.id} value={col.id}>{col.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {bulkTransferDialog.error && (
+              <p style={{ margin: "12px 0 0 0", color: "#b33524", fontSize: 13 }}>{bulkTransferDialog.error}</p>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+              <button
+                type="button"
+                onClick={() => setBulkTransferDialog(null)}
+                disabled={bulkTransferDialog.submitting}
+                style={{ border: "1px solid #d4c8fb", background: "#faf7ff", color: "#4b2d84", borderRadius: 10, padding: "9px 14px", fontWeight: 600, cursor: bulkTransferDialog.submitting ? "not-allowed" : "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmBulkTransfer}
+                disabled={bulkTransferDialog.submitting || !bulkTransferDialog.targetColumnId}
+                style={{ border: "1px solid #5a30ff", background: "linear-gradient(135deg,#7a50c6,#5a30ff)", color: "#fff", borderRadius: 10, padding: "9px 16px", fontWeight: 700, cursor: bulkTransferDialog.submitting || !bulkTransferDialog.targetColumnId ? "not-allowed" : "pointer", opacity: bulkTransferDialog.submitting || !bulkTransferDialog.targetColumnId ? 0.7 : 1 }}
+              >
+                {bulkTransferDialog.submitting ? "Transferindo…" : `Confirmar (${selectedCards.length} cards)`}
+              </button>
             </div>
           </div>
         </div>

@@ -23,15 +23,22 @@ export default function Header({ onToggleSidebar, isSidebarOpen, isMobile = fals
   const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [isDark, setIsDark] = useState(
-    () => document.documentElement.dataset.theme === "dark"
+  const THEMES = ["light", "gray", "dark"];
+  const THEME_ICONS  = { light: "🌙", gray: "⭐", dark: "☀️" };
+  const THEME_LABELS = { light: "Mudar para cinza", gray: "Mudar para escuro", dark: "Mudar para claro" };
+
+  const [theme, setTheme] = useState(
+    () => {
+      const saved = document.documentElement.dataset.theme;
+      return THEMES.includes(saved) ? saved : "light";
+    }
   );
 
   const toggleTheme = () => {
-    const next = isDark ? "light" : "dark";
+    const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
     document.documentElement.dataset.theme = next;
     localStorage.setItem("theme", next);
-    setIsDark(!isDark);
+    setTheme(next);
   };
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -487,11 +494,11 @@ export default function Header({ onToggleSidebar, isSidebarOpen, isMobile = fals
       {/* Área direita contendo notificações e menu do usuário */}
       <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "20px" }}>
 
-        {/* Toggle tema claro/escuro */}
+        {/* Toggle de tema: claro → cinza → escuro */}
         <button
           type="button"
           onClick={toggleTheme}
-          title={isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+          title={THEME_LABELS[theme]}
           style={{
             width: 36, height: 36, borderRadius: "50%",
             border: "1px solid rgba(255,255,255,0.2)",
@@ -504,7 +511,7 @@ export default function Header({ onToggleSidebar, isSidebarOpen, isMobile = fals
           onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
           onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
         >
-          {isDark ? "☀️" : "🌙"}
+          {THEME_ICONS[theme]}
         </button>
 
         {/* Ícone de Notificação */}
