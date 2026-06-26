@@ -148,7 +148,18 @@ function NoAccessNotice() {
 export default function Kanban() {
   const [user, setUser] = useState(() => readUserFromStorage());
 
-  // Busca perfil atualizado do servidor para garantir permissões corretas
+  /*
+   * Busca o perfil atualizado do servidor ao montar a página.
+   *
+   * O localStorage pode estar desatualizado: se um admin alterou as flags
+   * `acesso_kanban_*` do usuário após o login, a versão em cache não refletiria
+   * as novas permissões. Buscamos o dado fresco e fazemos o merge, preservando
+   * campos locais (ex: preferências de UI) que não vêm da API.
+   *
+   * A falha é silenciosa: se a rede estiver indisponível ou o token expirado,
+   * o interceptor em api.js cuidará do logout automático (401). Para os demais
+   * erros, degradamos graciosamente exibindo os boards do cache local.
+   */
   useEffect(() => {
     const stored = readUserFromStorage();
     if (!stored?.id) return;
@@ -163,11 +174,22 @@ export default function Kanban() {
       .catch(() => {}); // falha silenciosa — usa dados do localStorage
   }, []);
 
+  /*
+   * Cada flag é independente: um usuário pode ter acesso a qualquer combinação
+   * de boards sem relação com seu perfil (ex: delivery + bko). O cast para
+   * Boolean garante que undefined/null do usuário sem dados do servidor
+   * não seja tratado como truthy.
+   */
   const canDelivery = Boolean(user?.acesso_kanban_delivery);
   const canComercial = Boolean(user?.acesso_kanban_comercial);
   const canBko = Boolean(user?.acesso_kanban_bko);
   const canCompras = Boolean(user?.acesso_kanban_compras);
 
+  /*
+   * Lista de boards disponíveis para este usuário — usada para renderizar
+   * as abas e para calcular `canTransferTo` (boards para onde pode transferir).
+   * A ordem importa: define a sequência das abas na UI.
+   */
   const availableBoards = (() => {
     const list = [];
     if (canDelivery) list.push("delivery");
@@ -189,7 +211,17 @@ export default function Kanban() {
     return boards[0] ?? null;
   });
 
-  // Ajusta aba ativa se o fetch revelar novos boards disponíveis
+  /*
+   * Ajuste pós-fetch: o estado inicial de `activeBoard` é calculado a partir
+   * do localStorage (síncrono), mas pode ser null se o usuário não tinha
+   * nenhum board em cache. Quando o fetch retorna e `availableBoards` é
+   * populado, este efeito ativa o primeiro board disponível (ou a preferência
+   * salva, se ela ainda for válida para as novas flags).
+   *
+   * Exemplo de cenário: usuário nunca acessou o Kanban, não tem
+   * `kanbanBoardTab` salvo, o fetch revela acesso a "comercial" — sem este
+   * efeito a página ficaria em branco mostrando o <NoAccessNotice>.
+   */
   useEffect(() => {
     if (!activeBoard && availableBoards.length > 0) {
       const preferred = readPreferredBoard();

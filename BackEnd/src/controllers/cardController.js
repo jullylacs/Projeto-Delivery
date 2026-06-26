@@ -2,7 +2,20 @@ const { randomUUID } = require("crypto");
 const { Card, User, Column, sequelize } = require("../models"); // Importa o model de Card (Sequelize/PostgreSQL)
 const { fn, col, where, QueryTypes, Op } = require("sequelize");
 
+/*
+ * Lista explícita de boards válidos. Usada como allowlist — qualquer valor
+ * que não esteja aqui é tratado como inválido por `resolveBoard`.
+ * Ao adicionar um novo board (ex: "financeiro") inclua aqui E crie a migration
+ * correspondente para adicionar `acesso_kanban_financeiro` em users.
+ */
 const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+
+/*
+ * Normaliza e valida o board recebido como query/param.
+ * Retorna null quando o valor é inválido — os endpoints que chamam esta
+ * função devem responder 400 nesse caso, evitando consultas a boards
+ * inexistentes que retornariam dados vazios de forma silenciosa.
+ */
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;

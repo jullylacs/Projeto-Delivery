@@ -44,7 +44,18 @@ const User = sequelize.define("User", {
     allowNull: true,
   },
 
-  // Acesso aos Kanbans (Delivery, Comercial, BKO e Compras são abas independentes)
+  /*
+   * Flags de acesso ao Kanban — independentes do campo `perfil`.
+   *
+   * Um usuário com perfil "comercial" não tem acesso ao board de Delivery
+   * automaticamente; precisa que um admin ative a flag correspondente.
+   * Isso permite configuração granular: um usuário pode ter perfil "delivery"
+   * mas acesso simultâneo ao board "comercial" se o admin assim permitir.
+   *
+   * O frontend lê essas flags diretamente do objeto `user` no localStorage
+   * (atualizado via GET /users/:id ao carregar o Kanban) para montar as abas
+   * disponíveis. Nunca confie apenas no `perfil` para essa decisão.
+   */
   acesso_kanban_delivery: {
     type: DataTypes.BOOLEAN,
     allowNull: false,

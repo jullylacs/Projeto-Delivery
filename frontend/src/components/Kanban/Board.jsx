@@ -1839,9 +1839,23 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   // Estado para seleção múltipla
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedCards, setSelectedCards] = useState([]);
-  // Estado do dialog de transferência (drag-and-drop e botão de ação)
+
+  /*
+   * `transferDialog` — move UM card para outro board (via drag-and-drop ou
+   * botão "Transferir" no modal do card). O diálogo pede a coluna de destino
+   * no board alvo e então chama POST /cards/:id/transfer.
+   */
   const [transferDialog, setTransferDialog] = useState(null);
-  // Estado do dialog de transferência em lote para outro board
+
+  /*
+   * `bulkTransferDialog` — transfere VÁRIOS cards selecionados para outro
+   * board de uma vez. Diferente de `handleMoveSelectedCards` (que move cards
+   * dentro do MESMO board, apenas mudando de coluna de forma otimista), o
+   * bulk transfer envia cada card para um board diferente via API e os remove
+   * do state local ao concluir.
+   *
+   * Estrutura: { toBoard, columns, loading, error, submitting, targetColumnId }
+   */
   const [bulkTransferDialog, setBulkTransferDialog] = useState(null);
   // { card, toBoard, columns: [], loading: bool, error: "", submitting: bool, targetColumnId: number|null }
   const trelloPrefs = readTrelloPrefs();
@@ -2118,6 +2132,14 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
 
   const closeTransferDialog = useCallback(() => setTransferDialog(null), []);
 
+  /*
+   * Abre o diálogo de transferência em lote para `toBoard`.
+   * Carrega as colunas do board de destino antecipadamente para que o usuário
+   * possa escolher onde os cards vão cair. O estado inicial com `loading:true`
+   * exibe um spinner enquanto a API responde, e o state é atualizado
+   * funcionalmente (prev =>) para evitar race condition caso o usuário
+   * abra e feche o diálogo rapidamente.
+   */
   const openBulkTransferDialog = useCallback(async (toBoard) => {
     if (!VALID_BOARDS.includes(toBoard) || toBoard === safeBoard) return;
     setBulkTransferDialog({ toBoard, columns: [], loading: true, error: "", submitting: false, targetColumnId: null });
@@ -2132,6 +2154,25 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     }
   }, [safeBoard]);
 
+  /*
+   * Confirma a transferência em lote.
+   *
+   * Diferença fundamental em relação a `handleMoveSelectedCards`:
+   * - `handleMoveSelectedCards`: move cards dentro do MESMO board (só muda
+   *   coluna_id). Usa atualização otimista — o card permanece visível.
+   * - `confirmBulkTransfer`: envia cards para OUTRO board via endpoint dedicado
+   *   (/cards/:id/transfer). Os cards deixam de existir neste board e são
+   *   removidos do state local após confirmação da API.
+   *
+   * `Promise.all` dispara todas as transferências em paralelo — mais rápido que
+   * sequencial para lotes grandes, mas significa que uma falha em qualquer card
+   * cai no catch sem saber quais tiveram sucesso. Em caso de erro parcial, o
+   * usuário precisa retentar manualmente para os cards que sobraram.
+   * (Trade-off aceitável para o volume típico de uso.)
+   *
+   * `originCols` mapeia card → coluna de origem para ajustar os contadores de
+   * total de cada coluna após a remoção dos cards do state.
+   */
   const confirmBulkTransfer = useCallback(async () => {
     if (!bulkTransferDialog?.targetColumnId || !selectedCards.length) return;
     setBulkTransferDialog((prev) => prev ? { ...prev, submitting: true, error: "" } : prev);

@@ -57,6 +57,24 @@ html[data-theme="dark"] .nota-editor .ProseMirror mark { filter: brightness(0.55
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // ─── Extensões customizadas ───────────────────────────────────────────────────
+/*
+ * Por que extensões customizadas em vez dos pacotes oficiais?
+ *
+ * Os pacotes @tiptap/extension-task-item, @tiptap/extension-task-list,
+ * @tiptap/extension-link, @tiptap/extension-image, @tiptap/extension-highlight
+ * e @tiptap/extension-color dependem de @tiptap/core >= 2.x e têm peer
+ * dependencies específicas. A versão instalada (@tiptap/core 2.27.2) apresenta
+ * incompatibilidade de API com esses pacotes: os métodos de registro de
+ * extensão mudaram entre minor versions e as extensões do npm travavam o editor
+ * ou geravam erros de tipo silenciosos.
+ *
+ * A solução foi implementar cada extensão diretamente usando Node.create() /
+ * Mark.create() da API pública do core — que é estável — evitando a cadeia
+ * de peer deps problemática.
+ *
+ * ATENÇÃO: se @tiptap/core for atualizado, verifique se os pacotes oficiais
+ * passam a ser compatíveis e considere substituir estas implementações.
+ */
 
 // Task item
 function TaskItemView({ node, updateAttributes }) {
@@ -71,9 +89,31 @@ function TaskItemView({ node, updateAttributes }) {
 }
 const CustomTaskItem = Node.create({
   name:"taskItem", group:"listItem", content:"paragraph+", defining:true,
-  addAttributes() { return { checked:{ default:false, parseHTML:el=>el.dataset.checked==="true", renderHTML:attrs=>({ "data-checked":String(attrs.checked) }) } }; },
+  addAttributes() {
+    return {
+      /*
+       * `parseHTML` e `renderHTML` são obrigatórios para persistência dos atributos.
+       * Sem eles, o ProseMirror serializa o nó para HTML mas não lê o atributo
+       * de volta ao carregar — ou seja, ao salvar e recarregar a nota, todos os
+       * checkboxes voltariam para o estado padrão (false). O par parse/render
+       * garante que `data-checked` sobreviva ao ciclo salvar → banco → recarregar.
+       */
+      checked:{ default:false, parseHTML:el=>el.dataset.checked==="true", renderHTML:attrs=>({ "data-checked":String(attrs.checked) }) }
+    };
+  },
   parseHTML() { return [{ tag:'li[data-type="taskItem"]' }]; },
   renderHTML({ node, HTMLAttributes }) { return ["li", mergeAttributes({ "data-type":"taskItem" }, HTMLAttributes), 0]; },
+  /*
+   * `ReactNodeViewRenderer` monta um componente React dentro do nó ProseMirror,
+   * permitindo usar JSX, hooks e estado para renderizar o checkbox interativo.
+   * Sem isso, teríamos que manipular o DOM diretamente via spec de NodeView.
+   *
+   * `stopEvent: () => false` — por padrão, NodeViews do TipTap interceptam
+   * todos os eventos DOM do nó e os impedem de chegar ao ProseMirror. Isso
+   * quebraria o onChange do <input type="checkbox">, que nunca dispararia.
+   * Retornar false diz ao TipTap para NÃO interceptar eventos, deixando o
+   * React tratar o onChange normalmente.
+   */
   addNodeView() { return ReactNodeViewRenderer(TaskItemView, { stopEvent: () => false }); },
   addKeyboardShortcuts() { return { Enter:()=>this.editor.commands.splitListItem(this.name), Tab:()=>this.editor.commands.sinkListItem(this.name), "Shift-Tab":()=>this.editor.commands.liftListItem(this.name) }; },
 });
@@ -90,6 +130,12 @@ const CustomLink = Mark.create({
   name:"link", inclusive:false,
   addAttributes() {
     return {
+      /*
+       * Mesmo padrão de parseHTML + renderHTML: sem ele, salvar uma nota com
+       * link e recarregá-la perderia o href e o target (o texto ficaria, mas
+       * o link seria quebrado). Os guards `? ... : {}` evitam emitir atributos
+       * vazios no HTML serializado.
+       */
       href:   { default:null,     parseHTML: el => el.getAttribute("href"),   renderHTML: attrs => attrs.href   ? { href:   attrs.href   } : {} },
       target: { default:"_blank", parseHTML: el => el.getAttribute("target"), renderHTML: attrs => attrs.target ? { target: attrs.target } : {} },
     };
@@ -146,7 +192,22 @@ const CalloutExtension = Node.create({
 // ─── TABELA customizada (totalmente editável) ─────────────────────────────────
 const DEFAULT_TABLE = { hasHeader:true, rows:[["Coluna 1","Coluna 2","Coluna 3"],["","",""],["","",""]] };
 
-// Callback de módulo para abrir o modal da tabela fora do editor
+/*
+ * Por que variável de módulo em vez de contexto React ou prop?
+ *
+ * O `TableView` (e o `ChartView`) são renderizados pelo `ReactNodeViewRenderer`
+ * do TipTap, que cria raízes React separadas do árvore do componente `Notas`.
+ * Isso significa que não há Provider/Context disponível dentro das node views —
+ * elas estão "fora" da hierarquia. Usar useContext ou passar props seria
+ * impossível sem refatorar o TipTap internamente.
+ *
+ * A solução é uma variável de módulo (singleton no bundle) que o componente
+ * `Notas` preenche no useEffect de montagem. Quando a node view quer abrir
+ * o modal, chama a função armazenada aqui, que dispara o setState no `Notas`.
+ *
+ * Atenção: se houver múltiplas instâncias do editor na mesma página (improvável
+ * aqui, mas possível), apenas a última a montar sobrescreverá o callback.
+ */
 let _openTableModal = null;
 
 // TableView: apenas exibição — edição acontece no modal externo
@@ -191,6 +252,15 @@ function TableView({ node, updateAttributes }) {
   );
 }
 
+/*
+ * Por que o modal de edição fica FORA do editor (não dentro de TableView)?
+ *
+ * O ProseMirror chama `preventDefault()` em todos os eventos `mousedown` que
+ * ocorrem dentro do DOM do editor. Isso impede que inputs de texto dentro
+ * de uma node view recebam foco — clicar em um <input> dentro do editor
+ * simplesmente não funcionaria. Renderizar o modal como portal fora do
+ * ProseMirror contorna esse problema completamente.
+ */
 // Modal de edição da tabela — fora do DOM do editor
 function TableEditModal({ data, onSave, onClose }) {
   const [table, setTable] = useState(() => JSON.parse(JSON.stringify(data)));
@@ -311,8 +381,11 @@ const TableExtension = Node.create({
 });
 
 // ─── Gráfico ──────────────────────────────────────────────────────────────────
-// Callback de módulo: o Notas component registra aqui para abrir o modal de edição
-// fora do DOM do editor (evita conflito com o ProseMirror)
+/*
+ * Mesmo padrão de variável de módulo descrito em `_openTableModal` acima.
+ * O componente `Notas` registra a função neste slot ao montar e a limpa ao
+ * desmontar para evitar referências a setState de componentes não montados.
+ */
 let _openChartModal = null;
 
 // ChartView: apenas visualização inline — sem inputs dentro do editor
@@ -592,8 +665,12 @@ export default function Notas() {
 
   useEffect(() => { notaAtivaRef.current = notaAtiva; }, [notaAtiva]);
 
-  // Registra os handlers globais — node views rodam em React roots separadas
-  // e não têm acesso ao contexto do componente pai
+  /*
+   * Registra os callbacks nas variáveis de módulo para que as node views
+   * (TableView, ChartView) possam abrir modais no componente pai.
+   * O cleanup no retorno do useEffect garante que, se Notas for desmontado,
+   * cliques tardios em node views não chamem setState em componente morto.
+   */
   useEffect(() => {
     _openChartModal = (data, onSave) => setChartModal({ data, onSave });
     _openTableModal = (data, onSave) => setTableModal({ data, onSave });
@@ -637,7 +714,20 @@ export default function Notas() {
   function selecionarNota(nota) {
     const atual = notaAtivaRef.current;
 
-    // Se há save pendente, faz flush imediato antes de trocar de nota
+    /*
+     * Flush imediato antes de trocar de nota.
+     *
+     * O autosave usa debounce de 1500ms: se o usuário clicar em outra nota
+     * dentro desse intervalo, o setTimeout seria cancelado pelo React ao
+     * desmontar/remontar o estado e as alterações seriam perdidas silenciosamente.
+     *
+     * Ao detectar timers pendentes, cancelamos o debounce e disparamos o save
+     * de forma síncrona (fire-and-forget) antes de trocar a nota ativa.
+     *
+     * A atualização otimista de `notas` é necessária para que, se o usuário
+     * navegar de volta para a nota anterior imediatamente, o conteúdo exibido
+     * já reflita o que ele tinha digitado — sem esperar a resposta da API.
+     */
     if (atual && (saveTimer.current || tituloTimer.current)) {
       clearTimeout(saveTimer.current);
       clearTimeout(tituloTimer.current);
@@ -647,8 +737,6 @@ export default function Notas() {
       const html    = editor?.getHTML() || "";
       const tituloAtual = titulo;
 
-      // Atualiza o estado local otimisticamente para que navegar de volta
-      // carregue o conteúdo correto (mesmo antes da resposta da API chegar)
       setNotas(prev =>
         prev.map(n =>
           n.id === atual.id
@@ -670,6 +758,15 @@ export default function Notas() {
     editor?.commands.setContent(nota.conteudo || "", false);
   }
 
+  /*
+   * Autosave com debounce.
+   *
+   * O delay de 1500ms é deliberadamente maior que o padrão de 500-800ms
+   * encontrado em outras ferramentas de notas. Aqui o conteúdo pode ser
+   * HTML com widgets embedded (tabelas, gráficos) — serializar e transmitir
+   * payloads maiores a cada keystroke saturaria a API em sessões longas.
+   * 1500ms oferece boa percepção de autosave sem pressão excessiva no backend.
+   */
   function agendarSave(campos, delay=1500) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(()=>salvar(campos), delay);

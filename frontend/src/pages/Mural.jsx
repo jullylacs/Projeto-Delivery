@@ -608,6 +608,14 @@ function MidiaThumbs({ midias, onRemover }) {
 export default function MuralPage() {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
+
+  /*
+   * Apenas o perfil "admin" pode publicar, editar e excluir comunicados.
+   * Deliberadamente não usamos `isGestorOuAdmin` porque o mural é um canal
+   * oficial da empresa — gestores têm autonomia no Kanban e na Agenda, mas
+   * publicações no mural devem ser aprovadas pela administração.
+   * Se a política mudar, troque para: perfil === "admin" || perfil === "gestor"
+   */
   const isAdmin = user?.perfil === "admin";
 
   const [posts, setPosts] = useState([]);
@@ -616,6 +624,13 @@ export default function MuralPage() {
 
   // Compose
   const [composeMidias, setComposeMidias] = useState([]);
+
+  /*
+   * Flag de "publicação em andamento" — necessária para desabilitar o botão
+   * enquanto o POST está em trânsito, evitando cliques duplos que criariam
+   * posts duplicados. O editor TipTap não tem loading state nativo, então
+   * controlamos manualmente aqui.
+   */
   const [publicando, setPublicando] = useState(false);
   const composeFileInputRef = useRef();
 
@@ -913,7 +928,22 @@ export default function MuralPage() {
                       </span>
                     </div>
 
-                    {/* Conteúdo — detecta HTML (TipTap) ou texto plano */}
+                    {/*
+                      * Detecção de formato do conteúdo salvo.
+                      *
+                      * Posts criados antes da adoção do TipTap eram texto plano
+                      * e podem existir no banco sem tags HTML. A heurística de
+                      * verificar se o conteúdo começa com "<" distingue os dois
+                      * formatos sem precisar de campo extra no banco:
+                      *
+                      * - HTML (TipTap):   renderizado via dangerouslySetInnerHTML —
+                      *   seguro porque o backend sanitiza tudo ao salvar.
+                      * - Texto plano:     renderizado com white-space:pre-wrap para
+                      *   preservar quebras de linha originais.
+                      *
+                      * Se no futuro todos os posts forem migrados para HTML, este
+                      * branch pode ser removido.
+                      */}
                     {post.conteudo && (
                       <div className="post-html-content">
                         {post.conteudo.trimStart().startsWith("<")
