@@ -1,5 +1,15 @@
 const { Nota } = require("../models");
-const { sanitizeRichHtml } = require("../utils/sanitizeHtml");
+
+/*
+ * Usa sanitizeNotasHtml (permissivo) em vez de sanitizeRichHtml (restritivo).
+ * As Notas são conteúdo privado — cada usuário vê apenas as próprias notas —
+ * portanto não há risco de XSS inter-usuário. O sanitizador permissivo
+ * preserva todas as tags que o editor TipTap gera: <div data-chart>,
+ * <div data-custom-table>, <div data-callout>, <hr>, <img>, <mark>, <s>,
+ * <ul data-type="taskList">, etc. O restritivo (usado no Mural) removeria
+ * tudo isso silenciosamente, fazendo os blocos desaparecerem ao recarregar.
+ */
+const { sanitizeNotasHtml } = require("../utils/sanitizeHtml");
 
 async function list(req, res) {
   try {
@@ -29,7 +39,7 @@ async function create(req, res) {
     const nota = await Nota.create({
       usuario_id: req.user.id,
       titulo:   (titulo   ?? "").slice(0, 500),
-      conteudo: sanitizeRichHtml(conteudo ?? ""),
+      conteudo: sanitizeNotasHtml(conteudo ?? ""),
       cor:      cor      ?? "default",
       favorita: favorita ?? false,
     });
@@ -46,7 +56,7 @@ async function update(req, res) {
 
     const { titulo, conteudo, cor, favorita } = req.body;
     if (titulo   !== undefined) nota.titulo   = String(titulo).slice(0, 500);
-    if (conteudo !== undefined) nota.conteudo = sanitizeRichHtml(conteudo);
+    if (conteudo !== undefined) nota.conteudo = sanitizeNotasHtml(conteudo);
     if (cor      !== undefined) nota.cor      = cor;
     if (favorita !== undefined) nota.favorita = Boolean(favorita);
 
