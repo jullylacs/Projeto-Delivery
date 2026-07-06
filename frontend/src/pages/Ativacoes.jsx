@@ -51,6 +51,7 @@ export default function Ativacoes() {
   const [ativacoes, setAtivacoes] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [statusFiltro, setStatusFiltro] = useState("");
+  const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -72,6 +73,13 @@ export default function Ativacoes() {
     api.get("/technicians").then((res) => setTechnicians(res.data)).catch(() => setTechnicians([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFiltro]);
+
+  const termoBusca = busca.trim().toLowerCase();
+  const ativacoesFiltradas = termoBusca
+    ? ativacoes.filter((a) =>
+        [a.cliente, a.circuito, a.id_cliente_nvx, a.endereco].some((campo) => (campo || "").toLowerCase().includes(termoBusca))
+      )
+    : ativacoes;
 
   return (
     <div style={{ padding: "22px 24px", color: "var(--text)", maxWidth: 980, margin: "0 auto" }}>
@@ -123,6 +131,29 @@ export default function Ativacoes() {
         </button>
       </div>
 
+      {/* Busca */}
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", opacity: 0.5, fontSize: 14 }}>🔎</span>
+        <input
+          style={{ ...inputSt, paddingLeft: 36 }}
+          placeholder="Buscar por cliente, circuito, ID do cliente ou endereço…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+        />
+        {busca && (
+          <button
+            onClick={() => setBusca("")}
+            style={{
+              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+              border: "none", background: "transparent", cursor: "pointer", opacity: 0.5, fontSize: 15, color: "inherit",
+            }}
+            aria-label="Limpar busca"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {/* Filtros */}
       <div style={{ marginBottom: 18, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <FiltroBtn label="Todas" active={!statusFiltro} onClick={() => setStatusFiltro("")} />
@@ -145,7 +176,7 @@ export default function Ativacoes() {
             <div key={i} style={{ height: 66, borderRadius: 14, ...shimmerSt }} />
           ))}
         </div>
-      ) : ativacoes.length === 0 ? (
+      ) : ativacoesFiltradas.length === 0 ? (
         <div
           style={{
             textAlign: "center",
@@ -155,13 +186,22 @@ export default function Ativacoes() {
             color: "var(--text-muted, #6b7280)",
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>Nenhuma ativação encontrada</p>
-          <p style={{ margin: "4px 0 0", fontSize: 12.5 }}>Crie a primeira com o botão "+ Nova Ativação" acima.</p>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>{termoBusca ? "🔎" : "📭"}</div>
+          {termoBusca ? (
+            <>
+              <p style={{ margin: 0, fontWeight: 600 }}>Nenhum resultado para "{busca}"</p>
+              <p style={{ margin: "4px 0 0", fontSize: 12.5 }}>Tente buscar por outro cliente, circuito, ID do cliente ou endereço.</p>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: 0, fontWeight: 600 }}>Nenhuma ativação encontrada</p>
+              <p style={{ margin: "4px 0 0", fontSize: 12.5 }}>Crie a primeira com o botão "+ Nova Ativação" acima.</p>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {ativacoes.map((a) => {
+          {ativacoesFiltradas.map((a) => {
             const info = STATUS_INFO[a.status] || { label: a.status, color: "#666", icon: "•" };
             return (
               <div
@@ -367,7 +407,7 @@ function LinkModal({ link, onClose }) {
       <div style={{ display: "flex", gap: 8 }}>
         <input style={inputSt} readOnly value={link} onFocus={(e) => e.target.select()} />
         <button
-          style={copiado ? { ...secondaryBtnSt, background: "#dcfce7", borderColor: "#86efac", color: "#166534" } : secondaryBtnSt}
+          style={copiado ? { ...secondaryBtnSt, background: "#dcfce7", border: "1.5px solid #86efac", color: "#166534" } : secondaryBtnSt}
           onClick={() => {
             navigator.clipboard.writeText(link);
             setCopiado(true);
@@ -386,6 +426,7 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [linkCopiado, setLinkCopiado] = useState(false);
 
   async function aprovar() {
     setBusy(true);
@@ -464,12 +505,37 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
     setLightboxIndex((prev) => (prev + delta + evidencias.length) % evidencias.length);
   }
 
+  const processoAberto = ["aberta", "em_execucao", "rejeitada"].includes(ativacao.status);
+  const linkPublico = `${window.location.origin}/ativacao/${ativacao.public_token}`;
+
   return (
     <ModalShell title={`${ativacao.cliente} — ${ativacao.circuito}`} icon={iniciais(ativacao.cliente)} onClose={onClose} wide>
       {error && <div style={erroSt}>{error}</div>}
       <span style={{ ...badgeSt, background: info.color }}>
         {info.icon} {info.label}
       </span>
+
+      {processoAberto && (
+        <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
+          <input style={inputSt} readOnly value={linkPublico} onFocus={(e) => e.target.select()} />
+          <button
+            style={{
+              ...(linkCopiado
+                ? { ...secondaryBtnSt, background: "#dcfce7", border: "1.5px solid #86efac", color: "#166534" }
+                : secondaryBtnSt),
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onClick={() => {
+              navigator.clipboard.writeText(linkPublico);
+              setLinkCopiado(true);
+              setTimeout(() => setLinkCopiado(false), 2000);
+            }}
+          >
+            {linkCopiado ? "✓ Copiado!" : "🔗 Copiar link"}
+          </button>
+        </div>
+      )}
 
       <Section title="Dados técnicos">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 13 }}>
@@ -676,7 +742,7 @@ function Lightbox({ evidencias, index, onClose, onNavigate, onDownload }) {
           </>
         )}
         <button style={primaryBtnSt} onClick={() => onDownload(ev)}>⬇ Baixar</button>
-        <button style={{ ...secondaryBtnSt, background: "rgba(255,255,255,0.12)", color: "#fff", borderColor: "rgba(255,255,255,0.3)" }} onClick={onClose}>
+        <button style={{ ...secondaryBtnSt, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }} onClick={onClose}>
           ✕ Fechar
         </button>
       </div>
