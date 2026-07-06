@@ -27,4 +27,13 @@ const loginLimiter = rateLimit({
   message: "Muitas tentativas de login"
 });
 
-module.exports = { globalLimiter, loginLimiter };
+// Rate limiting para as rotas públicas de Ativação (acessadas por técnicos via link, sem login)
+const ativacaoPublicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Muitas requisições, tente novamente mais tarde",
+});
+
+module.exports = { globalLimiter, loginLimiter, ativacaoPublicLimiter };

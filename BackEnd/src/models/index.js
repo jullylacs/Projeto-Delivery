@@ -12,6 +12,7 @@ const RefreshToken = require("./RefreshToken");
 const Role = require("./Role");
 const AgendaEvento = require("./AgendaEvento");
 const Nota         = require("./Nota");
+const Ativacao     = require("./Ativacao");
 
 // ─────────────────────────────────────────────
 // 🔗 Associações (equivalente aos ref: do Mongoose)
@@ -60,7 +61,18 @@ User.hasMany(AgendaEvento,   { foreignKey: "usuario_id", as: "agendaEventos" });
 Nota.belongsTo(User, { foreignKey: "usuario_id", as: "usuario" });
 User.hasMany(Nota,   { foreignKey: "usuario_id", as: "notas" });
 
+// Ativacao pertence a um Technician
+Ativacao.belongsTo(Technician, { foreignKey: "tecnico_id", as: "tecnico" });
+Technician.hasMany(Ativacao,   { foreignKey: "tecnico_id", as: "ativacoes" });
+
+// Ativacao foi criada e (opcionalmente) aprovada por Users
+Ativacao.belongsTo(User, { foreignKey: "criado_por", as: "criador" });
+User.hasMany(Ativacao,   { foreignKey: "criado_por", as: "ativacoesCriadas" });
+
+Ativacao.belongsTo(User, { foreignKey: "aprovado_por", as: "aprovador" });
+User.hasMany(Ativacao,   { foreignKey: "aprovado_por", as: "ativacoesAprovadas" });
+
 // ─────────────────────────────────────────────
 // 📤 Exporta tudo
 // ─────────────────────────────────────────────
-module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken, Role, AgendaEvento, Nota };
+module.exports = { sequelize, User, Card, Column, Comment, Schedule, Technician, Notification, RefreshToken, Role, AgendaEvento, Nota, Ativacao };

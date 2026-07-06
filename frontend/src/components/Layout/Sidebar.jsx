@@ -7,6 +7,7 @@ export default function Sidebar({ isOpen = true, onNavigate }) {
   const user = userRaw ? JSON.parse(userRaw) : null;
 
   const canSeeAgendaDelivery = ["delivery", "admin", "noc"].includes(user?.perfil);
+  const canSeeAtivacoes = ["comercial", "operacional", "gestor", "admin"].includes(user?.perfil);
 
   function handleNav(path) {
     navigate(path);
@@ -19,6 +20,7 @@ export default function Sidebar({ isOpen = true, onNavigate }) {
     { name: "Kanban",          icon: "⬡",  path: "/kanban" },
     { name: "Agenda",          icon: "◷",  path: "/agenda" },
     ...(canSeeAgendaDelivery ? [{ name: "Agenda Team", icon: "⬡", path: "/agenda-delivery" }] : []),
+    ...(canSeeAtivacoes ? [{ name: "Ativações", icon: "📄", path: "/ativacoes" }] : []),
     { name: "Ramais",          icon: "✆",  path: "/ramais" },
     { name: "Mural",           icon: "◈",  path: "/mural" },
     { name: "Notas",           icon: "🗒️", path: "/notas" },
@@ -32,6 +34,7 @@ export default function Sidebar({ isOpen = true, onNavigate }) {
     "/kanban":          "🗂️",
     "/agenda":          "📅",
     "/agenda-delivery": "🛵",
+    "/ativacoes":       "📄",
     "/ramais":          "📞",
     "/mural":              "📝",
     "/notas":              "🗒️",

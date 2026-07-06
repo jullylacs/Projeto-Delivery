@@ -75,6 +75,7 @@ const muralRoutes = require("./routes/muralRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const agendaEventoRoutes = require("./routes/agendaEventoRoutes");
 const provedoresRoutes = require("./routes/provedoresRoutes");
+const ativacaoRoutes = require("./routes/ativacaoRoutes");
 const auth = require("./controllers/middleware/auth");
 
 // 🔹 Rotas versionadas da aplicação
@@ -106,6 +107,7 @@ app.use(`${apiBasePath}/mural`, muralRoutes);
 app.use(`${apiBasePath}/dashboard`, dashboardRoutes);
 app.use(`${apiBasePath}/agenda-eventos`, agendaEventoRoutes);
 app.use(`${apiBasePath}/provedores`, provedoresRoutes);
+app.use(`${apiBasePath}/ativacoes`, ativacaoRoutes);
 // Ramais
 const ramalRoutes = require("./routes/ramalRoutes");
 app.use(`${apiBasePath}/ramais`, ramalRoutes);

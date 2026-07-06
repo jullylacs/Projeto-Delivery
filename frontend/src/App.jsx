@@ -23,10 +23,12 @@ import Lixeira from "./pages/Lixeira";
 import Notas from "./pages/Notas";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AtivacaoTecnico from "./pages/AtivacaoTecnico";
+import Ativacoes from "./pages/Ativacoes";
 
 const LAST_PRIVATE_ROUTE_KEY = "lastPrivateRoute";
 const SIDEBAR_OPEN_KEY = "sidebarOpen";
-const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users", "/buscar-provedores", "/notas"];
+const PRIVATE_ROUTES = ["/dashboard", "/graficos", "/kanban", "/agenda", "/agenda-delivery", "/profile", "/admin/users", "/buscar-provedores", "/notas", "/ativacoes"];
 
 function AdminRoute({ children }) {
   const userRaw = localStorage.getItem("user");
@@ -41,6 +43,16 @@ function DeliveryAgendaRoute({ children }) {
   const userRaw = localStorage.getItem("user");
   const user = userRaw ? JSON.parse(userRaw) : null;
   const allowed = ["delivery", "admin", "noc"];
+  if (!user || !allowed.includes(user.perfil)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
+function AtivacaoRoute({ children }) {
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  const allowed = ["comercial", "operacional", "gestor", "admin"];
   if (!user || !allowed.includes(user.perfil)) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -170,6 +182,7 @@ function MainLayout() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/notas" element={<Notas />} />
+            <Route path="/ativacoes" element={<AtivacaoRoute><Ativacoes /></AtivacaoRoute>} />
             <Route path="/arquivados" element={<Arquivados />} />
             <Route path="/lixeira" element={<Lixeira />} />
             <Route path="/ramais" element={<RamaisPage />} />
@@ -189,6 +202,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/ativacao/:token" element={<AtivacaoTecnico />} />
         <Route path="/*" element={<MainLayout />} />
       </Routes>
     </BrowserRouter>
