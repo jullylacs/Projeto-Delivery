@@ -22,7 +22,12 @@ const CAMPOS_TECNICOS = [
   ["perda_pacotes", "Perda de pacotes"],
 ];
 
-const MAX_ANEXO_BYTES = 15 * 1024 * 1024; // 15MB por arquivo — vídeos maiores estouram o limite do corpo da requisição
+const MAX_ANEXO_BYTES = 200 * 1024 * 1024; // 200MB por arquivo
+// Soma de todos os anexos de observações: o array vira uma única coluna JSONB no
+// Postgres, que tem um teto físico de ~1GB por valor. Base64 adiciona ~33% de
+// overhead, então limitamos o total "cru" a 500MB (~685MB já em base64) para
+// sobrar folga e o registro nunca falhar ao salvar.
+const MAX_ANEXOS_TOTAL_BYTES = 500 * 1024 * 1024;
 
 function arquivoParaDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -31,6 +36,11 @@ function arquivoParaDataUrl(file) {
     reader.onerror = () => reject(new Error("Falha ao ler o arquivo"));
     reader.readAsDataURL(file);
   });
+}
+
+function estimarBytesDataUrl(dataUrl) {
+  const base64 = String(dataUrl || "").split(",")[1] || "";
+  return Math.floor(base64.length * 0.75);
 }
 
 const STATUS_LABEL = {
@@ -119,11 +129,17 @@ export default function AtivacaoTecnico() {
     setAnexandoObservacao(true);
     setMessage("");
     try {
+      let totalAcumulado = observacoesAnexos.reduce((soma, a) => soma + estimarBytesDataUrl(a.data), 0);
       const aceitos = Array.from(files).filter((file) => {
         if (file.size > MAX_ANEXO_BYTES) {
-          setMessage(`"${file.name}" excede 15MB e não foi anexado. Tente um arquivo menor.`);
+          setMessage(`"${file.name}" excede 200MB e não foi anexado. Tente um arquivo menor.`);
           return false;
         }
+        if (totalAcumulado + file.size > MAX_ANEXOS_TOTAL_BYTES) {
+          setMessage(`Limite total de anexos (500MB) atingido. "${file.name}" não foi anexado.`);
+          return false;
+        }
+        totalAcumulado += file.size;
         return true;
       });
       const novos = await Promise.all(
@@ -208,24 +224,46 @@ export default function AtivacaoTecnico() {
   }
 
   if (!editavel) {
+    const statusOk = ["carta_gerada", "finalizada"].includes(ativacao.status);
     return (
       <PageShell>
-        <h2 style={{ color: "#3d1466" }}>{ativacao.cliente}</h2>
-        <p style={{ color: "#444" }}>{ativacao.circuito} — {ativacao.endereco}</p>
-        <div style={{ marginTop: 24, padding: 16, borderRadius: 12, background: "#f0fdf4", border: "1px solid #86efac", color: "#166534", fontWeight: 600 }}>
-          {STATUS_LABEL[ativacao.status] || ativacao.status}
+        <h2 style={{ color: "#3d1466", marginBottom: 4 }}>{ativacao.cliente}</h2>
+        <p style={{ color: "#666", fontSize: 13, marginTop: 0 }}>{ativacao.circuito} — {ativacao.endereco}</p>
+        <div
+          style={{
+            marginTop: 24, padding: "18px 16px", borderRadius: 14, textAlign: "center",
+            background: statusOk ? "#f0fdf4" : "#fffbeb",
+            border: `1.5px solid ${statusOk ? "#86efac" : "#fde68a"}`,
+          }}
+        >
+          <div style={{ fontSize: 30, marginBottom: 6 }}>{statusOk ? "✅" : "⏳"}</div>
+          <div style={{ color: statusOk ? "#166534" : "#92400e", fontWeight: 700 }}>
+            {STATUS_LABEL[ativacao.status] || ativacao.status}
+          </div>
         </div>
       </PageShell>
     );
   }
 
+  const obrigatorias = EVIDENCIAS.filter((e) => e.obrigatoria);
+  const obrigatoriasFeitas = obrigatorias.filter((e) => evidencias.some((ev) => ev.tipo === e.tipo)).length;
+
   return (
     <PageShell>
-      <h2 style={{ color: "#3d1466", marginBottom: 4 }}>{ativacao.cliente}</h2>
-      <p style={{ color: "#444", marginTop: 0 }}>
-        {ativacao.circuito} · {ativacao.tipo_servico} · {ativacao.velocidade_contratada}
-      </p>
-      <p style={{ color: "#666", fontSize: 13 }}>{ativacao.endereco} {ativacao.cidade ? `— ${ativacao.cidade}/${ativacao.estado || ""}` : ""}</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ color: "#3d1466", marginBottom: 4 }}>{ativacao.cliente}</h2>
+          <p style={{ color: "#444", margin: 0 }}>
+            {ativacao.circuito} · {ativacao.tipo_servico} · {ativacao.velocidade_contratada}
+          </p>
+          <p style={{ color: "#666", fontSize: 13, margin: "2px 0 0" }}>
+            {ativacao.endereco} {ativacao.cidade ? `— ${ativacao.cidade}/${ativacao.estado || ""}` : ""}
+          </p>
+        </div>
+        <span style={statusPillSt}>
+          {ativacao.status === "rejeitada" ? "✖ Correção solicitada" : "🔧 Em execução"}
+        </span>
+      </div>
 
       {ativacao.status === "rejeitada" && ativacao.motivo_rejeicao && (
         <div style={sectionErro}>
@@ -234,7 +272,7 @@ export default function AtivacaoTecnico() {
       )}
 
       <Section title="Dados técnicos">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="atv-grid-2">
           {CAMPOS_TECNICOS.map(([campo, label]) => (
             <div key={campo}>
               <label style={labelSt}>{label}</label>
@@ -248,14 +286,23 @@ export default function AtivacaoTecnico() {
         </div>
       </Section>
 
-      <Section title="Evidências fotográficas">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <Section
+        title="Evidências fotográficas"
+        action={
+          <span style={progressoSt(obrigatoriasFeitas === obrigatorias.length)}>
+            {obrigatoriasFeitas}/{obrigatorias.length} obrigatórias
+          </span>
+        }
+      >
+        <div className="atv-grid-2">
           {EVIDENCIAS.map(({ tipo, label, obrigatoria }) => {
             const fotos = evidencias.filter((e) => e.tipo === tipo);
+            const completa = fotos.length > 0;
             return (
-              <div key={tipo} style={fotoCardSt}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-                  {label} {obrigatoria && <span style={{ color: "#c62828" }}>*</span>}
+              <div key={tipo} style={{ ...fotoCardSt, ...(obrigatoria && completa ? fotoCardCompletaSt : null) }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                  {obrigatoria && completa && <span style={{ color: "#16a34a" }}>✓</span>}
+                  {label} {obrigatoria && !completa && <span style={{ color: "#c62828" }}>*</span>}
                 </div>
                 {fotos.length > 0 ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
@@ -293,7 +340,7 @@ export default function AtivacaoTecnico() {
       </Section>
 
       <Section title="Testes">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div className="atv-grid-3">
           <div>
             <label style={labelSt}>Velocidade download</label>
             <input style={inputSt} value={testeVelocidade.download || ""} onChange={(e) => setTesteVelocidade((p) => ({ ...p, download: e.target.value }))} />
@@ -371,16 +418,20 @@ export default function AtivacaoTecnico() {
       )}
 
       {message && faltando.length === 0 && (
-        <div style={{ marginTop: 12, fontSize: 13, color: "#3d1466" }}>{message}</div>
+        <div style={mensagemSt(message)}>{message}</div>
       )}
 
-      <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-        <button style={secondaryBtnSt} disabled={saving} onClick={salvarProgresso}>
-          {saving ? "Salvando…" : "Salvar progresso"}
-        </button>
-        <button style={primaryBtnSt} disabled={concluding} onClick={concluirInstalacao}>
-          {concluding ? "Enviando…" : "Instalação Concluída"}
-        </button>
+      <div style={{ height: 84 }} />
+
+      <div style={acoesBarWrapperSt}>
+        <div style={acoesBarSt}>
+          <button style={secondaryBtnSt} disabled={saving} onClick={salvarProgresso}>
+            {saving ? "Salvando…" : "💾 Salvar progresso"}
+          </button>
+          <button style={primaryBtnSt} disabled={concluding} onClick={concluirInstalacao}>
+            {concluding ? "Enviando…" : "✓ Instalação Concluída"}
+          </button>
+        </div>
       </div>
     </PageShell>
   );
@@ -389,17 +440,28 @@ export default function AtivacaoTecnico() {
 function PageShell({ children }) {
   return (
     <div style={{ height: "100vh", overflowY: "auto", boxSizing: "border-box", background: "#f2efff", padding: "24px 16px" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto", background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 8px 32px rgba(90,60,180,0.12)" }}>
+      <style>{`
+        .atv-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .atv-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        @media (max-width: 480px) {
+          .atv-grid-2 { grid-template-columns: 1fr; }
+          .atv-grid-3 { grid-template-columns: 1fr; }
+        }
+      `}</style>
+      <div style={{ maxWidth: 720, margin: "0 auto", background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 8px 32px rgba(90,60,180,0.12)", position: "relative" }}>
         {children}
       </div>
     </div>
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, action, children }) {
   return (
     <div style={{ marginTop: 22 }}>
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b5ca8", marginBottom: 10 }}>{title}</h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.6px", color: "#6b5ca8", margin: 0 }}>{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -407,9 +469,34 @@ function Section({ title, children }) {
 
 const labelSt = { display: "block", fontSize: 11, fontWeight: 700, color: "#6b5ca8", marginBottom: 4 };
 const inputSt = { width: "100%", padding: "9px 11px", border: "1.5px solid #e4defa", borderRadius: 8, fontSize: 13, boxSizing: "border-box", outline: "none" };
-const fotoCardSt = { border: "1px solid #e4defa", borderRadius: 10, padding: 10 };
+const fotoCardSt = { border: "1px solid #e4defa", borderRadius: 10, padding: 10, transition: "border-color 150ms ease, background 150ms ease" };
+const fotoCardCompletaSt = { borderColor: "#86efac", background: "#f0fdf4" };
 const fotoBtnSt = { display: "block", textAlign: "center", padding: "8px 10px", borderRadius: 8, background: "#f6f2ff", color: "#4b2d84", fontWeight: 700, fontSize: 12, cursor: "pointer" };
 const removeBtnSt = { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 };
 const sectionErro = { marginTop: 16, padding: "11px 14px", borderRadius: 10, border: "1px solid #f3b3b3", background: "#fff1f2", color: "#9b1f1f", fontSize: 13 };
 const primaryBtnSt = { flex: 1, background: "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)", color: "#fff", border: "none", padding: "12px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14 };
-const secondaryBtnSt = { border: "1.5px solid #d4c8fb", background: "#f6f2ff", color: "#4b2d84", padding: "12px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14 };
+const secondaryBtnSt = { flex: 1, border: "1.5px solid #d4c8fb", background: "#f6f2ff", color: "#4b2d84", padding: "12px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14 };
+const statusPillSt = { flexShrink: 0, padding: "5px 12px", borderRadius: 999, background: "#f6f2ff", color: "#4b2d84", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" };
+const acoesBarWrapperSt = {
+  position: "fixed", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
+  padding: "0 16px 16px", pointerEvents: "none", zIndex: 20,
+};
+const acoesBarSt = {
+  display: "flex", gap: 10, width: "100%", maxWidth: 672, padding: "12px 14px",
+  borderRadius: 14, background: "#fff", boxShadow: "0 -6px 24px rgba(90,60,180,0.18)", pointerEvents: "auto",
+};
+
+function progressoSt(completo) {
+  return {
+    flexShrink: 0, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+    background: completo ? "#dcfce7" : "#fef3c7", color: completo ? "#166534" : "#92400e",
+  };
+}
+
+function mensagemSt(message) {
+  const erro = /erro|falha|excede/i.test(message);
+  return {
+    marginTop: 12, padding: "9px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+    background: erro ? "#fff1f2" : "#f0fdf4", color: erro ? "#9b1f1f" : "#166534",
+  };
+}

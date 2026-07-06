@@ -541,23 +541,70 @@ function CreateModal({ technicians, cards, onClose, onCreated }) {
 
 function LinkModal({ link, onClose }) {
   const [copiado, setCopiado] = useState(false);
+
+  function copiar() {
+    navigator.clipboard.writeText(link);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
   return (
     <ModalShell title="Ativação criada" icon="✅" onClose={onClose}>
-      <div style={{ textAlign: "center", padding: "6px 0 18px" }}>
-        <div style={{ fontSize: 38, marginBottom: 8 }}>🔗</div>
-        <p style={{ margin: 0, fontWeight: 600 }}>Envie este link ao técnico responsável pela instalação</p>
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input style={inputSt} readOnly value={link} onFocus={(e) => e.target.select()} />
-        <button
-          style={copiado ? { ...secondaryBtnSt, background: "#dcfce7", border: "1.5px solid #86efac", color: "#166534" } : secondaryBtnSt}
-          onClick={() => {
-            navigator.clipboard.writeText(link);
-            setCopiado(true);
+      <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
+        <div
+          style={{
+            width: 64, height: 64, borderRadius: "50%", margin: "0 auto 14px",
+            background: "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 28, boxShadow: "0 8px 20px rgba(108,59,255,0.28)",
           }}
         >
-          {copiado ? "✓ Copiado!" : "Copiar"}
+          🔗
+        </div>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>Envie este link ao técnico responsável</p>
+        <p style={{ margin: "4px 0 0", fontSize: 12.5, opacity: 0.65 }}>
+          Ele abrirá o formulário de instalação direto pelo celular, sem precisar de login.
+        </p>
+      </div>
+
+      <div
+        style={{
+          display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+          borderRadius: 10, background: "var(--bg-input, #f6f2ff)", border: "1.5px solid var(--border, #e4defa)",
+        }}
+      >
+        <span
+          style={{
+            flex: 1, fontFamily: "monospace", fontSize: 12.5, whiteSpace: "nowrap",
+            overflow: "hidden", textOverflow: "ellipsis", cursor: "text",
+          }}
+          onClick={(e) => {
+            const range = document.createRange();
+            range.selectNodeContents(e.currentTarget);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }}
+        >
+          {link}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button
+          style={copiado ? { ...primaryBtnSt, flex: 1, background: "#16a34a" } : { ...primaryBtnSt, flex: 1 }}
+          onClick={copiar}
+        >
+          {copiado ? "✓ Link copiado!" : "📋 Copiar link"}
         </button>
+        <a
+          href={link}
+          target="_blank"
+          rel="noreferrer"
+          style={{ ...secondaryBtnSt, textDecoration: "none", display: "inline-flex", alignItems: "center", whiteSpace: "nowrap" }}
+        >
+          ↗ Abrir
+        </a>
       </div>
     </ModalShell>
   );

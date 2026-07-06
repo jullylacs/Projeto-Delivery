@@ -343,6 +343,7 @@ exports.getPublic = async (req, res) => {
     if (!ativacao) return res.status(404).json({ message: "Link inválido ou expirado." });
     return res.json(serializePublic(ativacao));
   } catch (err) {
+    console.error("[ativacaoController.getPublic]", err);
     return res.status(500).json({ message: "Erro ao carregar ativação", error: err.message });
   }
 };
@@ -384,6 +385,7 @@ exports.updatePublic = async (req, res) => {
     await ativacao.update(patch);
     return res.json(serializePublic(ativacao));
   } catch (err) {
+    console.error("[ativacaoController.updatePublic]", err);
     return res.status(500).json({ message: "Erro ao salvar dados", error: err.message });
   }
 };
@@ -422,6 +424,7 @@ exports.concluirPublic = async (req, res) => {
     await ativacao.update({ status: "aguardando_validacao", motivo_rejeicao: null });
     return res.json(serializePublic(ativacao));
   } catch (err) {
+    console.error("[ativacaoController.concluirPublic]", err);
     return res.status(500).json({ message: "Erro ao concluir instalação", error: err.message });
   }
 };
