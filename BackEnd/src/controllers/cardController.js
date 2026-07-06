@@ -905,6 +905,24 @@ function handleControllerError(res, err, fallback) {
   return res.status(500).json({ error: err?.message || fallback });
 }
 
+// 🔹 Anexa um documento a um card como comentário de sistema — usado por outros
+// módulos (ex.: Ativações) para vincular um PDF gerado automaticamente, sem
+// passar por uma rota HTTP. `attachment` segue o mesmo formato usado pelos
+// anexos de comentário normais: { name, type, data(base64 dataURL) }.
+async function anexarDocumentoSistema(cardId, attachment, textoComentario = "") {
+  const newComment = {
+    id: randomUUID(),
+    text: String(textoComentario || ""),
+    author: "Sistema",
+    authorAvatar: null,
+    createdAt: new Date().toISOString(),
+    isSystem: true,
+    attachments: [attachment],
+  };
+  return appendCommentAtomically(cardId, newComment);
+}
+exports.anexarDocumentoSistema = anexarDocumentoSistema;
+
 // 🔹 POST /cards/:id/comments — adiciona um comentário
 exports.addComment = async (req, res) => {
   try {

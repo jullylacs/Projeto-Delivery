@@ -72,6 +72,10 @@ User.hasMany(Ativacao,   { foreignKey: "criado_por", as: "ativacoesCriadas" });
 Ativacao.belongsTo(User, { foreignKey: "aprovado_por", as: "aprovador" });
 User.hasMany(Ativacao,   { foreignKey: "aprovado_por", as: "ativacoesAprovadas" });
 
+// Ativacao (opcionalmente) vinculada a um Card do Kanban
+Ativacao.belongsTo(Card, { foreignKey: "card_id", as: "card" });
+Card.hasMany(Ativacao,   { foreignKey: "card_id", as: "ativacoes" });
+
 // ─────────────────────────────────────────────
 // 📤 Exporta tudo
 // ─────────────────────────────────────────────

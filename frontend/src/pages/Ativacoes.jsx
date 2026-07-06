@@ -50,6 +50,7 @@ export default function Ativacoes() {
 
   const [ativacoes, setAtivacoes] = useState([]);
   const [technicians, setTechnicians] = useState([]);
+  const [cards, setCards] = useState([]);
   const [statusFiltro, setStatusFiltro] = useState("");
   const [busca, setBusca] = useState("");
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,7 @@ export default function Ativacoes() {
   useEffect(() => {
     carregar();
     api.get("/technicians").then((res) => setTechnicians(res.data)).catch(() => setTechnicians([]));
+    api.get("/cards").then((res) => setCards(res.data)).catch(() => setCards([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFiltro]);
 
@@ -227,6 +229,7 @@ export default function Ativacoes() {
                     </div>
                     <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>
                       {a.tipo_servico} · {a.velocidade_contratada} · 👤 {a.tecnico?.nome || "sem técnico"}
+                      {a.card && " · 🔗 card vinculado"}
                     </div>
                   </div>
                 </div>
@@ -245,6 +248,7 @@ export default function Ativacoes() {
       {showCreate && (
         <CreateModal
           technicians={technicians}
+          cards={cards}
           onClose={() => setShowCreate(false)}
           onCreated={(a) => {
             setShowCreate(false);
@@ -305,15 +309,66 @@ function FiltroBtn({ label, icon, color, active, onClick }) {
   );
 }
 
-function CreateModal({ technicians, onClose, onCreated }) {
+function CreateModal({ technicians, cards, onClose, onCreated }) {
   const [form, setForm] = useState({
     cliente: "", cnpj: "", circuito: "", id_cliente_nvx: "", endereco: "",
     cidade: "", estado: "", contato_cliente: "", email_cliente: "",
     tipo_servico: "DIA", velocidade_contratada: "", gerente_conta: "",
   });
   const [tecnicoNome, setTecnicoNome] = useState("");
+  const [modoVinculo, setModoVinculo] = useState("nome"); // "nome" | "link"
+  const [cardBusca, setCardBusca] = useState("");
+  const [cardLink, setCardLink] = useState("");
+  const [cardLinkErro, setCardLinkErro] = useState("");
+  const [cardLinkBuscando, setCardLinkBuscando] = useState(false);
+  const [cardSelecionado, setCardSelecionado] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const termoCard = cardBusca.trim().toLowerCase();
+  const cardsFiltrados = termoCard.length >= 1
+    ? cards.filter((c) => `${c.cliente || ""} ${c.titulo || ""}`.toLowerCase().includes(termoCard)).slice(0, 8)
+    : [];
+
+  // Aceita o link "Copiar link do card" do Kanban (.../kanban#card-123) ou
+  // apenas o ID numérico do card.
+  function extrairCardIdDoLink(valor) {
+    const raw = String(valor || "").trim();
+    if (!raw) return null;
+    const match = raw.match(/#card-(\d+)/);
+    if (match) return Number(match[1]);
+    if (/^\d+$/.test(raw)) return Number(raw);
+    return null;
+  }
+
+  async function vincularPorLink() {
+    setCardLinkErro("");
+    const id = extrairCardIdDoLink(cardLink);
+    if (!id) {
+      setCardLinkErro("Cole o link do card (ex: .../kanban#card-123) ou o ID do card.");
+      return;
+    }
+
+    const local = cards.find((c) => Number(c.id) === id);
+    if (local) {
+      setCardSelecionado(local);
+      setCardLink("");
+      return;
+    }
+
+    setCardLinkBuscando(true);
+    try {
+      const res = await api.get(`/cards/${id}`);
+      if (res.data) {
+        setCardSelecionado(res.data);
+        setCardLink("");
+      }
+    } catch {
+      setCardLinkErro("Card não encontrado. Confira o link.");
+    } finally {
+      setCardLinkBuscando(false);
+    }
+  }
 
   function set(campo, value) {
     setForm((prev) => ({ ...prev, [campo]: value }));
@@ -337,7 +392,8 @@ function CreateModal({ technicians, onClose, onCreated }) {
     setError("");
     try {
       const tecnico_id = await resolverTecnicoId();
-      const res = await api.post("/ativacoes", { ...form, tecnico_id });
+      const card_id = cardSelecionado?.id || null;
+      const res = await api.post("/ativacoes", { ...form, tecnico_id, card_id });
       onCreated(res.data);
     } catch (err) {
       setError(err.response?.data?.message || "Erro ao criar ativação.");
@@ -388,6 +444,93 @@ function CreateModal({ technicians, onClose, onCreated }) {
         </div>
       </SubSection>
 
+      <SubSection title="Vincular ao card (opcional)">
+        <p style={{ fontSize: 12, opacity: 0.65, margin: "0 0 10px" }}>
+          Ao finalizar a ativação, a Carta de Ativação em PDF é anexada automaticamente neste card.
+        </p>
+        {cardSelecionado ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 12px", borderRadius: 8, background: "var(--bg-input, #f6f2ff)", border: "1.5px solid var(--border, #e4defa)" }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              🔗 {cardSelecionado.cliente || "Sem cliente"} {cardSelecionado.titulo ? `— ${cardSelecionado.titulo}` : ""}
+            </span>
+            <button
+              type="button"
+              style={linkBtnSt}
+              onClick={() => { setCardSelecionado(null); setCardBusca(""); setCardLink(""); setCardLinkErro(""); }}
+            >
+              Remover
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setModoVinculo("nome")}
+                style={modoVinculo === "nome" ? tabAtivaSt : tabInativaSt}
+              >
+                🔎 Por nome
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoVinculo("link")}
+                style={modoVinculo === "link" ? tabAtivaSt : tabInativaSt}
+              >
+                🔗 Por link
+              </button>
+            </div>
+
+            {modoVinculo === "nome" ? (
+              <div style={{ position: "relative" }}>
+                <input
+                  style={inputSt}
+                  placeholder="Buscar card por cliente ou título…"
+                  value={cardBusca}
+                  onChange={(e) => setCardBusca(e.target.value)}
+                />
+                {cardsFiltrados.length > 0 && (
+                  <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, marginTop: 4, background: "var(--bg-card, #fff)", border: "1px solid var(--border)", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", maxHeight: 180, overflowY: "auto" }}>
+                    {cardsFiltrados.map((c) => (
+                      <div
+                        key={c.id}
+                        onClick={() => { setCardSelecionado(c); setCardBusca(""); }}
+                        style={{ padding: "8px 12px", fontSize: 13, cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-input, #f6f2ff)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <strong>{c.cliente || "Sem cliente"}</strong>
+                        {c.titulo ? <span style={{ opacity: 0.6 }}> — {c.titulo}</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    style={inputSt}
+                    placeholder="Cole o link do card (botão 'Copiar link do card' no Kanban) ou o ID"
+                    value={cardLink}
+                    onChange={(e) => { setCardLink(e.target.value); setCardLinkErro(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); vincularPorLink(); } }}
+                  />
+                  <button
+                    type="button"
+                    style={{ ...secondaryBtnSt, whiteSpace: "nowrap", flexShrink: 0 }}
+                    disabled={cardLinkBuscando}
+                    onClick={vincularPorLink}
+                  >
+                    {cardLinkBuscando ? "Buscando…" : "Vincular"}
+                  </button>
+                </div>
+                {cardLinkErro && <p style={{ fontSize: 12, color: "#dc2626", margin: "6px 0 0" }}>{cardLinkErro}</p>}
+              </div>
+            )}
+          </>
+        )}
+      </SubSection>
+
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
         <button style={secondaryBtnSt} onClick={onClose}>Cancelar</button>
         <button style={primaryBtnSt} disabled={saving} onClick={salvar}>{saving ? "Criando…" : "Criar ativação"}</button>
@@ -428,11 +571,17 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [linkCopiado, setLinkCopiado] = useState(false);
 
+  const [aviso, setAviso] = useState("");
+
   async function aprovar() {
     setBusy(true);
     setError("");
+    setAviso("");
     try {
       const res = await api.post(`/ativacoes/${ativacao.id}/aprovar`);
+      if (ativacao.card_id && !res.data.anexoNoCard) {
+        setAviso("Carta gerada e enviada, mas não foi possível anexá-la ao card vinculado.");
+      }
       onChanged(res.data.ativacao);
     } catch (err) {
       setError(err.response?.data?.message || "Erro ao aprovar.");
@@ -488,17 +637,17 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
   const evidencias = Array.isArray(ativacao.evidencias) ? ativacao.evidencias : [];
   const info = STATUS_INFO[ativacao.status] || { label: ativacao.status, color: "#666", icon: "•" };
 
-  function baixarEvidencia(ev) {
+  function baixarEvidencia(ev, index) {
     const anchor = document.createElement("a");
     anchor.href = ev.dataUrl;
-    anchor.download = `evidencia-${ev.tipo}-${ativacao.id}.jpg`;
+    anchor.download = `evidencia-${ev.tipo}-${ev.id || index}-${ativacao.id}.jpg`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
   }
 
   function baixarTodasEvidencias() {
-    evidencias.forEach((ev, i) => setTimeout(() => baixarEvidencia(ev), i * 300));
+    evidencias.forEach((ev, i) => setTimeout(() => baixarEvidencia(ev, i), i * 300));
   }
 
   function navegarLightbox(delta) {
@@ -511,9 +660,17 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
   return (
     <ModalShell title={`${ativacao.cliente} — ${ativacao.circuito}`} icon={iniciais(ativacao.cliente)} onClose={onClose} wide>
       {error && <div style={erroSt}>{error}</div>}
-      <span style={{ ...badgeSt, background: info.color }}>
-        {info.icon} {info.label}
-      </span>
+      {aviso && <div style={{ ...erroSt, background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412" }}>{aviso}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ ...badgeSt, background: info.color }}>
+          {info.icon} {info.label}
+        </span>
+        {ativacao.card && (
+          <span style={{ ...badgeSt, background: "#4b2d84" }}>
+            🔗 Card: {ativacao.card.cliente || ativacao.card.titulo || `#${ativacao.card.id}`}
+          </span>
+        )}
+      </div>
 
       {processoAberto && (
         <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
@@ -558,7 +715,7 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
             {evidencias.map((ev, i) => (
               <div
-                key={ev.tipo}
+                key={ev.id || `${ev.tipo}-${i}`}
                 onClick={() => setLightboxIndex(i)}
                 style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)", cursor: "pointer", position: "relative" }}
                 onMouseEnter={(e) => (e.currentTarget.querySelector("img").style.transform = "scale(1.05)")}
@@ -586,9 +743,37 @@ function DetalheModal({ ativacao, podeAprovar, podeExcluir, onClose, onChanged, 
         </Section>
       )}
 
-      {ativacao.observacoes && (
+      {(ativacao.observacoes || (ativacao.observacoes_anexos || []).length > 0) && (
         <Section title="Observações">
-          <p style={{ fontSize: 13, margin: 0, background: "var(--bg-input, #faf7ff)", padding: 10, borderRadius: 8 }}>{ativacao.observacoes}</p>
+          {ativacao.observacoes && (
+            <p style={{ fontSize: 13, margin: 0, background: "var(--bg-input, #faf7ff)", padding: 10, borderRadius: 8 }}>{ativacao.observacoes}</p>
+          )}
+          {(ativacao.observacoes_anexos || []).length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: ativacao.observacoes ? 10 : 0 }}>
+              {ativacao.observacoes_anexos.map((anexo) => (
+                <div key={anexo.id} style={{ width: 140 }}>
+                  {anexo.type?.startsWith("image/") ? (
+                    <img
+                      src={anexo.data}
+                      alt={anexo.name}
+                      style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer" }}
+                      onClick={() => window.open(anexo.data, "_blank")}
+                    />
+                  ) : anexo.type?.startsWith("video/") ? (
+                    <video src={anexo.data} controls style={{ width: "100%", height: 100, borderRadius: 8, border: "1px solid var(--border)", background: "#000" }} />
+                  ) : (
+                    <a
+                      href={anexo.data}
+                      download={anexo.name}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: 100, borderRadius: 8, border: "1px solid var(--border)", fontSize: 11, textAlign: "center", padding: 6, wordBreak: "break-word", color: "#6c3bff", textDecoration: "none" }}
+                    >
+                      📎 {anexo.name}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
       )}
 
@@ -741,7 +926,7 @@ function Lightbox({ evidencias, index, onClose, onNavigate, onDownload }) {
             <button style={secondaryBtnSt} onClick={() => onNavigate(1)}>Próxima ›</button>
           </>
         )}
-        <button style={primaryBtnSt} onClick={() => onDownload(ev)}>⬇ Baixar</button>
+        <button style={primaryBtnSt} onClick={() => onDownload(ev, index)}>⬇ Baixar</button>
         <button style={{ ...secondaryBtnSt, background: "rgba(255,255,255,0.12)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.3)" }} onClick={onClose}>
           ✕ Fechar
         </button>
@@ -783,6 +968,8 @@ const primaryBtnSt = {
 const secondaryBtnSt = { border: "1.5px solid #d4c8fb", background: "#f6f2ff", color: "#4b2d84", padding: "9px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13 };
 const dangerBtnSt = { border: "none", background: "#dc2626", color: "#fff", padding: "9px 18px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13 };
 const linkBtnSt = { border: "none", background: "transparent", color: "#6c3bff", cursor: "pointer", fontWeight: 700, fontSize: 12 };
+const tabAtivaSt = { border: "none", background: "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)", color: "#fff", padding: "6px 13px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 };
+const tabInativaSt = { border: "1.5px solid var(--border, #e4defa)", background: "transparent", color: "inherit", padding: "6px 13px", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12, opacity: 0.7 };
 const badgeSt = { display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 999, color: "#fff", fontSize: 11, fontWeight: 700 };
 const erroSt = { marginBottom: 14, padding: "10px 14px", borderRadius: 10, border: "1px solid #f3b3b3", background: "#fff1f2", color: "#9b1f1f", fontSize: 13 };
 const fieldRowSt = { display: "flex", justifyContent: "space-between", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--border)" };

@@ -1,4 +1,9 @@
 const PDFDocument = require("pdfkit");
+const path = require("path");
+
+// Assinatura da Gabriele Mometti (Head of Service Delivery), aplicada em toda
+// Carta de Ativação — arquivo estático versionado junto do backend.
+const ASSINATURA_PATH = path.join(__dirname, "..", "assets", "assinatura-gabriele.jpg");
 
 // Paleta reaproveitada do design system do frontend (frontend/src/index.css)
 const PURPLE_900 = "#2c0b52";
@@ -230,19 +235,29 @@ function desenharDadosInstalacaoEntregue(doc, ativacao) {
 }
 
 function desenharAssinatura(doc) {
-  doc.moveDown(2.4);
+  doc.moveDown(1.2);
   const width = contentWidth(doc);
   const centerX = PAGE_MARGIN + width / 2;
   const y = doc.y;
 
-  doc.moveTo(centerX - 110, y + 26).lineTo(centerX + 110, y + 26).lineWidth(0.8).strokeColor(TEXT_DARK).stroke();
+  // Imagem da assinatura, centralizada, logo acima da linha.
+  const imgW = 120;
+  const imgH = 90;
+  try {
+    doc.image(ASSINATURA_PATH, centerX - imgW / 2, y, { fit: [imgW, imgH], align: "center", valign: "bottom" });
+  } catch {
+    // Sem a imagem, a carta ainda sai válida — só com a linha e o nome abaixo.
+  }
+
+  const lineY = y + imgH + 6;
+  doc.moveTo(centerX - 110, lineY).lineTo(centerX + 110, lineY).lineWidth(0.8).strokeColor(TEXT_DARK).stroke();
 
   doc.font("Helvetica-Bold").fontSize(11).fillColor(TEXT_DARK);
-  doc.text("GABRIELE MOMETTI", PAGE_MARGIN, y + 32, { width, align: "center" });
+  doc.text("GABRIELE MOMETTI", PAGE_MARGIN, lineY + 6, { width, align: "center" });
   doc.font("Helvetica-Oblique").fontSize(9.5).fillColor(TEXT_MUTED);
-  doc.text("Head of Service Delivery", PAGE_MARGIN, y + 47, { width, align: "center" });
+  doc.text("Head of Service Delivery", PAGE_MARGIN, lineY + 21, { width, align: "center" });
 
-  doc.y = y + 66;
+  doc.y = lineY + 40;
 }
 
 function desenharRodape(doc) {
@@ -270,11 +285,13 @@ function desenharRodape(doc) {
 
 // Uma página por evidência: título + foto (já com overlay de logo/GPS/timestamp
 // aplicado no momento da captura) emoldurada, redimensionada preservando proporção.
-function desenharPaginaEvidencia(doc, evidencia) {
+// `contador` numera a página quando há mais de uma evidência do mesmo tipo (ex: "(2/3)").
+function desenharPaginaEvidencia(doc, evidencia, contador) {
   const width = contentWidth(doc);
   doc.moveDown(1.2);
   doc.font("Helvetica-Bold").fontSize(13).fillColor(PURPLE_900);
-  doc.text(EVIDENCIA_LABELS[evidencia.tipo] || evidencia.tipo, PAGE_MARGIN, doc.y, {
+  const titulo = EVIDENCIA_LABELS[evidencia.tipo] || evidencia.tipo;
+  doc.text(contador && contador.total > 1 ? `${titulo} (${contador.indice}/${contador.total})` : titulo, PAGE_MARGIN, doc.y, {
     width,
     align: "center",
   });
@@ -401,10 +418,14 @@ function gerarCartaAtivacaoPdf(ativacao) {
       desenharRodape(doc);
 
       const evidencias = Array.isArray(ativacao.evidencias) ? ativacao.evidencias : [];
+      const totalPorTipo = {};
+      evidencias.forEach((e) => { totalPorTipo[e.tipo] = (totalPorTipo[e.tipo] || 0) + 1; });
+      const indicePorTipo = {};
       evidencias.forEach((evidencia) => {
+        indicePorTipo[evidencia.tipo] = (indicePorTipo[evidencia.tipo] || 0) + 1;
         doc.addPage();
         desenharCabecalho(doc);
-        desenharPaginaEvidencia(doc, evidencia);
+        desenharPaginaEvidencia(doc, evidencia, { indice: indicePorTipo[evidencia.tipo], total: totalPorTipo[evidencia.tipo] });
         desenharRodape(doc);
       });
 

@@ -22,6 +22,17 @@ const CAMPOS_TECNICOS = [
   ["perda_pacotes", "Perda de pacotes"],
 ];
 
+const MAX_ANEXO_BYTES = 15 * 1024 * 1024; // 15MB por arquivo — vídeos maiores estouram o limite do corpo da requisição
+
+function arquivoParaDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(String(ev.target?.result || ""));
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo"));
+    reader.readAsDataURL(file);
+  });
+}
+
 const STATUS_LABEL = {
   aguardando_validacao: "Aguardando validação da NVX",
   aprovada: "Aprovada — gerando carta de ativação",
@@ -39,7 +50,9 @@ export default function AtivacaoTecnico() {
   const [testeVelocidade, setTesteVelocidade] = useState({ download: "", upload: "", ping: "" });
   const [resultadoConectividade, setResultadoConectividade] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [observacoesAnexos, setObservacoesAnexos] = useState([]);
   const [uploadingTipo, setUploadingTipo] = useState(null);
+  const [anexandoObservacao, setAnexandoObservacao] = useState(false);
   const [saving, setSaving] = useState(false);
   const [concluding, setConcluding] = useState(false);
   const [faltando, setFaltando] = useState([]);
@@ -67,6 +80,7 @@ export default function AtivacaoTecnico() {
         setTesteVelocidade(data.teste_velocidade || { download: "", upload: "", ping: "" });
         setResultadoConectividade(data.resultado_conectividade || "");
         setObservacoes(data.observacoes || "");
+        setObservacoesAnexos(Array.isArray(data.observacoes_anexos) ? data.observacoes_anexos : []);
       })
       .catch(() => {
         if (!ignore) setNotFound(true);
@@ -81,19 +95,55 @@ export default function AtivacaoTecnico() {
 
   const editavel = ativacao && ["aberta", "em_execucao", "rejeitada"].includes(ativacao.status);
 
-  async function handlePhotoChange(tipo, file) {
+  async function handleAddPhoto(tipo, file) {
     if (!file) return;
     setUploadingTipo(tipo);
     setMessage("");
     try {
       const { lat, lng } = await obterLocalizacaoAtual();
       const evidencia = await capturarFotoComOverlay(file, { lat, lng });
-      setEvidencias((prev) => [...prev.filter((e) => e.tipo !== tipo), { tipo, ...evidencia }]);
+      setEvidencias((prev) => [...prev, { id: crypto.randomUUID(), tipo, ...evidencia }]);
     } catch (err) {
       setMessage(err.message || "Falha ao processar a foto.");
     } finally {
       setUploadingTipo(null);
     }
+  }
+
+  function handleRemovePhoto(id) {
+    setEvidencias((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  async function handleAddObservacaoAnexo(files) {
+    if (!files?.length) return;
+    setAnexandoObservacao(true);
+    setMessage("");
+    try {
+      const aceitos = Array.from(files).filter((file) => {
+        if (file.size > MAX_ANEXO_BYTES) {
+          setMessage(`"${file.name}" excede 15MB e não foi anexado. Tente um arquivo menor.`);
+          return false;
+        }
+        return true;
+      });
+      const novos = await Promise.all(
+        aceitos.map(async (file) => ({
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: file.type,
+          data: await arquivoParaDataUrl(file),
+        }))
+      );
+      setObservacoesAnexos((prev) => [...prev, ...novos]);
+    } catch (err) {
+      setMessage(err.message || "Falha ao anexar arquivo.");
+    } finally {
+      setAnexandoObservacao(false);
+    }
+  }
+
+  function handleRemoveObservacaoAnexo(id) {
+    setObservacoesAnexos((prev) => prev.filter((a) => a.id !== id));
   }
 
   function buildPayload() {
@@ -103,6 +153,7 @@ export default function AtivacaoTecnico() {
       teste_velocidade: testeVelocidade,
       resultado_conectividade: resultadoConectividade,
       observacoes,
+      observacoes_anexos: observacoesAnexos,
     };
   }
 
@@ -200,25 +251,39 @@ export default function AtivacaoTecnico() {
       <Section title="Evidências fotográficas">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {EVIDENCIAS.map(({ tipo, label, obrigatoria }) => {
-            const evidencia = evidencias.find((e) => e.tipo === tipo);
+            const fotos = evidencias.filter((e) => e.tipo === tipo);
             return (
               <div key={tipo} style={fotoCardSt}>
                 <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
                   {label} {obrigatoria && <span style={{ color: "#c62828" }}>*</span>}
                 </div>
-                {evidencia ? (
-                  <img src={evidencia.dataUrl} alt={label} style={{ width: "100%", borderRadius: 8, marginBottom: 6 }} />
+                {fotos.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                    {fotos.map((foto) => (
+                      <div key={foto.id} style={{ position: "relative", width: "calc(50% - 3px)" }}>
+                        <img src={foto.dataUrl} alt={label} style={{ width: "100%", borderRadius: 8, display: "block" }} />
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(foto.id)}
+                          title="Remover foto"
+                          style={removeBtnSt}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 6 }}>Nenhuma foto ainda</div>
                 )}
                 <label style={fotoBtnSt}>
-                  {uploadingTipo === tipo ? "Processando…" : evidencia ? "Trocar foto" : "Tirar/enviar foto"}
+                  {uploadingTipo === tipo ? "Processando…" : fotos.length > 0 ? "+ Adicionar outra foto" : "Tirar/enviar foto"}
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
                     style={{ display: "none" }}
-                    onChange={(e) => handlePhotoChange(tipo, e.target.files?.[0])}
+                    onChange={(e) => { handleAddPhoto(tipo, e.target.files?.[0]); e.target.value = ""; }}
                   />
                 </label>
               </div>
@@ -255,6 +320,43 @@ export default function AtivacaoTecnico() {
           onChange={(e) => setObservacoes(e.target.value)}
           placeholder="Campo livre para observações"
         />
+
+        {observacoesAnexos.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {observacoesAnexos.map((anexo) => (
+              <div key={anexo.id} style={{ position: "relative", width: 110 }}>
+                {anexo.type?.startsWith("image/") ? (
+                  <img src={anexo.data} alt={anexo.name} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 8, display: "block" }} />
+                ) : anexo.type?.startsWith("video/") ? (
+                  <video src={anexo.data} controls style={{ width: "100%", height: 90, borderRadius: 8, display: "block", background: "#000" }} />
+                ) : (
+                  <div style={{ width: "100%", height: 90, borderRadius: 8, background: "#f6f2ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, textAlign: "center", padding: 6, wordBreak: "break-word" }}>
+                    {anexo.name}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveObservacaoAnexo(anexo.id)}
+                  title="Remover anexo"
+                  style={removeBtnSt}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <label style={{ ...fotoBtnSt, display: "inline-block", marginTop: 10, width: "auto", padding: "8px 16px" }}>
+          {anexandoObservacao ? "Anexando…" : "📎 Anexar imagem ou vídeo"}
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => { handleAddObservacaoAnexo(e.target.files); e.target.value = ""; }}
+          />
+        </label>
       </Section>
 
       {faltando.length > 0 && (
@@ -307,6 +409,7 @@ const labelSt = { display: "block", fontSize: 11, fontWeight: 700, color: "#6b5c
 const inputSt = { width: "100%", padding: "9px 11px", border: "1.5px solid #e4defa", borderRadius: 8, fontSize: 13, boxSizing: "border-box", outline: "none" };
 const fotoCardSt = { border: "1px solid #e4defa", borderRadius: 10, padding: 10 };
 const fotoBtnSt = { display: "block", textAlign: "center", padding: "8px 10px", borderRadius: 8, background: "#f6f2ff", color: "#4b2d84", fontWeight: 700, fontSize: 12, cursor: "pointer" };
+const removeBtnSt = { position: "absolute", top: 4, right: 4, width: 22, height: 22, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, lineHeight: 1 };
 const sectionErro = { marginTop: 16, padding: "11px 14px", borderRadius: 10, border: "1px solid #f3b3b3", background: "#fff1f2", color: "#9b1f1f", fontSize: 13 };
 const primaryBtnSt = { flex: 1, background: "linear-gradient(135deg, #6c3bff 0%, #9b6dff 100%)", color: "#fff", border: "none", padding: "12px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14 };
 const secondaryBtnSt = { border: "1.5px solid #d4c8fb", background: "#f6f2ff", color: "#4b2d84", padding: "12px 20px", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14 };

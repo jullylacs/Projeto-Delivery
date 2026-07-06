@@ -1,7 +1,8 @@
-const { Ativacao, Technician, User } = require("../models");
+const { Ativacao, Technician, User, Card } = require("../models");
 const { gerarPublicToken } = require("../utils/ativacaoToken");
 const { gerarCartaAtivacaoPdf } = require("../utils/pdfCartaAtivacao");
 const { enviarCartaPorEmail } = require("../utils/emailAtivacao");
+const { anexarDocumentoSistema } = require("./cardController");
 
 const PERFIS_CRIACAO = new Set(["comercial", "gestor", "admin"]);
 const PERFIS_APROVACAO = new Set(["operacional", "gestor", "admin"]);
@@ -27,6 +28,7 @@ const INCLUDE_RELACOES = [
   { model: Technician, as: "tecnico" },
   { model: User, as: "criador", attributes: ["id", "nome", "email"] },
   { model: User, as: "aprovador", attributes: ["id", "nome", "email"] },
+  { model: Card, as: "card", attributes: ["id", "titulo", "cliente"] },
 ];
 
 // Revalida o perfil no banco — não confia no payload do token.
@@ -85,6 +87,7 @@ exports.create = async (req, res) => {
       velocidade_contratada: String(body.velocidade_contratada).trim(),
       gerente_conta: String(body.gerente_conta).trim(),
       tecnico_id: toNullableInt(body.tecnico_id),
+      card_id: toNullableInt(body.card_id),
       criado_por: req.userId,
       public_token: gerarPublicToken(),
       status: "aberta",
@@ -166,6 +169,7 @@ exports.update = async (req, res) => {
       if (body[campo] !== undefined) patch[campo] = typeof body[campo] === "string" ? body[campo].trim() : body[campo];
     });
     if (body.tecnico_id !== undefined) patch.tecnico_id = toNullableInt(body.tecnico_id);
+    if (body.card_id !== undefined) patch.card_id = toNullableInt(body.card_id);
 
     await ativacao.update(patch);
     const atualizada = await Ativacao.findByPk(ativacao.id, { include: INCLUDE_RELACOES });
@@ -219,8 +223,28 @@ exports.aprovar = async (req, res) => {
 
     await ativacao.update({ status: "finalizada", finalizada_em: new Date() });
 
+    // Anexa a carta finalizada diretamente no card vinculado (se houver).
+    // Falha aqui não deve derrubar a aprovação — a carta já foi gerada e enviada.
+    let anexoNoCard = false;
+    if (ativacao.card_id) {
+      try {
+        await anexarDocumentoSistema(
+          ativacao.card_id,
+          {
+            name: `Carta de Ativacao - ${ativacao.circuito || ativacao.id}.pdf`,
+            type: "application/pdf",
+            data: `data:application/pdf;base64,${pdfBuffer.toString("base64")}`,
+          },
+          `📄 Carta de Ativação finalizada e anexada automaticamente (circuito ${ativacao.circuito || "-"}).`
+        );
+        anexoNoCard = true;
+      } catch (err) {
+        console.error("[ativacaoController.aprovar] Falha ao anexar carta ao card:", err);
+      }
+    }
+
     const final = await Ativacao.findByPk(ativacao.id, { include: INCLUDE_RELACOES });
-    return res.json({ ativacao: final, emailEnviado: envio.sent, emailErro: envio.error || null });
+    return res.json({ ativacao: final, emailEnviado: envio.sent, emailErro: envio.error || null, anexoNoCard });
   } catch (err) {
     return res.status(500).json({ message: "Erro ao aprovar ativação", error: err.message });
   }
@@ -300,6 +324,7 @@ const CAMPOS_PUBLICOS = [
   "teste_velocidade",
   "resultado_conectividade",
   "observacoes",
+  "observacoes_anexos",
   "motivo_rejeicao",
 ];
 
@@ -335,6 +360,7 @@ const CAMPOS_EDITAVEIS_TECNICO = [
   "teste_velocidade",
   "resultado_conectividade",
   "observacoes",
+  "observacoes_anexos",
 ];
 
 // 🔹 Salva o progresso do técnico (dados técnicos, evidências, testes, observações).

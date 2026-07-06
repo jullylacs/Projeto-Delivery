@@ -179,7 +179,7 @@ if (legacyRoutesEnabled) {
 app.use((err, req, res, next) => {
   if (err?.type === "entity.too.large") {
     return res.status(413).json({
-      message: "Arquivo muito grande. Tente uma imagem menor para o avatar.",
+      message: "Arquivo muito grande. Tente um arquivo menor (imagem, vídeo ou avatar).",
     });
   }
 

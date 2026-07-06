@@ -36,6 +36,15 @@ const Ativacao = sequelize.define(
       onDelete: "SET NULL",
     },
 
+    // Card do Kanban vinculado a esta ativação (opcional) — quando definido, a
+    // Carta de Ativação finalizada é anexada automaticamente a ele.
+    card_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: "cards", key: "id" },
+      onDelete: "SET NULL",
+    },
+
     // Controle de acesso e status
     public_token: { type: DataTypes.STRING(64), allowNull: false, unique: true },
     status: {
@@ -74,6 +83,8 @@ const Ativacao = sequelize.define(
     teste_velocidade: { type: DataTypes.JSONB, allowNull: true },
     resultado_conectividade: { type: DataTypes.TEXT, allowNull: true },
     observacoes: { type: DataTypes.TEXT, allowNull: true },
+    // Imagens/vídeos livres anexados às observações — { id, name, type, data(base64 dataURL) }[]
+    observacoes_anexos: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
     motivo_rejeicao: { type: DataTypes.TEXT, allowNull: true },
 
     // Carta de Ativação gerada
