@@ -6,6 +6,10 @@ const { sequelize } = require("./models");
 const buildOpenApiSpec = require("./docs/openapi");
 
 const app = express();
+// Atrás do Nginx Proxy Manager: confia no 1º proxy para que req.ip use o
+// X-Forwarded-For (senão o express-rate-limit lança ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// e não identifica os clientes corretamente). Ajuste o número se houver mais hops.
+app.set("trust proxy", 1);
 const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || "5mb";
 const apiBasePath = process.env.API_BASE_PATH || "/api/v1";
 const legacyRoutesEnabled = String(process.env.ENABLE_LEGACY_ROUTES || "true").toLowerCase() === "true";

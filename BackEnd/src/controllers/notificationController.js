@@ -285,8 +285,35 @@ exports.syncMine = async (req, res) => {
     const user = await User.findByPk(userId, { attributes: ["id", "nome", "email"] });
     if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
 
+    // ⚠️ Os builders de notificação só usam comment.text / comment.author (e o
+    // mesmo nas replies). Carregar o `comments` cru traria os campos base64 —
+    // `authorAvatar` (~95 KB por comentário!), `attachment` (imagens/PDF) e
+    // `attachments` — de TODOS os cards para a memória → OOM / crash-loop.
+    // Removemos essas chaves já no SQL (nos comentários E nas respostas), para o
+    // base64 nunca entrar no heap. O texto que os builders varrem é preservado.
+    const STRIP = "- 'authorAvatar' - 'attachment' - 'attachments'";
+    const commentsSemAnexos = Card.sequelize.literal(`
+      CASE
+        WHEN jsonb_typeof("Card"."comments") = 'array' THEN (
+          SELECT COALESCE(jsonb_agg(
+            CASE
+              WHEN jsonb_typeof(c->'replies') = 'array'
+                THEN (c ${STRIP}) || jsonb_build_object(
+                       'replies',
+                       (SELECT COALESCE(jsonb_agg(r ${STRIP}), '[]'::jsonb)
+                          FROM jsonb_array_elements(c->'replies') AS r)
+                     )
+              ELSE (c ${STRIP})
+            END
+          ), '[]'::jsonb)
+          FROM jsonb_array_elements("Card"."comments") AS c
+        )
+        ELSE "Card"."comments"
+      END
+    `);
+
     const cards = await Card.findAll({
-      attributes: ["id", "titulo", "cliente", "prazo", "comments"],
+      attributes: ["id", "titulo", "cliente", "prazo", [commentsSemAnexos, "comments"]],
       include: [{ model: Column, as: "column", attributes: ["id", "nome"] }],
     });
 
