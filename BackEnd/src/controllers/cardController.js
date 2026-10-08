@@ -1,6 +1,7 @@
 const { randomUUID } = require("crypto");
 const { Card, User, Column, sequelize } = require("../models"); // Importa o model de Card (Sequelize/PostgreSQL)
 const { fn, col, where, QueryTypes, Op } = require("sequelize");
+const { BOARD_EXTERNO } = require("./middleware/escopo");
 
 /*
  * Lista explícita de boards válidos. Usada como allowlist — qualquer valor
@@ -8,7 +9,7 @@ const { fn, col, where, QueryTypes, Op } = require("sequelize");
  * Ao adicionar um novo board (ex: "financeiro") inclua aqui E crie a migration
  * correspondente para adicionar `acesso_kanban_financeiro` em users.
  */
-const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras", "externo"];
 
 /*
  * Normaliza e valida o board recebido como query/param.
@@ -22,8 +23,62 @@ const resolveBoard = (raw) => {
 };
 
 // Rótulos amigáveis dos boards — usados nos comentários de sistema de transferência.
-const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras" };
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras", externo: "Externo" };
 const boardLabel = (board) => BOARD_LABELS[board] || "Delivery";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Escopo do vendedor externo — ele só alcança cards que ele mesmo criou e que
+// estão no board Externo. `req.escopo` vem do middleware `escopo` (cardRoutes).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ehExterno = (req) => Boolean(req.escopo?.externo);
+
+// Trecho de `where` do Card: vazio para a equipe interna.
+const filtroDono = (req) => (ehExterno(req) ? { criado_por: req.escopo.userId } : {});
+
+// Include da coluna; para o externo o board é sempre o Externo, peça o que pedir.
+const includeColuna = (req, board = null) => {
+  const alvo = ehExterno(req) ? BOARD_EXTERNO : board;
+  return {
+    model: Column,
+    as: "column",
+    ...(alvo ? { where: { board: alvo }, required: true } : {}),
+  };
+};
+
+// O externo não escolhe responsável: no card dele o responsável é fixo.
+const travarResponsavel = (input, vendedorId) => {
+  const travado = { ...input, vendedor_id: vendedorId };
+  delete travado.vendedorId;
+  delete travado.vendedor;
+  return travado;
+};
+
+// Handler de router.param("id") — roda antes de QUALQUER rota /cards/:id...
+// Card alheio (ou fora do board Externo) responde 404, igual a card inexistente,
+// para o externo não conseguir nem confirmar que o card existe.
+exports.verificarAcessoAoCard = async (req, res, next, rawId) => {
+  try {
+    if (!ehExterno(req)) return next();
+
+    const id = Number(rawId);
+    if (!Number.isFinite(id)) return next(); // o controller responde 400/404
+
+    const card = await Card.findOne({
+      where: { id },
+      attributes: ["id", "criado_por"],
+      include: [{ model: Column, as: "column", attributes: ["board"] }],
+      paranoid: false, // a lixeira também é dele
+    });
+
+    const ehDele = card && card.criado_por === req.escopo.userId && card.column?.board === BOARD_EXTERNO;
+    if (!ehDele) return res.status(404).json({ error: "Card não encontrado" });
+
+    return next();
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao validar acesso ao card" });
+  }
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers de comentários — todos os updates de comments passam por aqui para
@@ -220,6 +275,8 @@ const buildCardPayload = async (input) => {
   delete payload.coluna;
   delete payload.vendedorId;
   delete payload.vendedor;
+  // Dono do card nunca vem do cliente — createCard grava, updateCard preserva.
+  delete payload.criado_por;
 
   return { payload };
 };
@@ -247,10 +304,23 @@ exports.getCardById = async (req, res) => {
 // 🔹 Criação de um novo card
 exports.createCard = async (req, res) => {
   try {
-    const { payload, error } = await buildCardPayload(req.body || {});
+    const input = ehExterno(req)
+      ? travarResponsavel(req.body || {}, req.escopo.userId)
+      : (req.body || {});
+    const { payload, error } = await buildCardPayload(input);
     if (error) {
       return res.status(400).json({ error });
     }
+
+    if (ehExterno(req)) {
+      const coluna = await Column.findByPk(payload.coluna_id, { attributes: ["board"] });
+      if (coluna?.board !== BOARD_EXTERNO) {
+        return res.status(403).json({ error: "Coluna fora do Kanban Externo." });
+      }
+    }
+
+    // Dono = quem está logado (token de sistema tem id 0 → sem dono).
+    payload.criado_por = Number(req.userId) || null;
 
     // Cria um novo card com os dados enviados no body da requisição
     const card = await Card.create(payload);
@@ -286,10 +356,10 @@ exports.getCards = async (req, res) => {
       const limit = Math.min(200, Math.max(1, Number(req.query?.limit) || 20));
 
       const cards = await Card.findAll({
-        where: { coluna_id: colunaId, arquivado_em: null },
+        where: { coluna_id: colunaId, arquivado_em: null, ...filtroDono(req) },
         include: [
           { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
-          { model: Column, as: "column" },
+          includeColuna(req),
         ],
         order: [["updatedAt", "DESC"], ["id", "DESC"]],
         offset,
@@ -301,17 +371,11 @@ exports.getCards = async (req, res) => {
 
     // Modo 2/3: lista global (com filtro de board opcional). Não usar em produção
     // se a tabela for grande — prefira o /cards/board-summary para o load inicial.
-    const columnInclude = {
-      model: Column,
-      as: "column",
-      ...(board ? { where: { board }, required: true } : {}),
-    };
-
     const cards = await Card.findAll({
-      where: { arquivado_em: null },
+      where: { arquivado_em: null, ...filtroDono(req) },
       include: [
         { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
-        columnInclude,
+        includeColuna(req, board),
       ],
       order: [["updatedAt", "DESC"], ["id", "DESC"]],
     });
@@ -334,7 +398,7 @@ exports.getCards = async (req, res) => {
 // O front esconde "Ver mais" quando filtered=true (todos os matches já vieram).
 exports.getBoardSummary = async (req, res) => {
   try {
-    const board = resolveBoard(req.query?.board) || "delivery";
+    const board = ehExterno(req) ? BOARD_EXTERNO : (resolveBoard(req.query?.board) || "delivery");
     const perColumn = Math.min(50, Math.max(1, Number(req.query?.perColumn) || 5));
 
     const search = String(req.query?.search || "").trim();
@@ -354,7 +418,7 @@ exports.getBoardSummary = async (req, res) => {
     if (isFiltered) {
       const limit = Math.min(2000, Math.max(1, Number(req.query?.limit) || 500));
 
-      const cardWhere = { arquivado_em: null };
+      const cardWhere = { arquivado_em: null, ...filtroDono(req) };
       if (hasVendor) cardWhere.vendedor_id = vendorId;
       if (hasColumnFilter) cardWhere.coluna_id = columnFilterId;
       if (hasSearch) {
@@ -397,6 +461,9 @@ exports.getBoardSummary = async (req, res) => {
     // ──────────────────────────────────────────────────────────────────
     // Modo (a): sem filtros — top N por coluna via window function.
     // ──────────────────────────────────────────────────────────────────
+    const donoSql = ehExterno(req) ? "AND c.criado_por = :criadoPor" : "";
+    const donoRepl = ehExterno(req) ? { criadoPor: req.escopo.userId } : {};
+
     const topRows = await sequelize.query(
       `SELECT id
          FROM (
@@ -410,10 +477,11 @@ exports.getBoardSummary = async (req, res) => {
             WHERE col.board = :board
               AND c.deleted_at IS NULL
               AND c.arquivado_em IS NULL
+              ${donoSql}
          ) sub
         WHERE sub.rn <= :perColumn`,
       {
-        replacements: { board, perColumn },
+        replacements: { board, perColumn, ...donoRepl },
         type: QueryTypes.SELECT,
       }
     );
@@ -438,9 +506,10 @@ exports.getBoardSummary = async (req, res) => {
         WHERE col.board = :board
           AND c.deleted_at IS NULL
           AND c.arquivado_em IS NULL
+          ${donoSql}
         GROUP BY c.coluna_id`,
       {
-        replacements: { board },
+        replacements: { board, ...donoRepl },
         type: QueryTypes.SELECT,
       }
     );
@@ -468,6 +537,11 @@ exports.getBoardSummary = async (req, res) => {
 // Body: { coluna_id } — coluna alvo em outro board. Cria comentário de sistema.
 exports.transferCard = async (req, res) => {
   try {
+    // Transferir tiraria o card do único board que o externo enxerga.
+    if (ehExterno(req)) {
+      return res.status(403).json({ error: "Sem permissão para transferir cards entre Kanbans." });
+    }
+
     const targetId = req.params.id;
     const targetColumnId = Number(req.body?.coluna_id ?? req.body?.colunaId);
 
@@ -548,7 +622,8 @@ exports.updateCard = async (req, res) => {
       return res.status(404).json({ error: "Card não encontrado" });
     }
 
-    const mergedInput = { ...existing.toJSON(), ...(req.body || {}) };
+    let mergedInput = { ...existing.toJSON(), ...(req.body || {}) };
+    if (ehExterno(req)) mergedInput = travarResponsavel(mergedInput, existing.vendedor_id);
     const { payload, error } = await buildCardPayload(mergedInput);
     if (error) {
       return res.status(400).json({ error });
@@ -746,10 +821,10 @@ exports.getTrash = async (req, res) => {
 
     const cards = await Card.findAll({
       paranoid: false,
-      where: { deleted_at: { [Op.ne]: null } },
+      where: { deleted_at: { [Op.ne]: null }, ...filtroDono(req) },
       include: [
         { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
-        { model: Column, as: "column" },
+        includeColuna(req),
       ],
       order: [["deleted_at", "DESC"]],
     });
@@ -866,11 +941,11 @@ exports.unarchiveCard = async (req, res) => {
 exports.getArchived = async (req, res) => {
   try {
     const cards = await Card.findAll({
-      where: { arquivado_em: { [Op.ne]: null }, deleted_at: null },
+      where: { arquivado_em: { [Op.ne]: null }, deleted_at: null, ...filtroDono(req) },
       paranoid: false,
       include: [
         { model: User, as: "vendedor", attributes: { exclude: ["senha"] } },
-        { model: Column, as: "column" },
+        includeColuna(req),
       ],
       order: [["arquivado_em", "DESC"]],
     });

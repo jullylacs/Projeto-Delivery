@@ -25,7 +25,7 @@ const User = sequelize.define("User", {
 
   // Perfil/role do usuário
   perfil: {
-    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "gestor_delivery", "admin", "bko", "noc", "compras"),
+    type: DataTypes.ENUM("convidado", "comercial", "operacional", "tecnico", "delivery", "gestor", "gestor_delivery", "admin", "bko", "noc", "compras", "vendedor_externo"),
     defaultValue: "convidado"
   },
 
@@ -72,6 +72,14 @@ const User = sequelize.define("User", {
     defaultValue: false,
   },
   acesso_kanban_compras: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+  // Board dos vendedores externos. Para a equipe interna a flag libera a aba;
+  // o perfil "vendedor_externo" usa esse board sempre, e só ele (ver
+  // controllers/middleware/escopo.js) — aí a regra é do backend, não da flag.
+  acesso_kanban_externo: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,

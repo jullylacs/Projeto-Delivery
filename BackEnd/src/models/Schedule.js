@@ -34,6 +34,15 @@ const Schedule = sequelize.define("Schedule", {
     allowNull: true
   },
 
+  // Usuário que criou o agendamento (gravado pelo servidor a partir do token).
+  // O vendedor externo só enxerga os agendamentos que ele mesmo criou.
+  criado_por: {
+    type: DataTypes.INTEGER,
+    references: { model: "users", key: "id" },
+    onDelete: "SET NULL",
+    allowNull: true
+  },
+
   // Data da instalação
   data: DataTypes.DATE,
 

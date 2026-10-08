@@ -4,7 +4,7 @@ import api from "../services/api";
 const Board = lazy(() => import("../components/Kanban/Board"));
 
 const BOARD_TAB_KEY = "kanbanBoardTab";
-const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras", "externo"];
 
 function readPreferredBoard() {
   try {
@@ -22,6 +22,25 @@ function readUserFromStorage() {
   } catch {
     return null;
   }
+}
+
+/*
+ * Boards que o usuário pode abrir, na ordem das abas.
+ *
+ * Cada flag é independente: um usuário pode ter acesso a qualquer combinação
+ * de boards sem relação com seu perfil (ex: delivery + bko). A exceção é o
+ * vendedor externo, que usa só o board Externo — regra imposta pelo backend,
+ * independente das flags.
+ */
+function boardsDoUsuario(user) {
+  if (user?.perfil === "vendedor_externo") return ["externo"];
+  const list = [];
+  if (user?.acesso_kanban_delivery) list.push("delivery");
+  if (user?.acesso_kanban_comercial) list.push("comercial");
+  if (user?.acesso_kanban_bko) list.push("bko");
+  if (user?.acesso_kanban_compras) list.push("compras");
+  if (user?.acesso_kanban_externo) list.push("externo");
+  return list;
 }
 
 function KanbanSkeleton() {
@@ -118,6 +137,11 @@ function BoardTabs({ activeBoard, onChange, availableBoards }) {
           🛒 Compras
         </button>
       )}
+      {availableBoards.includes("externo") && (
+        <button type="button" style={tabStyle(activeBoard === "externo")} onClick={() => onChange("externo")}>
+          🤝 Externo
+        </button>
+      )}
     </div>
   );
 }
@@ -139,7 +163,7 @@ function NoAccessNotice() {
     >
       <h2 style={{ margin: "0 0 8px 0", fontSize: "20px" }}>Sem acesso ao Kanban</h2>
       <p style={{ margin: 0, color: "#5f4e8f" }}>
-        Seu usuário não tem permissão para visualizar Delivery nem Comercial. Solicite acesso a um administrador ou gestor.
+        Seu usuário não tem permissão para visualizar nenhum Kanban. Solicite acesso a um administrador ou gestor.
       </p>
     </div>
   );
@@ -175,38 +199,15 @@ export default function Kanban() {
   }, []);
 
   /*
-   * Cada flag é independente: um usuário pode ter acesso a qualquer combinação
-   * de boards sem relação com seu perfil (ex: delivery + bko). O cast para
-   * Boolean garante que undefined/null do usuário sem dados do servidor
-   * não seja tratado como truthy.
-   */
-  const canDelivery = Boolean(user?.acesso_kanban_delivery);
-  const canComercial = Boolean(user?.acesso_kanban_comercial);
-  const canBko = Boolean(user?.acesso_kanban_bko);
-  const canCompras = Boolean(user?.acesso_kanban_compras);
-
-  /*
    * Lista de boards disponíveis para este usuário — usada para renderizar
    * as abas e para calcular `canTransferTo` (boards para onde pode transferir).
    * A ordem importa: define a sequência das abas na UI.
    */
-  const availableBoards = (() => {
-    const list = [];
-    if (canDelivery) list.push("delivery");
-    if (canComercial) list.push("comercial");
-    if (canBko) list.push("bko");
-    if (canCompras) list.push("compras");
-    return list;
-  })();
+  const availableBoards = boardsDoUsuario(user);
 
   const [activeBoard, setActiveBoard] = useState(() => {
     const preferred = readPreferredBoard();
-    const initial = readUserFromStorage();
-    const boards = [];
-    if (initial?.acesso_kanban_delivery) boards.push("delivery");
-    if (initial?.acesso_kanban_comercial) boards.push("comercial");
-    if (initial?.acesso_kanban_bko) boards.push("bko");
-    if (initial?.acesso_kanban_compras) boards.push("compras");
+    const boards = boardsDoUsuario(readUserFromStorage());
     if (preferred && boards.includes(preferred)) return preferred;
     return boards[0] ?? null;
   });

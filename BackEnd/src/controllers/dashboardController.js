@@ -1,13 +1,14 @@
 const { sequelize } = require("../models");
 const { QueryTypes } = require("sequelize");
+const { BOARD_EXTERNO } = require("./middleware/escopo");
 
-const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras", "externo"];
 const resolveBoard = (raw) => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : null;
 };
 
-// 🔹 GET /dashboard/summary[?board=delivery|comercial|bko|compras]
+// 🔹 GET /dashboard/summary[?board=delivery|comercial|bko|compras|externo]
 //
 // Substitui as 3 chamadas pesadas que o Dashboard fazia (/cards + /columns +
 // /users/admin) — antes trazia TODOS os cards e usuários para o cliente computar
@@ -15,9 +16,17 @@ const resolveBoard = (raw) => {
 // números, em alguns KB em vez de MB.
 exports.getDashboardSummary = async (req, res) => {
   try {
-    const board = resolveBoard(req.query?.board); // opcional
+    // Vendedor externo: os números saem só dos cards que ele criou, no board
+    // Externo, e o ranking por usuário mostra só ele mesmo.
+    const externo = Boolean(req.escopo?.externo);
+    const board = externo ? BOARD_EXTERNO : resolveBoard(req.query?.board); // opcional
     const boardFilter = board ? `AND col.board = :board` : "";
-    const repl = board ? { board } : {};
+    const donoCard = externo ? `AND c.criado_por = :uid` : "";
+    const soEle = externo ? `AND u.id = :uid` : "";
+    const repl = {
+      ...(board ? { board } : {}),
+      ...(externo ? { uid: req.escopo.userId } : {}),
+    };
 
     // 1) Totais gerais (1 query, FILTER WHERE para múltiplas contagens condicionais).
     const [totalsRow] = await sequelize.query(
@@ -37,7 +46,7 @@ exports.getDashboardSummary = async (req, res) => {
          )::int AS sla_warnings
        FROM cards c
        LEFT JOIN columns col ON col.id = c.coluna_id
-       WHERE 1=1 ${boardFilter}`,
+       WHERE 1=1 ${boardFilter} ${donoCard}`,
       { replacements: repl, type: QueryTypes.SELECT }
     );
 
@@ -50,7 +59,7 @@ exports.getDashboardSummary = async (req, res) => {
     const breakdownRows = await sequelize.query(
       `SELECT col.id, col.nome, col.ordem, COUNT(c.id)::int AS count
          FROM columns col
-         LEFT JOIN cards c ON c.coluna_id = col.id
+         LEFT JOIN cards c ON c.coluna_id = col.id ${donoCard}
          WHERE 1=1 ${board ? "AND col.board = :board" : ""}
          GROUP BY col.id, col.nome, col.ordem
          ORDER BY col.ordem ASC, col.id ASC`,
@@ -73,9 +82,9 @@ exports.getDashboardSummary = async (req, res) => {
          COUNT(c.id)::int AS total,
          COUNT(c.id) FILTER (WHERE col.nome = 'Concluído')::int AS completed
        FROM users u
-       LEFT JOIN cards c ON c.vendedor_id = u.id
+       LEFT JOIN cards c ON c.vendedor_id = u.id ${donoCard}
        LEFT JOIN columns col ON col.id = c.coluna_id
-       WHERE u.aprovado = TRUE
+       WHERE u.aprovado = TRUE ${soEle}
          ${board ? "AND (col.board = :board OR col.board IS NULL)" : ""}
        GROUP BY u.perfil, u.id, u.nome
        ORDER BY u.perfil ASC, u.nome ASC`,
@@ -88,9 +97,9 @@ exports.getDashboardSummary = async (req, res) => {
          u.id AS user_id,
          COUNT(c.id)::int AS atualizados
        FROM users u
-       LEFT JOIN cards c ON c.atualizado_por_nome = u.nome
+       LEFT JOIN cards c ON c.atualizado_por_nome = u.nome ${donoCard}
        LEFT JOIN columns col ON col.id = c.coluna_id
-       WHERE u.aprovado = TRUE
+       WHERE u.aprovado = TRUE ${soEle}
          ${board ? "AND (col.board = :board OR col.id IS NULL)" : ""}
        GROUP BY u.id`,
       { replacements: repl, type: QueryTypes.SELECT }

@@ -46,11 +46,11 @@ const KANBAN_FOCUS_CARD_KEY = "kanbanFocusCardId";
 const KANBAN_FOCUS_EVENT = "kanban-focus-card";
 const KANBAN_TRELLO_PREFS_KEY = "kanbanTrelloPrefs";
 
-const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras", "externo"];
 
 const getKanbanPrefsKey = (board) => `${KANBAN_PREFS_KEY}:${board || "delivery"}`;
 
-const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras" };
+const BOARD_LABELS = { delivery: "Delivery", comercial: "Comercial", bko: "BKO", compras: "Compras", externo: "Externo" };
 
 const normalizeColumnEntity = (item, index = 0) => ({
   id: Number(item?.id ?? item?._id ?? index + 1),
@@ -2227,6 +2227,10 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   const userData = JSON.parse(localStorage.getItem("user") || "null");
   const seller = userData?.nome || userData?.username || userData?.email || "Sem vendedor";
   const sellerId = userData?._id || userData?.id || null;
+  // Vendedor externo só mexe nos próprios cards: a estrutura do Kanban (colunas)
+  // e a escolha de responsável ficam com a equipe interna. O backend já barra
+  // essas ações — aqui só escondemos os controles que dariam erro.
+  const isExterno = userData?.perfil === "vendedor_externo";
 
   const mentionProfileLookup = useMemo(() => {
     const map = new Map();
@@ -2324,7 +2328,9 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
   //  - Sem filtros: pega top 5 por coluna via window function + totais globais.
   //  - Com filtros: pede ao backend busca server-side (até 500 matches).
   // Debounce de 300ms para o search digitado não disparar request a cada tecla.
-  const BOARD_CACHE_KEY = `kanbanBoard_${safeBoard}`;
+  // Cache separado por usuário: o que um usuário carregou não pode aparecer
+  // para o próximo que logar no mesmo navegador (ex.: um vendedor externo).
+  const BOARD_CACHE_KEY = `kanbanBoard_${safeBoard}_${sellerId ?? "anon"}`;
 
   useEffect(() => {
     const trimmedSearch = searchTerm.trim();
@@ -2333,6 +2339,8 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
     // Carrega cache imediatamente (sem filtros ativos) para exibição instantânea.
     if (!hasFilter) {
       try {
+        // Descarta o cache antigo, que era compartilhado entre usuários.
+        localStorage.removeItem(`kanbanBoard_${safeBoard}`);
         const cached = JSON.parse(localStorage.getItem(BOARD_CACHE_KEY) || "null");
         if (cached && Array.isArray(cached.cards) && cached.cards.length > 0) {
           setCards(cached.cards);
@@ -3797,12 +3805,14 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
             >
               <Plus size={15} /> Novo Card
             </button>
-            <button
-              style={{ ...styles.addButton, background: "linear-gradient(135deg, #d5c9ff 0%, #8f75ff 100%)", color: "#2f1e70" }}
-              onClick={openAddColumn}
-            >
-              <Plus size={15} /> Nova Coluna
-            </button>
+            {!isExterno && (
+              <button
+                style={{ ...styles.addButton, background: "linear-gradient(135deg, #d5c9ff 0%, #8f75ff 100%)", color: "#2f1e70" }}
+                onClick={openAddColumn}
+              >
+                <Plus size={15} /> Nova Coluna
+              </button>
+            )}
             <div style={{ position: "relative" }}>
               <button
                 style={{ ...styles.addButton, background: "linear-gradient(135deg, #cce5ff 0%, #8ec5ff 100%)", color: "#1a3f74" }}
@@ -4064,18 +4074,20 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
         
         {/* Select para filtrar por vendedor — popula a partir do diretório completo
             (independe de quais cards estão carregados, vital para a busca server-side). */}
-        <select
-          value={vendorFilter}
-          onChange={(e) => setVendorFilter(e.target.value)}
-          style={styles.modalInput}
-        >
-          <option value="">Todos os Vendedores</option>
-          {directoryUsers.map((u) => (
-            <option key={u.id} value={String(u.id)}>
-              {u.nome || u.email || `Usuário #${u.id}`}
-            </option>
-          ))}
-        </select>
+        {!isExterno && (
+          <select
+            value={vendorFilter}
+            onChange={(e) => setVendorFilter(e.target.value)}
+            style={styles.modalInput}
+          >
+            <option value="">Todos os Vendedores</option>
+            {directoryUsers.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.nome || u.email || `Usuário #${u.id}`}
+              </option>
+            ))}
+          </select>
+        )}
         
         {/* Botão para limpar todos os filtros */}
         <button
@@ -4212,7 +4224,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   return (
                     <th
                       key={column.id || col}
-                      draggable
+                      draggable={!isExterno}
                       onDragStart={() => handleColumnDragStart(idx)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => handleColumnDrop(idx)}
@@ -4220,7 +4232,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       style={{
                         ...styles.th,
                         minWidth: densityCfg.columnWidth,
-                        cursor: "grab",
+                        cursor: isExterno ? "default" : "grab",
                         opacity: draggedColumnIndex === idx ? 0.65 : 1,
                       }}
                     >
@@ -4248,6 +4260,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                           </span>
                         </div>
                         {/* Linha 2: botões de ação agrupados */}
+                        {!isExterno && (
                         <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "flex-end" }}>
                           <button
                             title="Excluir todos os cards da coluna"
@@ -4290,6 +4303,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                             <Trash2 size={13} />
                           </button>
                         </div>
+                        )}
                       </div>
                     </th>
                   );
@@ -4665,6 +4679,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                     </div>
                   </div>
 
+                  {!isExterno && (
                   <div style={styles.createField}>
                     <label style={styles.createLabel}><User size={13} /> Vendedor responsável</label>
                     <div style={{ marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -4696,6 +4711,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                       ))}
                     </select>
                   </div>
+                  )}
                 </div>
               </div>
 
@@ -4956,6 +4972,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                 </button>
               </div>
 
+              {!isExterno && (
               <div style={styles.detailsStatusRow}>
                 <span style={styles.detailsLabel}><User size={14} /> Vendedor:</span>
                 <span style={{ ...getProfileBadgeStyle(currentDetailVendor?.perfil), borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, whiteSpace: "normal" }}>
@@ -4984,6 +5001,7 @@ export default function Board({ board = "delivery", canTransferTo = [], onTransf
                   Atualizar vendedor
                 </button>
               </div>
+              )}
             </div>
             
             {/* Exibe observações se houver */}

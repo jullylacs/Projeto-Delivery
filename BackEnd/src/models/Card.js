@@ -89,6 +89,19 @@ const Card = sequelize.define("Card", {
     allowNull: true
   },
 
+  // Usuário que criou o card. Gravado pelo servidor a partir do token (nunca
+  // do body) e imutável — é o que define o que o vendedor externo enxerga.
+  // Diferente de vendedor_id, que é o responsável e pode ser trocado.
+  criado_por: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: "users",
+      key: "id"
+    },
+    onDelete: "SET NULL",
+    allowNull: true
+  },
+
   // Nome do último usuário que atualizou o card (desnormalizado para evitar JOIN extra)
   atualizado_por_nome: {
     type: DataTypes.STRING(255),

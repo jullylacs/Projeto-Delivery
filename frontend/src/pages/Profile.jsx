@@ -238,6 +238,7 @@ export default function Profile() {
     bko:            { label: "BKO",                color: "#1a56aa" },
     noc:            { label: "NOC",                color: "#0e6b3a" },
     compras:        { label: "Compras",            color: "#0e7490" },
+    vendedor_externo:{ label: "Vendedor Externo",  color: "#92400e" },
     convidado:      { label: "Convidado",          color: "#7a5b00" },
   };
 

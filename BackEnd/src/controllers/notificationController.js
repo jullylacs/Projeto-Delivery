@@ -1,4 +1,5 @@
 const { Card, Column, Notification, Schedule, Technician, User } = require("../models");
+const { PERFIL_EXTERNO, BOARD_EXTERNO } = require("./middleware/escopo");
 
 let cachedNotificationTypes = null;
 
@@ -282,8 +283,13 @@ const toResponse = (notification) => ({
 exports.syncMine = async (req, res) => {
   try {
     const userId = Number(req.userId);
-    const user = await User.findByPk(userId, { attributes: ["id", "nome", "email"] });
+    const user = await User.findByPk(userId, { attributes: ["id", "nome", "email", "perfil"] });
     if (!user) return res.status(404).json({ message: "Usuário não encontrado" });
+
+    // Vendedor externo: só varre os cards e agendamentos que ele mesmo criou —
+    // senão o título/cliente de um card alheio vazaria no texto da notificação.
+    const externo = user.perfil === PERFIL_EXTERNO;
+    const filtroDono = externo ? { criado_por: userId } : {};
 
     // ⚠️ Os builders de notificação só usam comment.text / comment.author (e o
     // mesmo nas replies). Carregar o `comments` cru traria os campos base64 —
@@ -314,11 +320,18 @@ exports.syncMine = async (req, res) => {
 
     const cards = await Card.findAll({
       attributes: ["id", "titulo", "cliente", "prazo", [commentsSemAnexos, "comments"]],
-      include: [{ model: Column, as: "column", attributes: ["id", "nome"] }],
+      where: filtroDono,
+      include: [{
+        model: Column,
+        as: "column",
+        attributes: ["id", "nome"],
+        ...(externo ? { where: { board: BOARD_EXTERNO }, required: true } : {}),
+      }],
     });
 
     const schedules = await Schedule.findAll({
       attributes: ["id", "titulo", "data", "horario", "status", "card_id", "tecnico_id"],
+      where: filtroDono,
       include: [
         { model: Card, as: "card", attributes: ["id", "titulo", "cliente"] },
         { model: Technician, as: "tecnico", attributes: ["id", "nome"] },

@@ -7,6 +7,7 @@ const BOARD_OPTIONS = [
   { value: "delivery",  label: "Delivery" },
   { value: "bko",       label: "BKO" },
   { value: "compras",   label: "Compras" },
+  { value: "externo",   label: "Externo" },
 ];
 
 const COLUMN_COLORS = [

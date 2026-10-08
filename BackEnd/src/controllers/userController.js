@@ -69,7 +69,7 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 // Detecta se a senha já é um hash bcrypt (evita re-hash acidental)
 const isBcryptHash = (value) => typeof value === "string" && /^\$2[aby]\$\d{2}\$/.test(value);
 // Perfis válidos aceitos pelo sistema
-const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin", "bko", "noc", "compras"];
+const allowedPerfis = ["convidado", "comercial", "operacional", "tecnico", "delivery", "gestor_delivery", "gestor", "admin", "bko", "noc", "compras", "vendedor_externo"];
 // Aceita avatar como data URL de imagem ou URL http/https
 const sanitizeAvatar = (value) => {
   if (typeof value !== "string") return undefined;
@@ -318,6 +318,11 @@ exports.getUserProfile = async (req, res) => {
       return res.status(400).json({ message: "ID inválido" });
     }
 
+    // Vendedor externo só consulta o próprio perfil.
+    if (req.escopo?.externo && Number(userId) !== req.escopo.userId) {
+      return res.status(404).json({ message: "Usuário não encontrado" });
+    }
+
     // Busca excluindo a senha do retorno
     const user = await User.findByPk(userId, {
       attributes: { exclude: ["senha"] }
@@ -481,6 +486,7 @@ exports.adminUpdateUser = async (req, res) => {
       acesso_kanban_comercial,
       acesso_kanban_bko,
       acesso_kanban_compras,
+      acesso_kanban_externo,
       nova_senha,
     } = req.body;
 
@@ -536,6 +542,23 @@ exports.adminUpdateUser = async (req, res) => {
         return res.status(400).json({ message: "Campo 'acesso_kanban_compras' inválido" });
       }
       updateData.acesso_kanban_compras = acesso_kanban_compras;
+    }
+
+    if (acesso_kanban_externo !== undefined) {
+      if (typeof acesso_kanban_externo !== "boolean") {
+        return res.status(400).json({ message: "Campo 'acesso_kanban_externo' inválido" });
+      }
+      updateData.acesso_kanban_externo = acesso_kanban_externo;
+    }
+
+    // Vendedor externo usa só o board Externo — mantém as flags coerentes com
+    // a regra do backend, para a tela de Usuários não mostrar acesso que não vale.
+    if (perfil === "vendedor_externo") {
+      updateData.acesso_kanban_delivery = false;
+      updateData.acesso_kanban_comercial = false;
+      updateData.acesso_kanban_bko = false;
+      updateData.acesso_kanban_compras = false;
+      updateData.acesso_kanban_externo = true;
     }
 
     if (aprovado !== undefined) {
@@ -661,6 +684,8 @@ exports.getAssignableUsers = async (req, res) => {
         perfil: {
           [Op.ne]: "convidado",
         },
+        // Vendedor externo não recebe o diretório da equipe: só ele mesmo.
+        ...(req.escopo?.externo ? { id: req.escopo.userId } : {}),
       },
       attributes: ["id", "nome", "email", "perfil", "avatar"],
       order: [["nome", "ASC"], ["id", "ASC"]],

@@ -4,7 +4,7 @@ import api from "../services/api";
 // Cargos disponíveis para atribuição no painel.
 // Valores legados (gestor, operacional, etc.) são mantidos fora da lista
 // para não quebrar usuários existentes — aparecem apenas na exibição.
-const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc", "compras"];
+const PERFIS = ["admin", "convidado", "bko", "delivery", "comercial", "noc", "compras", "vendedor_externo"];
 
 // Mapeia o valor do enum para um rótulo amigável exibido nos selects e badges.
 const PERFIL_LABELS = {
@@ -15,6 +15,7 @@ const PERFIL_LABELS = {
   comercial: "Comercial",
   noc: "NOC",
   compras: "Compras",
+  vendedor_externo: "Vendedor Externo",
   // legados — exibição somente
   operacional: "Operacional",
   tecnico: "Técnico",
@@ -32,6 +33,7 @@ const ROLE_STYLES = {
   comercial:      { bg: "#f6ecff", fg: "#6b2cb3",  label: "Comercial" },
   noc:            { bg: "#e8fff0", fg: "#0e6b3a",  label: "NOC" },
   compras:        { bg: "#cffafe", fg: "#0e7490",  label: "Compras" },
+  vendedor_externo:{ bg: "#fef3c7", fg: "#92400e", label: "Vendedor Externo" },
   // legados — exibição somente
   gestor:         { bg: "#e8ecff", fg: "#2f3d99",  label: "Gestor" },
   gestor_delivery:{ bg: "#ffe7f3", fg: "#9b1b5a",  label: "Gestora de Delivery" },
@@ -362,6 +364,7 @@ export default function AdminUsers() {
     acesso_kanban_comercial: false,
     acesso_kanban_bko: false,
     acesso_kanban_compras: false,
+    acesso_kanban_externo: false,
     nova_senha: "",
   });
 
@@ -526,6 +529,7 @@ export default function AdminUsers() {
       acesso_kanban_comercial: Boolean(user.acesso_kanban_comercial),
       acesso_kanban_bko: Boolean(user.acesso_kanban_bko),
       acesso_kanban_compras: Boolean(user.acesso_kanban_compras),
+      acesso_kanban_externo: Boolean(user.acesso_kanban_externo),
       nova_senha: "",
     });
   };
@@ -541,6 +545,7 @@ export default function AdminUsers() {
       acesso_kanban_comercial: false,
       acesso_kanban_bko: false,
       acesso_kanban_compras: false,
+      acesso_kanban_externo: false,
       nova_senha: "",
     });
   };
@@ -859,7 +864,10 @@ export default function AdminUsers() {
                     </span>
                   </td>
                   <td style={styles.td}>
-                    {editing ? (
+                    {editing && form.perfil === "vendedor_externo" ? (
+                      // O backend fixa o board desse perfil — não há o que escolher.
+                      <span style={{ color: "#7a73a1", fontSize: 13 }}>Somente Externo (fixo neste perfil)</span>
+                    ) : editing ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
                           <input
@@ -901,6 +909,16 @@ export default function AdminUsers() {
                           />
                           Compras
                         </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#2f2758" }}>
+                          <input
+                            type="checkbox"
+                            checked={!!form.acesso_kanban_externo}
+                            onChange={(e) =>
+                              setForm((p) => ({ ...p, acesso_kanban_externo: e.target.checked }))
+                            }
+                          />
+                          Externo
+                        </label>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -916,7 +934,10 @@ export default function AdminUsers() {
                         {user.acesso_kanban_compras && (
                           <span style={{ ...styles.badge, background: "#cffafe", color: "#0e7490" }}>Compras</span>
                         )}
-                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && !user.acesso_kanban_compras && (
+                        {user.acesso_kanban_externo && (
+                          <span style={{ ...styles.badge, background: "#fef3c7", color: "#92400e" }}>Externo</span>
+                        )}
+                        {!user.acesso_kanban_delivery && !user.acesso_kanban_comercial && !user.acesso_kanban_bko && !user.acesso_kanban_compras && !user.acesso_kanban_externo && (
                           <span style={{ color: "#7a73a1", fontSize: 13 }}>—</span>
                         )}
                       </div>

@@ -81,9 +81,21 @@ Convenções de FK importantes (o frontend depende delas):
 - Aliases das associações usam nomes em português: `as: "vendedor"`, `as: "column"`, `as: "comentarios"`, `as: "schedules"`.
 - `Card.coordenadas` é `JSONB` (`{ lat, lng }`) — preserve a forma quando manipular.
 - `Card.comments` também é `JSONB` (array embutido) **e** existe uma tabela `comments` separada (model `Comment`). Trate isso como dual-stack: o controller que tocar uma forma deve manter coerência com a outra se relevante para o fluxo.
-- `User.perfil` é um ENUM: `convidado | comercial | operacional | tecnico | delivery | gestor | gestor_delivery | admin`. `User.aprovado` controla acesso (gestor/admin aprovam). `gestor_delivery` ("Gestora de Delivery") tem permissões específicas sobre a Agenda Geral de Delivery (criar/editar/excluir avisos compartilhados).
+- `User.perfil` é um ENUM: `convidado | comercial | operacional | tecnico | delivery | gestor | gestor_delivery | admin | bko | noc | compras | vendedor_externo`. `User.aprovado` controla acesso (gestor/admin aprovam). `gestor_delivery` ("Gestora de Delivery") tem permissões específicas sobre a Agenda Geral de Delivery (criar/editar/excluir avisos compartilhados).
 - Card.coluna_id usa `onDelete: "SET NULL"`; comments usam `CASCADE`. Notifications usam `SET NULL` (ver `20260504-alter-notifications-cardid-ondelete-setnull.js`).
 - Notifications são **soft-delete** via flag `limpa` — nunca use `DELETE`. Limpar = `PATCH /api/v1/notifications/clear-read`.
+
+### Vendedor externo — só enxerga o que ele mesmo criou
+
+O perfil `vendedor_externo` é o único com regra de visibilidade **por dono**, e ela é imposta no backend (o front só esconde controles):
+
+- **Dono** = `criado_por` (em `cards` e `schedules`), gravado pelo servidor a partir do token — nunca aceito do body, nunca alterado. Não confundir com `vendedor_id`, que é o responsável e pode ser trocado. Registros anteriores à coluna têm `criado_por = NULL` e ficam invisíveis para o externo.
+- **Board**: ele usa só o board `externo` (a equipe interna entra nele pela flag `acesso_kanban_externo`). Um card dele transferido para outro board sai do alcance dele.
+- `controllers/middleware/escopo.js` carrega `req.escopo = { externo, userId }` (revalida o perfil no banco, pois o token só tem id/email, e responde 403 a usuário desaprovado) e exporta `bloqueiaExterno`, `PERFIL_EXTERNO` e `BOARD_EXTERNO`.
+- Em `cardRoutes.js`, `auth` + `escopo` ficam no `router.use` e um `router.param("id")` responde 404 para card alheio em **qualquer** rota `/cards/:id...` — rota nova com `:id` já nasce protegida. As listagens filtram com `filtroDono(req)` / `includeColuna(req)` em `cardController.js`.
+- Também filtram por dono: `/schedules`, `/dashboard/summary`, `/notifications/sync` e `/users/assignable` (devolve só ele). Bloqueados para o externo: escrita em `/columns`, `POST /technicians`, tudo de `/ativacoes` e `GET /users/:id` de outro usuário.
+
+**Ao criar endpoint novo que devolva card, agendamento ou dado de cliente, aplique o escopo** — sem isso o externo passa a ver lead de outro vendedor.
 
 ### Agenda de Delivery (não confundir com `Schedule`)
 

@@ -1,4 +1,21 @@
-const { Schedule, Card, Technician } = require("../models"); // Importa models via index centralizado
+const { Schedule, Card, Column, Technician } = require("../models"); // Importa models via index centralizado
+const { BOARD_EXTERNO } = require("./middleware/escopo");
+
+// Vendedor externo só alcança os agendamentos que ele mesmo criou.
+// `req.escopo` vem do middleware `escopo` (scheduleRoutes).
+const ehExterno = (req) => Boolean(req.escopo?.externo);
+const filtroDono = (req) => (ehExterno(req) ? { criado_por: req.escopo.userId } : {});
+
+// O externo só pode amarrar o agendamento a um card dele, do board Externo.
+const cardForaDoEscopo = async (req, cardId) => {
+  if (!ehExterno(req) || cardId === null) return false;
+  const card = await Card.findOne({
+    where: { id: cardId, criado_por: req.escopo.userId },
+    attributes: ["id"],
+    include: [{ model: Column, as: "column", attributes: [], where: { board: BOARD_EXTERNO }, required: true }],
+  });
+  return !card;
+};
 
 const toNullableInt = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -14,6 +31,9 @@ const normalizeSchedulePayload = (body = {}) => {
   if (typeof body.titulo === "string") payload.titulo = body.titulo.trim();
   if (typeof body.notas === "string") payload.notas = body.notas.trim();
 
+  // Dono do agendamento nunca vem do cliente — `create` grava a partir do token.
+  delete payload.criado_por;
+
   return payload;
 };
 
@@ -21,6 +41,11 @@ const normalizeSchedulePayload = (body = {}) => {
 exports.create = async (req, res) => {
   try {
     const payload = normalizeSchedulePayload(req.body);
+    if (await cardForaDoEscopo(req, payload.card_id)) {
+      return res.status(404).json({ message: "Card não encontrado" });
+    }
+    payload.criado_por = Number(req.userId) || null;
+
     const schedule = await Schedule.create(payload);
     res.json(schedule);
   } catch (err) {
@@ -32,6 +57,7 @@ exports.create = async (req, res) => {
 exports.getAll = async (req, res) => {
   try {
     const schedules = await Schedule.findAll({
+      where: filtroDono(req),
       include: [
         { model: Card,       as: "card"    }, // Dados completos do card vinculado
         { model: Technician, as: "tecnico" }  // Dados completos do técnico
@@ -48,10 +74,16 @@ exports.getAll = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const payload = normalizeSchedulePayload(req.body);
-    await Schedule.update(payload, { where: { id: req.params.id } });
+    if (await cardForaDoEscopo(req, payload.card_id)) {
+      return res.status(404).json({ message: "Card não encontrado" });
+    }
+
+    const where = { id: req.params.id, ...filtroDono(req) };
+    await Schedule.update(payload, { where });
 
     // Retorna o agendamento atualizado com dados relacionados
-    const schedule = await Schedule.findByPk(req.params.id, {
+    const schedule = await Schedule.findOne({
+      where,
       include: [
         { model: Card,       as: "card"    },
         { model: Technician, as: "tecnico" }
@@ -71,7 +103,7 @@ exports.update = async (req, res) => {
 // 🔹 Exclusão de um agendamento
 exports.remove = async (req, res) => {
   try {
-    const deleted = await Schedule.destroy({ where: { id: req.params.id } });
+    const deleted = await Schedule.destroy({ where: { id: req.params.id, ...filtroDono(req) } });
     if (!deleted) {
       return res.status(404).json({ message: "Agendamento não encontrado" });
     }

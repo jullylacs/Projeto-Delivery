@@ -2,6 +2,7 @@ const router = require("express").Router();
 const controller = require("../controllers/userController");
 const { loginLimiter } = require("../middleware/rateLimiter");
 const auth = require("../controllers/middleware/auth");
+const escopo = require("../controllers/middleware/escopo");
 const requireAdmin = require("../controllers/middleware/requireAdmin");
 const requireManagerOrAdmin = require("../controllers/middleware/requireManagerOrAdmin");
 
@@ -18,10 +19,10 @@ router.patch("/admin/:id/approve", auth, requireManagerOrAdmin, controller.admin
 router.delete("/admin/:id", auth, requireAdmin, controller.adminDeleteUser);
 
 // Usuários disponíveis para atribuição em cards
-router.get("/assignable", auth, controller.getAssignableUsers);
+router.get("/assignable", auth, escopo, controller.getAssignableUsers);
 
 // Rotas protegidas
-router.get("/:id", auth, controller.getUserProfile);
+router.get("/:id", auth, escopo, controller.getUserProfile);
 router.put("/:id", auth, controller.updateUserProfile);
 
 module.exports = router;

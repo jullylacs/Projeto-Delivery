@@ -2,9 +2,11 @@
 const router = require("express").Router();
 const Technician = require("../models/Technician");
 const auth = require("../controllers/middleware/auth");
+const escopo = require("../controllers/middleware/escopo");
+const { bloqueiaExterno } = escopo;
 
-// POST /technicians — cadastra um novo técnico
-router.post("/", auth, async (req, res) => {
+// POST /technicians — cadastra um novo técnico (equipe interna)
+router.post("/", auth, escopo, bloqueiaExterno, async (req, res) => {
   try {
     // Cria o técnico com os dados enviados no body
     const tech = await Technician.create(req.body);

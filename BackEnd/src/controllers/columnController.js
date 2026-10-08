@@ -1,7 +1,8 @@
 const { Column, Card } = require("../models");
 const { fn, col, where, Op } = require("sequelize");
+const { BOARD_EXTERNO } = require("./middleware/escopo");
 
-const VALID_BOARDS = ["delivery", "comercial", "bko", "compras"];
+const VALID_BOARDS = ["delivery", "comercial", "bko", "compras", "externo"];
 
 const DEFAULT_DELIVERY_COLUMNS = [
   "Novo",
@@ -43,6 +44,16 @@ const DEFAULT_COMPRAS_COLUMNS = [
   "Cancelado",
 ];
 
+const DEFAULT_EXTERNO_COLUMNS = [
+  "Novo",
+  "Prospecção",
+  "Qualificação",
+  "Proposta",
+  "Negociação",
+  "Fechado",
+  "Perdido",
+];
+
 const resolveBoard = (raw, fallback = "delivery") => {
   const value = String(raw || "").trim().toLowerCase();
   return VALID_BOARDS.includes(value) ? value : fallback;
@@ -52,6 +63,7 @@ const defaultSeedFor = (board) => {
   if (board === "comercial") return DEFAULT_COMERCIAL_COLUMNS;
   if (board === "bko") return DEFAULT_BKO_COLUMNS;
   if (board === "compras") return DEFAULT_COMPRAS_COLUMNS;
+  if (board === "externo") return DEFAULT_EXTERNO_COLUMNS;
   return DEFAULT_DELIVERY_COLUMNS;
 };
 
@@ -75,7 +87,8 @@ const findColumnByNameCI = async (name, board) => {
 
 exports.getColumns = async (req, res) => {
   try {
-    const board = resolveBoard(req.query?.board);
+    // Vendedor externo só enxerga as colunas do board Externo, peça o que pedir.
+    const board = req.escopo?.externo ? BOARD_EXTERNO : resolveBoard(req.query?.board);
 
     let columns = await Column.findAll({
       where: { board },
